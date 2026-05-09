@@ -125,10 +125,22 @@ export function dashboardCommand(): Command {
 
           // Backward compatible: serve from current directory
           try {
-            const data = readFileSync(jsonPath, 'utf-8')
+            const raw = readFileSync(jsonPath, 'utf-8')
+            const doc = JSON.parse(raw) as TallyDocument
+            // If nearly empty, serve demo for richer visualization
+            if (doc.tasks.length < 5 && doc.rounds.length === 0) {
+              const demoPath = join(import.meta.dirname, '..', '..', '..', 'demo-tally.json')
+              if (existsSync(demoPath)) {
+                const demoData = readFileSync(demoPath, 'utf-8')
+                res.setHeader('Content-Type', 'application/json')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(demoData)
+                return
+              }
+            }
             res.setHeader('Content-Type', 'application/json')
             res.setHeader('Access-Control-Allow-Origin', '*')
-            res.end(data)
+            res.end(raw)
           } catch {
             // Fallback: try bundled demo-tally.json
             const demoPath = join(import.meta.dirname, '..', '..', '..', 'demo-tally.json')
