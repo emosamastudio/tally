@@ -1,6 +1,6 @@
 // cli/src/schema.ts
 
-import Ajv from 'ajv/dist/2020'
+import Ajv from 'ajv/dist/2020.js'
 import type { CheckError, CheckResult, LintError, LintResult } from './types.js'
 
 // ── JSON Schema ──

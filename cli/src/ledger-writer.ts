@@ -1,7 +1,7 @@
 // cli/src/ledger-writer.ts
 import { writeFileSync, renameSync } from 'fs'
 import { join } from 'path'
-import type { TallyDocument } from './types'
+import type { TallyDocument } from './types.js'
 
 export function writeLedger(
   doc: TallyDocument,

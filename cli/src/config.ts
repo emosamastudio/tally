@@ -3,7 +3,7 @@ import { readFileSync } from 'fs'
 import { join } from 'path'
 import { parse as parseYaml } from 'yaml'
 import { homedir } from 'os'
-import type { TallyConfig } from './types'
+import type { TallyConfig } from './types.js'
 
 const DEFAULTS: TallyConfig = {
   agent: { id: 'main' },

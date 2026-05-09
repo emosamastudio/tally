@@ -1,7 +1,7 @@
 // cli/src/ledger-reader.ts
 import { readFileSync } from 'fs'
 import { join } from 'path'
-import type { TallyDocument } from './types'
+import type { TallyDocument } from './types.js'
 
 const DEFAULT_PATH = 'tally.json'
 
