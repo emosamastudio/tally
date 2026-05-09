@@ -10,6 +10,7 @@ import { exportCommand } from './commands/export.js'
 import { syncCommand } from './commands/sync.js'
 import { graphCommand } from './commands/graph.js'
 import { upgradeCommand } from './commands/upgrade.js'
+import { dashboardCommand } from './commands/dashboard.js'
 import { migrateCommand } from './commands/migrate.js'
 
 const program = new Command()
@@ -26,5 +27,6 @@ program.addCommand(syncCommand())
 program.addCommand(graphCommand())
 program.addCommand(upgradeCommand())
 program.addCommand(migrateCommand())
+program.addCommand(dashboardCommand())
 
 program.parse()
