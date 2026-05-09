@@ -10,8 +10,14 @@ const TEMPLATE: TallyDocument = {
     created: new Date().toISOString().slice(0, 10),
     updated: new Date().toISOString().slice(0, 10),
     agents: [{ id: 'main', name: '主会话' }],
-    stages: [],
-    modules: [],
+    stages: [
+      { id: 'S1', name: 'Stage 1', modules: ['core'] },
+      { id: 'S2', name: 'Stage 2', modules: ['core'] },
+      { id: 'S3', name: 'Stage 3', modules: ['core'] },
+    ],
+    modules: [
+      { id: 'core', name: 'Core' },
+    ],
   },
   tasks: [],
   rounds: [],
