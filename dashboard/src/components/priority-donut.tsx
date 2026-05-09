@@ -61,14 +61,14 @@ export default function PriorityDonut({ tasks }: PriorityDonutProps) {
         </span>
       </CardHeader>
       <CardContent>
-        <ResponsiveContainer width="100%" height={220}>
+        <ResponsiveContainer width="100%" height={240}>
           <PieChart>
             <Pie
               data={data}
               cx="50%"
-              cy="50%"
-              innerRadius={50}
-              outerRadius={80}
+              cy="45%"
+              innerRadius={40}
+              outerRadius={70}
               paddingAngle={3}
               dataKey="value"
               stroke="var(--ink)"
@@ -85,10 +85,10 @@ export default function PriorityDonut({ tasks }: PriorityDonutProps) {
             {/* Center label — total count */}
             <text
               x="50%"
-              y="50%"
+              y="45%"
               textAnchor="middle"
               dominantBaseline="central"
-              style={{ fontFamily: 'Caveat, cursive', fontWeight: 700, fontSize: 32, fill: 'var(--ink)' }}
+              style={{ fontFamily: 'Caveat, cursive', fontWeight: 700, fontSize: 28, fill: 'var(--ink)' }}
             >
               {total}
             </text>
@@ -128,7 +128,7 @@ export function PriorityDonutSkeleton() {
       <CardContent>
         <div
           style={{
-            height: 220,
+            height: 240,
             background: 'var(--paper-2)',
             borderRadius: 'var(--sk-radius)',
             display: 'flex',
