@@ -1,0 +1,26 @@
+schema_version: 1
+kind: agent_plugin_manifest
+id: tally
+status: active
+purpose: Agent-native task management with CLI-driven ledger, round discipline, and visualization.
+entrypoints:
+  machine: manifest.yaml
+  human: README.md
+  cli: cli/dist/index.js
+documents:
+  - id: readme
+    path: README.md
+    surface: human
+    role: package_overview
+  - id: tally_schema_doc
+    path: templates/tally-schema.md
+    surface: human
+    role: schema_reference
+  - id: round_log_template
+    path: templates/round-log.md
+    surface: human
+    role: copyable_template
+  - id: report_template
+    path: templates/report.md
+    surface: human
+    role: copyable_template

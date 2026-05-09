@@ -1,0 +1,17 @@
+name: tally
+version: "0.1.0"
+description: Agent-native task management with CLI-driven ledger, round discipline, and visualization
+commands:
+  - tally status
+  - tally check
+  - tally round start
+  - tally task done
+  - tally task add
+  - tally round close
+  - tally lint
+  - tally sync
+rules:
+  - Never edit tally.json directly -- always use CLI
+  - Always prefer batch forms (multiple IDs in one command)
+  - New tasks discovered during execution go into the ledger, not the current round
+  - Before commit, run tally lint
