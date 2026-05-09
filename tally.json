@@ -1,0 +1,106 @@
+{
+  "_meta": {
+    "project": "tally-smoke-test",
+    "tally_version": "1.0",
+    "created": "2026-05-09",
+    "updated": "2026-05-09",
+    "agents": [
+      {
+        "id": "main",
+        "name": "主会话"
+      }
+    ],
+    "stages": [
+      {
+        "id": "foundation",
+        "name": "Foundation",
+        "modules": [
+          "core",
+          "auth"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "id": "core",
+        "name": "Core"
+      },
+      {
+        "id": "auth",
+        "name": "Auth"
+      }
+    ]
+  },
+  "tasks": [
+    {
+      "id": "D-001",
+      "status": "done",
+      "priority": "P0",
+      "stage": "foundation",
+      "module": "core",
+      "name": "Setup project scaffold",
+      "acceptance": "Repo created",
+      "deps": [],
+      "blocks": null,
+      "nextAction": null,
+      "evidence": "Repo created and configured",
+      "rule": null,
+      "tags": [],
+      "order": null,
+      "completedOrder": 1,
+      "claimedBy": null,
+      "claimedAt": null,
+      "createdAt": "2026-05-09",
+      "completedAt": "2026-05-09"
+    },
+    {
+      "id": "U-002",
+      "status": "pending",
+      "priority": "P0",
+      "stage": "foundation",
+      "module": "auth",
+      "name": "Implement auth",
+      "acceptance": "待定义",
+      "deps": [
+        "D-001"
+      ],
+      "blocks": null,
+      "nextAction": null,
+      "evidence": null,
+      "rule": null,
+      "tags": [],
+      "order": 2,
+      "completedOrder": null,
+      "claimedBy": null,
+      "claimedAt": null,
+      "createdAt": "2026-05-09",
+      "completedAt": null
+    },
+    {
+      "id": "U-003",
+      "status": "blocked",
+      "priority": "P1",
+      "stage": "foundation",
+      "module": "core",
+      "name": "Write tests",
+      "acceptance": "待定义",
+      "deps": [
+        "U-002"
+      ],
+      "blocks": "Waiting on auth implementation",
+      "nextAction": null,
+      "evidence": null,
+      "rule": null,
+      "tags": [],
+      "order": 3,
+      "completedOrder": null,
+      "claimedBy": null,
+      "claimedAt": null,
+      "createdAt": "2026-05-09",
+      "completedAt": null
+    }
+  ],
+  "rounds": [],
+  "blocks": [],
+  "progress": []
+}

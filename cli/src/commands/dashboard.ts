@@ -60,7 +60,7 @@ export function dashboardCommand(): Command {
       const jsonPath = ledgerPath()
 
       // Look for dashboard dist relative to CLI package
-      const distDir = join(import.meta.dirname, '..', '..', 'dashboard', 'dist')
+      const distDir = join(import.meta.dirname, '..', '..', '..', 'dashboard', 'dist')
 
       const server = createServer((req, res) => {
         const url = req.url ?? '/'
