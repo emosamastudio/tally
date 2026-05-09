@@ -3,8 +3,10 @@ import { Command } from 'commander'
 import { createServer } from 'http'
 import { readFileSync, existsSync } from 'fs'
 import { join, extname } from 'path'
-import { ledgerPath } from '../ledger-reader.js'
+import { homedir } from 'os'
+import { ledgerPath, readLedger } from '../ledger-reader.js'
 import { loadConfig } from '../config.js'
+import type { TallyDocument } from '../types.js'
 
 const MIME: Record<string, string> = {
   '.html': 'text/html',
@@ -26,6 +28,27 @@ function serveStatic(res: any, filePath: string): void {
   res.end(readFileSync(filePath))
 }
 
+function computeStatus(doc: TallyDocument) {
+  const tasks = doc.tasks
+  const done = tasks.filter((t) => t.status === 'done').length
+  const hold = tasks.filter((t) => t.status === 'hold').length
+  const blocked = tasks.filter((t) => t.status === 'blocked').length
+  const open = tasks.filter((t) => !['done', 'hold'].includes(t.status)).length
+  const activeRound = doc.rounds.find((r) => r.status === 'active')
+  return {
+    totalDone: done,
+    totalOpen: open,
+    totalHold: hold,
+    totalBlocked: blocked,
+    activeRoundId: activeRound?.id ?? null,
+    activeBlocks: doc.blocks.filter((b) => b.resolvedAt === null).length,
+  }
+}
+
+function resolvePath(path: string): string {
+  return path.replace(/^~/, homedir())
+}
+
 export function dashboardCommand(): Command {
   const cmd = new Command('dashboard')
   cmd.description('Start visualization dashboard')
@@ -41,9 +64,66 @@ export function dashboardCommand(): Command {
 
       const server = createServer((req, res) => {
         const url = req.url ?? '/'
+        const parsedUrl = new URL(url, 'http://localhost')
+        const pathname = parsedUrl.pathname
 
-        // API: serve tally.json
-        if (url === '/api/tally.json') {
+        // API: list projects
+        if (pathname === '/api/projects') {
+          const config = loadConfig()
+          const results: Array<{
+            name: string
+            path: string
+            error?: string
+            totalDone?: number
+            totalOpen?: number
+            totalHold?: number
+            totalBlocked?: number
+            activeRoundId?: string | null
+            activeBlocks?: number
+          }> = []
+          for (const p of config.projects) {
+            const resolvedPath = resolvePath(p.path)
+            try {
+              const doc = readLedger(resolvedPath)
+              const status = computeStatus(doc)
+              results.push({ name: p.name, path: resolvedPath, ...status })
+            } catch {
+              results.push({ name: p.name, path: resolvedPath, error: 'tally.json not found' })
+            }
+          }
+          res.setHeader('Content-Type', 'application/json')
+          res.setHeader('Access-Control-Allow-Origin', '*')
+          res.end(JSON.stringify(results))
+          return
+        }
+
+        // API: serve tally.json (with optional project query param)
+        if (pathname === '/api/tally.json') {
+          const projectName = parsedUrl.searchParams.get('project')
+          if (projectName) {
+            const config = loadConfig()
+            const project = config.projects.find((p) => p.name === projectName)
+            if (!project) {
+              res.statusCode = 404
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'Project not found' }))
+              return
+            }
+            const resolvedPath = resolvePath(project.path)
+            try {
+              const data = readFileSync(join(resolvedPath, 'tally.json'), 'utf-8')
+              res.setHeader('Content-Type', 'application/json')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(data)
+            } catch {
+              res.statusCode = 404
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'tally.json not found' }))
+            }
+            return
+          }
+
+          // Backward compatible: serve from current directory
           try {
             const data = readFileSync(jsonPath, 'utf-8')
             res.setHeader('Content-Type', 'application/json')
@@ -58,7 +138,7 @@ export function dashboardCommand(): Command {
         }
 
         // Static: serve dashboard SPA
-        const filePath = url === '/' ? join(distDir, 'index.html') : join(distDir, url)
+        const filePath = pathname === '/' ? join(distDir, 'index.html') : join(distDir, pathname)
         serveStatic(res, filePath)
       })
 

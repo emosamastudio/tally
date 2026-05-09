@@ -10,6 +10,7 @@ import type {
   ProgressPoint,
   StageStatus,
   ModuleMeta,
+  ProjectInfo,
 } from './types'
 
 // ── Tally raw document shapes (subset of what we consume) ──
@@ -258,9 +259,18 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
 
 // ── Loader ──
 
-export async function loadLedgerData(): Promise<LedgerData> {
-  const res = await fetch('/api/tally.json')
+export async function loadLedgerData(projectName?: string): Promise<LedgerData> {
+  const url = projectName
+    ? `/api/tally.json?project=${encodeURIComponent(projectName)}`
+    : '/api/tally.json'
+  const res = await fetch(url)
   if (!res.ok) throw new Error(`Failed to load tally.json: ${res.status}`)
   const raw = await res.json()
   return adaptTallyDocument(raw)
+}
+
+export async function loadProjects(): Promise<ProjectInfo[]> {
+  const res = await fetch('/api/projects')
+  if (!res.ok) return []
+  return res.json()
 }

@@ -10,6 +10,7 @@ const DEFAULTS: TallyConfig = {
   round: { maxTasks: 10, allowParallel: false },
   lint: { strict: false },
   dashboard: { port: 5173 },
+  projects: [],
 }
 
 function loadYaml(path: string): Partial<TallyConfig> | null {
@@ -31,6 +32,7 @@ export function loadConfig(cwd: string = process.cwd()): TallyConfig {
     round: { ...DEFAULTS.round, ...global.round, ...local.round },
     lint: { ...DEFAULTS.lint, ...global.lint, ...local.lint },
     dashboard: { ...DEFAULTS.dashboard, ...global.dashboard, ...local.dashboard },
+    projects: local.projects ?? global.projects ?? DEFAULTS.projects,
   }
   return merged
 }

@@ -10,3 +10,9 @@ lint:
 
 dashboard:
   port: 5173
+
+# projects:                       # Multi-project dashboard (optional)
+#   - name: Inori OS
+#     path: ~/workspace/inori
+#   - name: Tally
+#     path: ~/workspace/tally

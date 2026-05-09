@@ -1,4 +1,5 @@
 // src/App.tsx
+import { useState, useEffect } from 'react'
 import { useLedgerData } from '@/hooks/useLedgerData'
 import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
@@ -12,7 +13,38 @@ import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependenc
 import RoundTimeline, { RoundTimelineSkeleton } from '@/components/round-timeline'
 
 export default function App() {
-  const state = useLedgerData()
+  const [selectedProject, setSelectedProject] = useState<string | null>(null)
+  const { state, projects } = useLedgerData(selectedProject)
+
+  // Auto-select first project when multi-project mode is detected
+  useEffect(() => {
+    if (projects.length > 0 && !selectedProject) {
+      setSelectedProject(projects[0].name)
+    }
+  }, [projects, selectedProject])
+
+  // Project selector chip
+  const projectSelector = projects.length > 0 ? (
+    <select
+      className="sk-select"
+      value={selectedProject ?? ''}
+      onChange={(e) => setSelectedProject(e.target.value)}
+      style={{
+        fontFamily: 'inherit',
+        fontSize: 12,
+        padding: '4px 8px',
+        border: '1px solid var(--ink-4)',
+        borderRadius: 6,
+        background: 'var(--surface-1)',
+        color: 'var(--ink-1)',
+        cursor: 'pointer',
+      }}
+    >
+      {projects.map((p) => (
+        <option key={p.name} value={p.name}>{p.name}</option>
+      ))}
+    </select>
+  ) : null
 
   if (state.status === 'loading' || state.status === 'idle') {
     return (
@@ -23,7 +55,8 @@ export default function App() {
               <h1 className="sk-h1" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
               <p className="sk-mono" style={{ fontSize: 11, color: 'var(--ink-3)', maxWidth: 300 }}>加载中...</p>
             </div>
-            <div className="flex gap-2">
+            <div className="flex gap-2 items-center">
+              {projectSelector}
               <span className="sk-chip">单人监控</span>
               <span className="sk-chip solid">● 实时</span>
             </div>
@@ -66,7 +99,8 @@ export default function App() {
             <h1 className="sk-h1 shrink-0" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
             <span className="sk-chip shrink-0">v · 经典驾驶舱</span>
           </div>
-          <div className="flex gap-2 shrink-0">
+          <div className="flex gap-2 shrink-0 items-center">
+            {projectSelector}
             <span className="sk-chip">单人监控</span>
             <span className="sk-chip solid">● 实时</span>
           </div>

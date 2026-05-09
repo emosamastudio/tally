@@ -118,3 +118,12 @@ export type LoadState =
   | { status: 'loading' }
   | { status: 'error'; message: string }
   | { status: 'ready'; data: LedgerData }
+
+export interface ProjectInfo {
+  name: string
+  path: string
+  error?: string
+  totalDone?: number
+  totalOpen?: number
+  activeRoundId?: string | null
+}

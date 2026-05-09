@@ -112,11 +112,17 @@ export interface TallyDocument {
 
 // ── Config ──
 
+export interface ProjectEntry {
+  name: string
+  path: string
+}
+
 export interface TallyConfig {
   agent: { id: string }
   round: { maxTasks: number; allowParallel: boolean }
   lint: { strict: boolean }
   dashboard: { port: number }
+  projects: ProjectEntry[]
 }
 
 // ── CLI results ──

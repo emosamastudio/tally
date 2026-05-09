@@ -1,15 +1,22 @@
 // src/hooks/useLedgerData.ts
 import { useState, useEffect } from 'react'
-import type { LoadState } from '@/lib/types'
-import { loadLedgerData } from '@/lib/loader'
+import type { LoadState, ProjectInfo } from '@/lib/types'
+import { loadLedgerData, loadProjects } from '@/lib/loader'
 
-export function useLedgerData(): LoadState {
-  const [state, setState] = useState<LoadState>({ status: 'idle' })
+export function useLedgerData(projectName: string | null) {
+  const [state, setState] = useState<LoadState>({ status: 'loading' })
+  const [projects, setProjects] = useState<ProjectInfo[]>([])
 
+  // Load project list once on mount
+  useEffect(() => {
+    loadProjects().then(setProjects).catch(() => setProjects([]))
+  }, [])
+
+  // Load ledger data when project changes
   useEffect(() => {
     let cancelled = false
     setState({ status: 'loading' })
-    loadLedgerData()
+    loadLedgerData(projectName ?? undefined)
       .then((data) => {
         if (!cancelled) setState({ status: 'ready', data })
       })
@@ -22,7 +29,7 @@ export function useLedgerData(): LoadState {
         }
       })
     return () => { cancelled = true }
-  }, [])
+  }, [projectName])
 
-  return state
+  return { state, projects }
 }
