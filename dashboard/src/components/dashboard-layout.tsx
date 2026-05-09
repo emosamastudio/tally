@@ -51,14 +51,14 @@ export default function DashboardLayout({
           <div className="md:col-span-1">{currentRound}</div>
         </section>
 
-        {/* ROW 3: Three columns — StageMatrix (1/2) | PriorityDonut + ModuleDistribution (1/4) | BlockList (1/4) */}
-        <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
-          <div className="md:col-span-2">{stageMatrix}</div>
-          <div className="md:col-span-1 space-y-4">
-            {priorityDonut}
-            {moduleDistribution}
-          </div>
-          <div className="md:col-span-1">{blockList}</div>
+        {/* ROW 3a: Stage Matrix — full width horizontal pipeline */}
+        <section>{stageMatrix}</section>
+
+        {/* ROW 3b: Three equal columns — Priority Donut | Module Distribution | Block List */}
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="flex">{priorityDonut}</div>
+          <div className="flex">{moduleDistribution}</div>
+          <div className="flex">{blockList}</div>
         </section>
 
         {/* ROW 4: Full width — AgentContribution */}
