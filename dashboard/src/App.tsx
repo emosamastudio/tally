@@ -1,4 +1,22 @@
 // src/App.tsx
+/**
+ * Diagram opportunities (future):
+ *
+ * Already implemented:
+ * - ProgressTrend: area chart (Recharts)
+ * - DependencyGraph: DAG with dagre layout
+ * - StageMatrix: pipeline with progress bars
+ * - CurrentRound: SVG progress ring
+ * - RoundTimeline: vertical timeline
+ *
+ * Could add:
+ * - Burndown chart: tasks done per round over time (line chart)
+ * - Module distribution: treemap or packed-bubble of tasks per module
+ * - Dependency chain: mini inline graph per task showing direct ancestors/descendants
+ * - Velocity chart: tasks completed per round (bar chart)
+ * - Priority breakdown: donut/pie chart of tasks by priority
+ * - Agent contribution: stacked bar of tasks done per agent
+ */
 import { useState, useEffect } from 'react'
 import { useLedgerData } from '@/hooks/useLedgerData'
 import DashboardLayout from '@/components/dashboard-layout'

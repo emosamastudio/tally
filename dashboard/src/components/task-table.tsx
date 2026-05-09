@@ -89,14 +89,61 @@ function TaskRow({ task }: { task: Task }) {
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={9} style={{ background: 'var(--paper-2)', padding: '12px 24px' }}>
+          <TableCell colSpan={9} style={{ background: 'var(--paper-2)', padding: '14px 24px' }}>
             <div className="space-y-3" style={{ fontSize: 12 }}>
+              {/* Task name as header */}
+              <div>
+                <span className="sk-h3" style={{ fontSize: 18 }}>{task.name}</span>
+                <div className="flex gap-2 mt-1">
+                  <span className="sk-chip" style={{ fontSize: 10 }}>{task.module}</span>
+                  <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.stage}</span>
+                </div>
+              </div>
+
+              {/* Timeline */}
+              <div className="flex gap-4">
+                <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  创建 {task.createdAt ?? '—'}
+                </span>
+                {task.completedAt && (
+                  <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    完成 {task.completedAt}
+                  </span>
+                )}
+                {task.order != null && (
+                  <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                    排序 #{task.order}
+                  </span>
+                )}
+              </div>
+
+              <hr className="sk-rule dashed thin" />
+
+              {/* Acceptance criteria */}
               <div>
                 <span className="sk-label" style={{ fontSize: 10 }}>验收标准</span>
                 <p className="sk-body" style={{ fontSize: 12, marginTop: 2, whiteSpace: 'pre-wrap' }}>
                   {task.acceptanceCriteria || '—'}
                 </p>
               </div>
+
+              {/* Next action (for non-done tasks) */}
+              {task.status !== 'completed' && task.nextAction && (
+                <div>
+                  <span className="sk-label" style={{ fontSize: 10 }}>下一步</span>
+                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.nextAction}</p>
+                </div>
+              )}
+
+              {/* Evidence (for done tasks) */}
+              {task.status === 'completed' && task.evidence && (
+                <div>
+                  <span className="sk-label" style={{ fontSize: 10 }}>完成证据</span>
+                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.evidence}</p>
+                </div>
+              )}
+
+              {/* Dependencies */}
               {task.dependencies.length > 0 && (
                 <div>
                   <span className="sk-label" style={{ fontSize: 10 }}>依赖关系</span>
@@ -105,6 +152,8 @@ function TaskRow({ task }: { task: Task }) {
                   </p>
                 </div>
               )}
+
+              {/* Tags */}
               {task.tags.length > 0 && (
                 <div>
                   <span className="sk-label" style={{ fontSize: 10 }}>标签</span>
@@ -113,12 +162,16 @@ function TaskRow({ task }: { task: Task }) {
                   </p>
                 </div>
               )}
+
+              {/* Blocks */}
               {task.blocks && (
                 <div>
                   <span className="sk-label" style={{ fontSize: 10 }}>阻塞 / 风险</span>
                   <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.blocks}</p>
                 </div>
               )}
+
+              {/* Claim info */}
               {task.claimedBy && (
                 <div>
                   <span className="sk-label" style={{ fontSize: 10 }}>认领</span>
@@ -127,6 +180,8 @@ function TaskRow({ task }: { task: Task }) {
                   </p>
                 </div>
               )}
+
+              {/* Follow-up rule */}
               {task.followUpRule && (
                 <div>
                   <span className="sk-label" style={{ fontSize: 10 }}>后续规则</span>

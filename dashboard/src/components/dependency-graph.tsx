@@ -413,26 +413,38 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
     e.preventDefault()
     const svg = svgRef.current
     if (!svg) return
-    const rect = svg.getBoundingClientRect()
-    const mouseX = e.clientX - rect.left
-    const mouseY = e.clientY - rect.top
 
-    const vbMouseX = viewBox.x + (mouseX / svgSize.w) * viewBox.w
-    const vbMouseY = viewBox.y + (mouseY / svgSize.h) * viewBox.h
+    if (e.ctrlKey) {
+      // Pinch-to-zoom (trackpad) or Ctrl+scroll (mouse)
+      const rect = svg.getBoundingClientRect()
+      const mouseX = e.clientX - rect.left
+      const mouseY = e.clientY - rect.top
+      const vbMouseX = viewBox.x + (mouseX / svgSize.w) * viewBox.w
+      const vbMouseY = viewBox.y + (mouseY / svgSize.h) * viewBox.h
 
-    const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87
-    const newW = viewBox.w * zoomFactor
-    const newH = viewBox.h * zoomFactor
+      const zoomFactor = e.deltaY > 0 ? 1.15 : 0.87
+      const newW = viewBox.w * zoomFactor
+      const newH = viewBox.h * zoomFactor
 
-    const clampedW = Math.max(50, Math.min(10000, newW))
-    const clampedH = Math.max(50, Math.min(10000, newH))
+      const clampedW = Math.max(50, Math.min(10000, newW))
+      const clampedH = Math.max(50, Math.min(10000, newH))
 
-    setViewBox({
-      w: clampedW,
-      h: clampedH,
-      x: vbMouseX - (mouseX / svgSize.w) * clampedW,
-      y: vbMouseY - (mouseY / svgSize.h) * clampedH,
-    })
+      setViewBox({
+        w: clampedW,
+        h: clampedH,
+        x: vbMouseX - (mouseX / svgSize.w) * clampedW,
+        y: vbMouseY - (mouseY / svgSize.h) * clampedH,
+      })
+    } else {
+      // Regular scroll → pan
+      const scaleX = viewBox.w / svgSize.w
+      const scaleY = viewBox.h / svgSize.h
+      setViewBox(prev => ({
+        ...prev,
+        x: prev.x + e.deltaX * scaleX,
+        y: prev.y + e.deltaY * scaleY,
+      }))
+    }
   }, [viewBox, svgSize])
 
   useEffect(() => {
