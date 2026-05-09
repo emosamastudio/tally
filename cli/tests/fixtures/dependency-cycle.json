@@ -1,0 +1,58 @@
+{
+  "_meta": {
+    "project": "test",
+    "tally_version": "1.0",
+    "created": "2026-05-10",
+    "updated": "2026-05-10",
+    "agents": [{ "id": "main", "name": "主会话" }],
+    "stages": [{ "id": "S1", "name": "Core", "modules": ["core"] }],
+    "modules": [{ "id": "core", "name": "Core Module" }]
+  },
+  "tasks": [
+    {
+      "id": "U-001",
+      "status": "pending",
+      "priority": "P0",
+      "stage": "S1",
+      "module": "core",
+      "name": "Task One",
+      "acceptance": "passes",
+      "deps": ["U-002"],
+      "blocks": null,
+      "nextAction": "do it",
+      "evidence": null,
+      "rule": null,
+      "tags": [],
+      "order": 1,
+      "completedOrder": null,
+      "claimedBy": null,
+      "claimedAt": null,
+      "createdAt": "2026-05-10",
+      "completedAt": null
+    },
+    {
+      "id": "U-002",
+      "status": "pending",
+      "priority": "P0",
+      "stage": "S1",
+      "module": "core",
+      "name": "Task Two",
+      "acceptance": "passes",
+      "deps": ["U-001"],
+      "blocks": null,
+      "nextAction": "do it",
+      "evidence": null,
+      "rule": null,
+      "tags": [],
+      "order": 2,
+      "completedOrder": null,
+      "claimedBy": null,
+      "claimedAt": null,
+      "createdAt": "2026-05-10",
+      "completedAt": null
+    }
+  ],
+  "rounds": [],
+  "blocks": [],
+  "progress": []
+}
