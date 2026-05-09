@@ -130,9 +130,18 @@ export function dashboardCommand(): Command {
             res.setHeader('Access-Control-Allow-Origin', '*')
             res.end(data)
           } catch {
-            res.statusCode = 404
-            res.setHeader('Content-Type', 'application/json')
-            res.end(JSON.stringify({ error: 'tally.json not found' }))
+            // Fallback: try bundled demo-tally.json
+            const demoPath = join(import.meta.dirname, '..', '..', '..', 'demo-tally.json')
+            try {
+              const data = readFileSync(demoPath, 'utf-8')
+              res.setHeader('Content-Type', 'application/json')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(data)
+            } catch {
+              res.statusCode = 404
+              res.setHeader('Content-Type', 'application/json')
+              res.end(JSON.stringify({ error: 'tally.json not found' }))
+            }
           }
           return
         }

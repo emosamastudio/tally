@@ -14,7 +14,6 @@ interface DashboardLayoutProps {
   agentContribution?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
-  roundTimeline?: ReactNode
 }
 
 export default function DashboardLayout({
@@ -30,49 +29,45 @@ export default function DashboardLayout({
   agentContribution,
   dependencyGraph,
   taskTable,
-  roundTimeline,
 }: DashboardLayoutProps) {
   return (
     <div className="sk-board">
       <div className="sk-grid" />
       <div className="relative mx-auto max-w-7xl px-4 py-4 space-y-4">
-        {/* Header */}
+        {/* ROW 0: Header */}
         <header className="flex items-center justify-between">
           {header}
         </header>
 
-        {/* Overview bar — KPI strip */}
+        {/* ROW 1: KPI Strip — full width */}
         {overview && <section>{overview}</section>}
 
-        {/* Row 1: Progress trend + Current round */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">{progressTrend}</div>
-          <div className="lg:col-span-1">{currentRound}</div>
-        </section>
-
-        {/* Row 1b: Round analytics (burndown + velocity) */}
-        {roundAnalytics && <section>{roundAnalytics}</section>}
-
-        {/* Row 2: Stage matrix + small panels + Block list */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
-          <div className="lg:col-span-2">{stageMatrix}</div>
-          <div className="lg:col-span-1 space-y-4">
-            {moduleDistribution}
-            {priorityDonut}
+        {/* ROW 2: Two columns — ProgressTrend + RoundAnalytics (left 2/3) | CurrentRound (right 1/3) */}
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-3">
+          <div className="md:col-span-2 space-y-4">
+            {progressTrend}
+            {roundAnalytics}
           </div>
-          <div className="lg:col-span-1">{blockList}</div>
+          <div className="md:col-span-1">{currentRound}</div>
         </section>
 
-        {/* Row 3: Agent contribution */}
+        {/* ROW 3: Three columns — StageMatrix (1/2) | PriorityDonut + ModuleDistribution (1/4) | BlockList (1/4) */}
+        <section className="grid grid-cols-1 gap-6 md:grid-cols-4">
+          <div className="md:col-span-2">{stageMatrix}</div>
+          <div className="md:col-span-1 space-y-4">
+            {priorityDonut}
+            {moduleDistribution}
+          </div>
+          <div className="md:col-span-1">{blockList}</div>
+        </section>
+
+        {/* ROW 4: Full width — AgentContribution */}
         {agentContribution && <section>{agentContribution}</section>}
 
-        {/* Row 4: Round timeline */}
-        {roundTimeline && <section>{roundTimeline}</section>}
+        {/* ROW 5: Full width — DependencyGraph (tall) */}
+        <section style={{ minHeight: 500 }}>{dependencyGraph}</section>
 
-        {/* Row 5: Dependency graph */}
-        <section>{dependencyGraph}</section>
-
-        {/* Row 6: Task table */}
+        {/* ROW 6: Full width — TaskTable */}
         <section>{taskTable}</section>
       </div>
     </div>

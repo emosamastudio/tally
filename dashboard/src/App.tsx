@@ -10,8 +10,7 @@
  * - AgentContribution: stacked bar chart (Recharts BarChart)
  * - DependencyGraph: DAG with dagre layout
  * - StageMatrix: pipeline with progress bars
- * - CurrentRound: SVG progress ring
- * - RoundTimeline: vertical timeline
+ * - CurrentRound: SVG progress ring + collapsible round timeline
  * - TaskTable: inline dependency chain in expanded rows
  */
 import { useState, useEffect } from 'react'
@@ -29,7 +28,6 @@ import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import AgentContribution, { AgentContributionSkeleton } from '@/components/agent-contribution'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
-import RoundTimeline, { RoundTimelineSkeleton } from '@/components/round-timeline'
 
 export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
@@ -92,7 +90,6 @@ export default function App() {
         agentContribution={<AgentContributionSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
-        roundTimeline={<RoundTimelineSkeleton />}
       />
     )
   }
@@ -131,7 +128,7 @@ export default function App() {
       }
       overview={<OverviewBar data={merged} tasks={allTasks} modules={modules} />}
       progressTrend={<ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />}
-      currentRound={<CurrentRound round={merged.activeRound} />}
+      currentRound={<CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />}
       roundAnalytics={<RoundAnalytics rounds={rounds} tasks={allTasks} />}
       stageMatrix={<StageMatrix stages={merged.allStages} />}
       moduleDistribution={<ModuleDistribution tasks={allTasks} />}
@@ -140,7 +137,6 @@ export default function App() {
       agentContribution={<AgentContribution rounds={rounds} tasks={allTasks} />}
       dependencyGraph={<DependencyGraph tasks={allTasks} />}
       taskTable={<TaskTable tasks={allTasks} allTasks={allTasks} />}
-      roundTimeline={<RoundTimeline rounds={rounds} tasks={allTasks} />}
     />
   )
 }

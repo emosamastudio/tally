@@ -1,12 +1,20 @@
 // src/components/current-round.tsx
+import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import type { Round } from '@/lib/types'
+import { ChevronDown, ChevronRight, Clock, CheckCircle2, Play } from 'lucide-react'
+import type { Round, Task } from '@/lib/types'
 
 interface CurrentRoundProps {
   round: Round | null
+  /** All rounds for the collapsible timeline section */
+  allRounds?: Round[]
+  /** All tasks for computing round completion stats */
+  allTasks?: Task[]
 }
 
-export default function CurrentRound({ round }: CurrentRoundProps) {
+export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoundProps) {
+  const [showHistory, setShowHistory] = useState(false)
+
   if (!round) {
     return (
       <Card tilt={1}>
@@ -23,6 +31,12 @@ export default function CurrentRound({ round }: CurrentRoundProps) {
   const isActive = round.status === 'active'
   const doneCount = round.tasks.length
   const totalCount = round.tasks.length
+
+  // Build timeline data: all rounds sorted chronologically, excluding the active round shown above
+  const roundsArr = allRounds ?? []
+  const timelineRounds = roundsArr
+    .filter((r) => r.id !== round.id)
+    .sort((a, b) => a.startDate.localeCompare(b.startDate))
 
   return (
     <Card tilt={1} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
@@ -84,6 +98,121 @@ export default function CurrentRound({ round }: CurrentRoundProps) {
         <span className="sk-chip" style={{ fontSize: 10 }}>校验</span>
         <span className="sk-chip" style={{ fontSize: 10 }}>收尾</span>
       </div>
+
+      {/* Collapsible Round History */}
+      {timelineRounds.length > 0 && (
+        <>
+          <hr className="sk-rule dashed" style={{ margin: '4px 0' }} />
+          <button
+            onClick={() => setShowHistory((v) => !v)}
+            className="flex items-center gap-1.5 sk-body"
+            style={{
+              fontSize: 12,
+              cursor: 'pointer',
+              background: 'none',
+              border: 'none',
+              padding: 0,
+              color: 'var(--ink-2)',
+              fontFamily: 'inherit',
+            }}
+          >
+            {showHistory ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
+            回合历史 ({timelineRounds.length})
+          </button>
+
+          {showHistory && (
+            <div className="relative" style={{ marginTop: 8 }}>
+              {/* Vertical timeline line */}
+              <div
+                className="absolute left-[12px] top-1 bottom-1"
+                style={{
+                  width: 2,
+                  background: 'var(--ink-4)',
+                  borderRadius: 1,
+                }}
+              />
+
+              <div className="space-y-3">
+                {timelineRounds.map((r) => {
+                  const plannedIds = new Set(r.tasks.map((rt) => rt.taskId))
+                  const rDoneCount = (allTasks ?? []).filter(
+                    (t) => plannedIds.has(t.id) && t.status === 'completed',
+                  ).length
+                  const rTotalCount = r.tasks.length
+
+                  return (
+                    <div key={r.id} className="flex gap-2.5 ml-1">
+                      {/* Timeline dot */}
+                      <div className="relative z-10 shrink-0 mt-1">
+                        <div
+                          style={{
+                            width: 10,
+                            height: 10,
+                            borderRadius: '50%',
+                            background: r.status === 'active' ? 'var(--accent)' : 'var(--accent-3)',
+                            border: '2px solid var(--ink)',
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                          }}
+                        >
+                          {r.status === 'active' ? (
+                            <Play size={5} style={{ color: 'var(--ink)', marginLeft: 0.5 }} />
+                          ) : (
+                            <CheckCircle2 size={6} style={{ color: 'var(--ink)' }} />
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Round card */}
+                      <div
+                        className="sk-box fill flex-1"
+                        style={{
+                          padding: '6px 10px',
+                          borderStyle: r.status === 'active' ? 'solid' : 'dashed',
+                          borderWidth: r.status === 'active' ? 'var(--sk-border)' : '1.2px',
+                        }}
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <span className="sk-body" style={{ fontSize: 11, fontWeight: 700 }}>{r.id}</span>
+                              <span className={`sk-chip ${r.status === 'active' ? 'accent' : 'ok'}`} style={{ fontSize: 9 }}>
+                                {r.status === 'active' ? '进行中' : '已完成'}
+                              </span>
+                            </div>
+                            <div className="flex items-center gap-1.5 mt-0.5" style={{ color: 'var(--ink-3)' }}>
+                              <Clock size={9} />
+                              <span className="sk-body" style={{ fontSize: 10 }}>{r.startDate}</span>
+                              <span className="sk-body" style={{ fontSize: 10 }}>·</span>
+                              <span className="sk-body" style={{ fontSize: 10 }}>{r.executor}</span>
+                            </div>
+                          </div>
+                          {rTotalCount > 0 && (
+                            <div className="text-right shrink-0">
+                              <span className="sk-num-sm" style={{ fontSize: 16 }}>
+                                {rDoneCount}<span style={{ fontSize: 11, color: 'var(--ink-3)' }}>/{rTotalCount}</span>
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                        {rTotalCount > 0 && (
+                          <div className="sk-progress-track" style={{ marginTop: 6, height: 4 }}>
+                            <div
+                              className={`sk-progress-fill ${r.status === 'active' ? 'accent' : ''}`}
+                              style={{ width: `${Math.round((rDoneCount / rTotalCount) * 100)}%` }}
+                            />
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+            </div>
+          )}
+        </>
+      )}
     </Card>
   )
 }

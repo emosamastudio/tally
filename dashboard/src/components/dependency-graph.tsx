@@ -410,12 +410,11 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
   }, [])
 
   const handleWheel = useCallback((e: React.WheelEvent) => {
-    e.preventDefault()
-    const svg = svgRef.current
-    if (!svg) return
-
     if (e.ctrlKey) {
+      e.preventDefault()
       // Pinch-to-zoom (trackpad) or Ctrl+scroll (mouse)
+      const svg = svgRef.current
+      if (!svg) return
       const rect = svg.getBoundingClientRect()
       const mouseX = e.clientX - rect.left
       const mouseY = e.clientY - rect.top
@@ -435,16 +434,8 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
         x: vbMouseX - (mouseX / svgSize.w) * clampedW,
         y: vbMouseY - (mouseY / svgSize.h) * clampedH,
       })
-    } else {
-      // Regular scroll → pan
-      const scaleX = viewBox.w / svgSize.w
-      const scaleY = viewBox.h / svgSize.h
-      setViewBox(prev => ({
-        ...prev,
-        x: prev.x + e.deltaX * scaleX,
-        y: prev.y + e.deltaY * scaleY,
-      }))
     }
+    // Regular scroll (no ctrlKey) — let it pass through to browser for natural page scroll
   }, [viewBox, svgSize])
 
   useEffect(() => {
