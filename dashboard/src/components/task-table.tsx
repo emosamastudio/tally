@@ -1,5 +1,5 @@
 // src/components/task-table.tsx
-import { useState, useMemo, useEffect } from 'react'
+import { useState, useMemo, useEffect, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Progress } from '@/components/ui/progress'
@@ -8,6 +8,7 @@ import type { Task, TaskStatus, TaskSource, Priority } from '@/lib/types'
 
 interface TaskTableProps {
   tasks: Task[]
+  allTasks?: Task[]
 }
 
 const PRIORITY_LABEL: Record<Priority, string> = { P0: 'P0', P1: 'P1', P2: 'P2' }
@@ -36,15 +37,198 @@ const PRIORITY_CHIP: Record<Priority, string> = {
   P2: '',
 }
 
+const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
+  completed: 'var(--accent-3)',
+  in_progress: 'var(--accent)',
+  pending: 'var(--ink-4)',
+  blocked: 'var(--danger)',
+  hold: 'var(--ink-4)',
+  deferred: 'var(--ink-4)',
+}
+
 const PAGE_SIZE_OPTIONS = [10, 30, 50, 100]
 const DEFAULT_PAGE_SIZE = 30
 
-function TaskRow({ task }: { task: Task }) {
+/** BFS to find ancestors (dependencies) up to maxDepth */
+function findAncestors(
+  taskId: string,
+  taskMap: Map<string, Task>,
+  maxDepth: number,
+): string[] {
+  const result: string[] = []
+  const visited = new Set<string>()
+  const queue: { id: string; depth: number }[] = [{ id: taskId, depth: 0 }]
+  while (queue.length > 0) {
+    const { id, depth } = queue.shift()!
+    if (visited.has(id) || depth > maxDepth) continue
+    visited.add(id)
+    const task = taskMap.get(id)
+    if (!task) continue
+    if (id !== taskId) result.push(id)
+    if (depth < maxDepth) {
+      for (const depId of task.dependencies) {
+        if (!visited.has(depId)) {
+          queue.push({ id: depId, depth: depth + 1 })
+        }
+      }
+    }
+  }
+  // Reverse so ancestors appear in order (root → closest)
+  return result.reverse()
+}
+
+/** BFS to find descendants (dependents) up to maxDepth */
+function findDescendants(
+  taskId: string,
+  reverseDepMap: Map<string, string[]>,
+  maxDepth: number,
+): string[] {
+  const result: string[] = []
+  const visited = new Set<string>()
+  const queue: { id: string; depth: number }[] = [{ id: taskId, depth: 0 }]
+  while (queue.length > 0) {
+    const { id, depth } = queue.shift()!
+    if (visited.has(id) || depth > maxDepth) continue
+    visited.add(id)
+    if (id !== taskId) result.push(id)
+    if (depth < maxDepth) {
+      for (const depId of reverseDepMap.get(id) ?? []) {
+        if (!visited.has(depId)) {
+          queue.push({ id: depId, depth: depth + 1 })
+        }
+      }
+    }
+  }
+  return result
+}
+
+function DepChain({
+  taskId,
+  taskMap,
+  reverseDepMap,
+  onNavigate,
+}: {
+  taskId: string
+  taskMap: Map<string, Task>
+  reverseDepMap: Map<string, string[]>
+  onNavigate?: (taskId: string) => void
+}) {
+  const ancestors = useMemo(() => findAncestors(taskId, taskMap, 5), [taskId, taskMap])
+  const descendants = useMemo(() => findDescendants(taskId, reverseDepMap, 5), [taskId, reverseDepMap])
+
+  const hasAncestors = ancestors.length > 0
+  const hasDescendants = descendants.length > 0
+
+  if (!hasAncestors && !hasDescendants) {
+    return (
+      <p className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+        无依赖链 — 此任务无上下游依赖
+      </p>
+    )
+  }
+
+  const truncateAncestors = ancestors.length > 5
+    ? [...ancestors.slice(0, 2), '...', ...ancestors.slice(-2)]
+    : ancestors
+  const truncateDescendants = descendants.length > 5
+    ? [...descendants.slice(0, 2), '...', ...descendants.slice(-2)]
+    : descendants
+
+  const renderNode = (id: string, isCurrent: boolean) => {
+    if (id === '...') {
+      return (
+        <span key={`ellipsis-${Math.random()}`} className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', padding: '0 2px' }}>
+          ...
+        </span>
+      )
+    }
+    const nodeTask = taskMap.get(id)
+    const color = nodeTask ? STATUS_DOT_COLORS[nodeTask.status] : 'var(--ink-4)'
+    return (
+      <button
+        key={id}
+        onClick={(e) => { e.stopPropagation(); onNavigate?.(id) }}
+        className="flex flex-col items-center gap-0.5"
+        style={{
+          background: 'none',
+          border: isCurrent ? '2px solid var(--ink)' : '1.4px solid var(--ink-4)',
+          borderRadius: 'var(--sk-radius)',
+          padding: '2px 6px',
+          cursor: onNavigate ? 'pointer' : 'default',
+          minWidth: 56,
+        }}
+        title={nodeTask ? `${nodeTask.id}: ${nodeTask.name}` : id}
+      >
+        <span
+          className="inline-block rounded-full shrink-0"
+          style={{
+            width: 8,
+            height: 8,
+            backgroundColor: color,
+            border: isCurrent ? '1.4px solid var(--ink)' : '1px solid var(--ink-3)',
+          }}
+        />
+        <span
+          className="sk-mono"
+          style={{
+            fontSize: 9,
+            color: isCurrent ? 'var(--ink)' : 'var(--ink-3)',
+            fontWeight: isCurrent ? 700 : 400,
+          }}
+        >
+          {id}
+        </span>
+      </button>
+    )
+  }
+
+  const renderArrow = (key: string) => (
+    <span key={key} className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', padding: '0 1px', alignSelf: 'center' }}>
+      &rarr;
+    </span>
+  )
+
+  const nodes: React.ReactNode[] = []
+  truncateAncestors.forEach((id, i) => {
+    nodes.push(renderNode(id, false))
+    if (i < truncateAncestors.length - 1) {
+      nodes.push(renderArrow(`a-${id}-${i}`))
+    }
+  })
+  if (hasAncestors) {
+    nodes.push(renderArrow('pre-self'))
+  }
+  nodes.push(renderNode(taskId, true))
+  if (hasDescendants) {
+    nodes.push(renderArrow('post-self'))
+  }
+  truncateDescendants.forEach((id, i) => {
+    nodes.push(renderNode(id, false))
+    if (i < truncateDescendants.length - 1) {
+      nodes.push(renderArrow(`d-${id}-${i}`))
+    }
+  })
+
+  return (
+    <div className="flex items-center flex-wrap gap-1" style={{ marginTop: 8 }}>
+      <span className="sk-label" style={{ fontSize: 10, marginRight: 4 }}>依赖链</span>
+      <div className="flex items-center flex-wrap gap-1">{nodes}</div>
+    </div>
+  )
+}
+
+function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
+  task: Task
+  taskMap: Map<string, Task>
+  reverseDepMap: Map<string, string[]>
+  onNavigate?: (taskId: string) => void
+}) {
   const [expanded, setExpanded] = useState(false)
 
   return (
     <>
       <TableRow
+        id={`task-row-${task.id}`}
         className="cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
@@ -143,15 +327,13 @@ function TaskRow({ task }: { task: Task }) {
                 </div>
               )}
 
-              {/* Dependencies */}
-              {task.dependencies.length > 0 && (
-                <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>依赖关系</span>
-                  <p className="sk-mono" style={{ fontSize: 11, marginTop: 2 }}>
-                    {task.dependencies.join(', ')}
-                  </p>
-                </div>
-              )}
+              {/* Dependency chain */}
+              <DepChain
+                taskId={task.id}
+                taskMap={taskMap}
+                reverseDepMap={reverseDepMap}
+                onNavigate={onNavigate}
+              />
 
               {/* Tags */}
               {task.tags.length > 0 && (
@@ -196,7 +378,7 @@ function TaskRow({ task }: { task: Task }) {
   )
 }
 
-export default function TaskTable({ tasks }: TaskTableProps) {
+export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
   const [source, setSource] = useState<'all' | TaskSource>('all')
   const [status, setStatus] = useState<'all' | TaskStatus>('all')
   const [stage, setStage] = useState('')
@@ -204,6 +386,44 @@ export default function TaskTable({ tasks }: TaskTableProps) {
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+
+  // Build lookup maps from allTasks (or tasks if allTasks not provided)
+  const lookupTasks = allTasks ?? tasks
+  const taskMap = useMemo(() => {
+    const m = new Map<string, Task>()
+    for (const t of lookupTasks) m.set(t.id, t)
+    return m
+  }, [lookupTasks])
+
+  // Build reverse dependency map (taskId → list of tasks that depend on it)
+  const reverseDepMap = useMemo(() => {
+    const rev = new Map<string, string[]>()
+    for (const t of lookupTasks) {
+      for (const depId of t.dependencies) {
+        const list = rev.get(depId)
+        if (list) list.push(t.id)
+        else rev.set(depId, [t.id])
+      }
+    }
+    return rev
+  }, [lookupTasks])
+
+  const handleNavigate = useCallback((taskId: string) => {
+    // Switch to 'all' filters so the task is visible
+    setSource('all')
+    setStatus('all')
+    setStage('')
+    setModuleFilter('')
+    setSearch(taskId)
+
+    // Scroll to the task row after render
+    setTimeout(() => {
+      const el = document.getElementById(`task-row-${taskId}`)
+      if (el) {
+        el.scrollIntoView({ behavior: 'smooth', block: 'center' })
+      }
+    }, 100)
+  }, [])
 
   // Reset to page 1 whenever filters or search changes
   useEffect(() => {
@@ -342,7 +562,7 @@ export default function TaskTable({ tasks }: TaskTableProps) {
               </TableHeader>
               <TableBody>
                 {paginatedData.map((t) => (
-                  <TaskRow key={t.id} task={t} />
+                  <TaskRow key={t.id} task={t} taskMap={taskMap} reverseDepMap={reverseDepMap} onNavigate={handleNavigate} />
                 ))}
               </TableBody>
             </Table>

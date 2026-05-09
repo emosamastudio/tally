@@ -6,8 +6,12 @@ interface DashboardLayoutProps {
   overview: ReactNode
   progressTrend: ReactNode
   currentRound: ReactNode
+  roundAnalytics?: ReactNode
   stageMatrix: ReactNode
+  moduleDistribution?: ReactNode
+  priorityDonut?: ReactNode
   blockList: ReactNode
+  agentContribution?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
   roundTimeline?: ReactNode
@@ -18,8 +22,12 @@ export default function DashboardLayout({
   overview,
   progressTrend,
   currentRound,
+  roundAnalytics,
   stageMatrix,
+  moduleDistribution,
+  priorityDonut,
   blockList,
+  agentContribution,
   dependencyGraph,
   taskTable,
   roundTimeline,
@@ -42,19 +50,29 @@ export default function DashboardLayout({
           <div className="lg:col-span-1">{currentRound}</div>
         </section>
 
-        {/* Row 2: Stage matrix + Block list */}
-        <section className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-          {stageMatrix}
-          {blockList}
+        {/* Row 1b: Round analytics (burndown + velocity) */}
+        {roundAnalytics && <section>{roundAnalytics}</section>}
+
+        {/* Row 2: Stage matrix + small panels + Block list */}
+        <section className="grid grid-cols-1 gap-6 lg:grid-cols-4">
+          <div className="lg:col-span-2">{stageMatrix}</div>
+          <div className="lg:col-span-1 space-y-4">
+            {moduleDistribution}
+            {priorityDonut}
+          </div>
+          <div className="lg:col-span-1">{blockList}</div>
         </section>
 
-        {/* Row 3: Round timeline (NEW) */}
+        {/* Row 3: Agent contribution */}
+        {agentContribution && <section>{agentContribution}</section>}
+
+        {/* Row 4: Round timeline */}
         {roundTimeline && <section>{roundTimeline}</section>}
 
-        {/* Row 4: Dependency graph */}
+        {/* Row 5: Dependency graph */}
         <section>{dependencyGraph}</section>
 
-        {/* Row 5: Task table */}
+        {/* Row 6: Task table */}
         <section>{taskTable}</section>
       </div>
     </div>

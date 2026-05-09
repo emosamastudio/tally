@@ -4,18 +4,15 @@
  *
  * Already implemented:
  * - ProgressTrend: area chart (Recharts)
+ * - RoundAnalytics: burndown + velocity (Recharts ComposedChart)
+ * - ModuleDistribution: treemap (Recharts Treemap)
+ * - PriorityDonut: donut chart (Recharts PieChart)
+ * - AgentContribution: stacked bar chart (Recharts BarChart)
  * - DependencyGraph: DAG with dagre layout
  * - StageMatrix: pipeline with progress bars
  * - CurrentRound: SVG progress ring
  * - RoundTimeline: vertical timeline
- *
- * Could add:
- * - Burndown chart: tasks done per round over time (line chart)
- * - Module distribution: treemap or packed-bubble of tasks per module
- * - Dependency chain: mini inline graph per task showing direct ancestors/descendants
- * - Velocity chart: tasks completed per round (bar chart)
- * - Priority breakdown: donut/pie chart of tasks by priority
- * - Agent contribution: stacked bar of tasks done per agent
+ * - TaskTable: inline dependency chain in expanded rows
  */
 import { useState, useEffect } from 'react'
 import { useLedgerData } from '@/hooks/useLedgerData'
@@ -24,8 +21,12 @@ import { Card, CardContent } from '@/components/ui/card'
 import OverviewBar, { OverviewBarSkeleton } from '@/components/overview-bar'
 import ProgressTrend, { ProgressTrendSkeleton } from '@/components/progress-trend'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
+import RoundAnalytics, { RoundAnalyticsSkeleton } from '@/components/round-analytics'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
+import ModuleDistribution, { ModuleDistributionSkeleton } from '@/components/module-distribution'
+import PriorityDonut, { PriorityDonutSkeleton } from '@/components/priority-donut'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
+import AgentContribution, { AgentContributionSkeleton } from '@/components/agent-contribution'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
 import RoundTimeline, { RoundTimelineSkeleton } from '@/components/round-timeline'
@@ -83,8 +84,12 @@ export default function App() {
         overview={<OverviewBarSkeleton />}
         progressTrend={<ProgressTrendSkeleton />}
         currentRound={<CurrentRoundSkeleton />}
+        roundAnalytics={<RoundAnalyticsSkeleton />}
         stageMatrix={<StageMatrixSkeleton />}
+        moduleDistribution={<ModuleDistributionSkeleton />}
+        priorityDonut={<PriorityDonutSkeleton />}
         blockList={<BlockListSkeleton />}
+        agentContribution={<AgentContributionSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
         roundTimeline={<RoundTimelineSkeleton />}
@@ -127,10 +132,14 @@ export default function App() {
       overview={<OverviewBar data={merged} tasks={allTasks} modules={modules} />}
       progressTrend={<ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />}
       currentRound={<CurrentRound round={merged.activeRound} />}
+      roundAnalytics={<RoundAnalytics rounds={rounds} tasks={allTasks} />}
       stageMatrix={<StageMatrix stages={merged.allStages} />}
+      moduleDistribution={<ModuleDistribution tasks={allTasks} />}
+      priorityDonut={<PriorityDonut tasks={allTasks} />}
       blockList={<BlockList blocks={merged.activeBlocks} />}
+      agentContribution={<AgentContribution rounds={rounds} tasks={allTasks} />}
       dependencyGraph={<DependencyGraph tasks={allTasks} />}
-      taskTable={<TaskTable tasks={allTasks} />}
+      taskTable={<TaskTable tasks={allTasks} allTasks={allTasks} />}
       roundTimeline={<RoundTimeline rounds={rounds} tasks={allTasks} />}
     />
   )
