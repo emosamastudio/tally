@@ -1,0 +1,12 @@
+agent:
+  id: main
+
+round:
+  maxTasks: 10
+  allowParallel: false
+
+lint:
+  strict: false
+
+dashboard:
+  port: 5173

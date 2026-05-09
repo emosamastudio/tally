@@ -1,0 +1,10 @@
+{
+  "name": "tally-monorepo",
+  "private": true,
+  "workspaces": ["cli", "dashboard"],
+  "scripts": {
+    "test": "npm run test -w cli",
+    "build": "npm run build -w cli && npm run build -w dashboard",
+    "lint": "npm run lint -w cli"
+  }
+}
