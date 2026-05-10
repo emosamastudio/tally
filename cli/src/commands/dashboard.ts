@@ -80,7 +80,23 @@ export function dashboardCommand(): Command {
 
         // API: list projects
         if (pathname === '/api/projects') {
-          const config = loadConfig()
+          // If no projects configured, return the current single project
+          if (config.projects.length === 0) {
+            try {
+              const raw = readFileSync(jsonPath, 'utf-8')
+              const doc = JSON.parse(raw) as TallyDocument
+              const status = computeStatus(doc)
+              res.setHeader('Content-Type', 'application/json')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(JSON.stringify([{ name: doc._meta.project, path: process.cwd(), ...status }]))
+            } catch {
+              res.setHeader('Content-Type', 'application/json')
+              res.setHeader('Access-Control-Allow-Origin', '*')
+              res.end(JSON.stringify([]))
+            }
+            return
+          }
+
           const results: Array<{
             name: string
             path: string

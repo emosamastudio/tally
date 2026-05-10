@@ -110,6 +110,7 @@ export interface LedgerData {
   }
   rounds: Round[]
   modules: ModuleMeta[]
+  projectName: string
   updated: string | null
 }
 

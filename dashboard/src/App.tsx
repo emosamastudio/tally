@@ -162,29 +162,6 @@ export default function App() {
     }
   }, [projects, selectedProject])
 
-  // Project selector chip
-  const projectSelector = projects.length > 0 ? (
-    <select
-      className="sk-select w-full md:w-auto"
-      value={selectedProject ?? ''}
-      onChange={(e) => setSelectedProject(e.target.value)}
-      style={{
-        fontFamily: 'inherit',
-        fontSize: 12,
-        padding: '4px 8px',
-        border: '1px solid var(--ink-4)',
-        borderRadius: 6,
-        background: 'var(--surface-1)',
-        color: 'var(--ink-1)',
-        cursor: 'pointer',
-      }}
-    >
-      {projects.map((p) => (
-        <option key={p.name} value={p.name}>{p.name}</option>
-      ))}
-    </select>
-  ) : null
-
   // Theme toggle button
   const themeToggle = (
     <button
@@ -214,7 +191,19 @@ export default function App() {
               <p className="sk-mono" style={{ fontSize: 11, color: 'var(--ink-3)', maxWidth: 300 }}>加载中...</p>
             </div>
             <div className="flex gap-2 items-center flex-wrap">
-              {projectSelector}
+              {projects.length > 0 ? (
+                <select
+                  className="sk-select"
+                  value={selectedProject ?? ''}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                >
+                  {projects.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="sk-chip shrink-0">Tally</span>
+              )}
               {themeToggle}
               <span className="sk-chip">单人监控</span>
               <span className="sk-chip solid">● 实时</span>
@@ -262,11 +251,22 @@ export default function App() {
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
             <div className="flex items-baseline gap-4 min-w-0 flex-wrap">
               <h1 className="sk-h1 shrink-0" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
-              <span className="sk-chip shrink-0">v · 经典驾驶舱</span>
+              {projects.length > 0 ? (
+                <select
+                  className="sk-select"
+                  value={selectedProject ?? ''}
+                  onChange={(e) => setSelectedProject(e.target.value)}
+                >
+                  {projects.map((p) => (
+                    <option key={p.name} value={p.name}>{p.name}</option>
+                  ))}
+                </select>
+              ) : (
+                <span className="sk-chip shrink-0">{state.status === 'ready' ? state.data.projectName : 'Tally'}</span>
+              )}
               {refreshIndicator}
             </div>
             <div className="flex gap-2 shrink-0 items-center flex-wrap">
-              {projectSelector}
               {themeToggle}
               <span className="sk-chip">单人监控</span>
               <span className="sk-chip solid">● 实时</span>

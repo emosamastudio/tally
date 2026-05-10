@@ -77,6 +77,7 @@ interface TallyModuleRaw {
 }
 
 interface TallyMetaRaw {
+  project?: string
   modules?: TallyModuleRaw[]
   updated?: string
 }
@@ -255,6 +256,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
     merged,
     rounds,
     modules,
+    projectName: raw._meta?.project ?? 'Tally',
     updated: raw._meta?.updated ?? null,
   }
 }
