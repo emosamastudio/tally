@@ -128,26 +128,22 @@ export function dashboardCommand(): Command {
         if (pathname === '/api/tally.json') {
           const projectName = parsedUrl.searchParams.get('project')
           if (projectName) {
-            const config = loadConfig()
             const project = config.projects.find((p) => p.name === projectName)
-            if (!project) {
-              res.statusCode = 404
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify({ error: 'Project not found' }))
+            if (project) {
+              const resolvedPath = resolvePath(project.path)
+              try {
+                const data = readFileSync(join(resolvedPath, 'tally.json'), 'utf-8')
+                res.setHeader('Content-Type', 'application/json')
+                res.setHeader('Access-Control-Allow-Origin', '*')
+                res.end(data)
+              } catch {
+                res.statusCode = 404
+                res.setHeader('Content-Type', 'application/json')
+                res.end(JSON.stringify({ error: 'tally.json not found' }))
+              }
               return
             }
-            const resolvedPath = resolvePath(project.path)
-            try {
-              const data = readFileSync(join(resolvedPath, 'tally.json'), 'utf-8')
-              res.setHeader('Content-Type', 'application/json')
-              res.setHeader('Access-Control-Allow-Origin', '*')
-              res.end(data)
-            } catch {
-              res.statusCode = 404
-              res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify({ error: 'tally.json not found' }))
-            }
-            return
+            // Project not in config — fall through to serve current project
           }
 
           // Backward compatible: serve from current directory
