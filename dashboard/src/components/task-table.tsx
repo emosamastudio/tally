@@ -486,11 +486,11 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
 
       <CardContent className="p-0 space-y-3">
         {/* Filters as SkChip-style */}
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col sm:flex-row flex-wrap gap-2">
           <select
             value={source}
             onChange={(e) => setSource(e.target.value as 'all' | TaskSource)}
-            className="sk-select"
+            className="sk-select w-full sm:w-auto"
           >
             <option value="all">全部来源</option>
             <option value="os">OS</option>
@@ -499,7 +499,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
           <select
             value={status}
             onChange={(e) => setStatus(e.target.value as 'all' | TaskStatus)}
-            className="sk-select"
+            className="sk-select w-full sm:w-auto"
           >
             <option value="all">全部状态</option>
             <option value="pending">待处理</option>
@@ -511,7 +511,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
           <select
             value={stage}
             onChange={(e) => setStage(e.target.value)}
-            className="sk-select"
+            className="sk-select w-full sm:w-auto"
           >
             <option value="">全部阶段</option>
             {stages.map((s) => (
@@ -521,14 +521,14 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
           <select
             value={moduleFilter}
             onChange={(e) => setModuleFilter(e.target.value)}
-            className="sk-select"
+            className="sk-select w-full sm:w-auto"
           >
             <option value="">全部模块</option>
             {modules.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
             ))}
           </select>
-          <div className="relative flex-1 min-w-[160px]">
+          <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-[160px]">
             <input
               type="text"
               placeholder="搜索任务..."
@@ -546,6 +546,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
           </p>
         ) : (
           <>
+            <div className="max-w-[calc(100vw-2rem)] overflow-auto">
             <Table>
               <TableHeader>
                 <TableRow>
@@ -566,6 +567,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
                 ))}
               </TableBody>
             </Table>
+            </div>
 
             {/* Pagination */}
             <div className="flex items-center justify-between pt-3">

@@ -13,7 +13,7 @@ const TILTS = [1, 2, 3, 1, 2] as const
 
 function StatTile({ label, value, hint, tilt }: { label: string; value: string; hint?: string; tilt?: number }) {
   return (
-    <Card tilt={tilt as 1 | 2 | 3 | undefined} style={{ minWidth: 0, padding: '12px 14px', overflow: 'hidden' }}>
+    <Card tilt={tilt as 1 | 2 | 3 | undefined} className="px-3 py-2 md:px-4 md:py-3" style={{ minWidth: 0, overflow: 'hidden' }}>
       <div className="sk-label truncate">{label}</div>
       <div className="sk-num truncate" style={{ marginTop: 4, fontSize: 40 }}>
         {value}

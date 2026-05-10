@@ -4,10 +4,10 @@
  *
  * Already implemented:
  * - ProgressTrend: area chart (Recharts)
- * - RoundAnalytics: burndown + velocity (Recharts ComposedChart)
- * - ModuleDistribution: treemap (Recharts Treemap)
- * - PriorityDonut: donut chart (Recharts PieChart)
- * - AgentContribution: stacked bar chart (Recharts BarChart)
+ * - RoundAnalytics: burndown + velocity (Recharts ComposedChart) — lazy loaded
+ * - ModuleDistribution: treemap (Recharts Treemap) — lazy loaded
+ * - PriorityDonut: donut chart (Recharts PieChart) — lazy loaded
+ * - AgentContribution: stacked bar chart (Recharts BarChart) — lazy loaded
  * - DependencyGraph: DAG with dagre layout
  * - StageMatrix: pipeline with progress bars
  * - CurrentRound: SVG progress ring + collapsible round timeline
@@ -17,17 +17,24 @@ import { useState, useEffect } from 'react'
 import { useLedgerData } from '@/hooks/useLedgerData'
 import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
+import { ErrorBoundary } from '@/components/error-boundary'
 import OverviewBar, { OverviewBarSkeleton } from '@/components/overview-bar'
 import ProgressTrend, { ProgressTrendSkeleton } from '@/components/progress-trend'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
-import RoundAnalytics, { RoundAnalyticsSkeleton } from '@/components/round-analytics'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
-import ModuleDistribution, { ModuleDistributionSkeleton } from '@/components/module-distribution'
-import PriorityDonut, { PriorityDonutSkeleton } from '@/components/priority-donut'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
-import AgentContribution, { AgentContributionSkeleton } from '@/components/agent-contribution'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
+import {
+  LazyRoundAnalytics,
+  LazyModuleDistribution,
+  LazyPriorityDonut,
+  LazyAgentContribution,
+  RoundAnalyticsSkeleton,
+  ModuleDistributionSkeleton,
+  PriorityDonutSkeleton,
+  AgentContributionSkeleton,
+} from '@/components/lazy-wrappers'
 
 export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
@@ -43,7 +50,7 @@ export default function App() {
   // Project selector chip
   const projectSelector = projects.length > 0 ? (
     <select
-      className="sk-select"
+      className="sk-select w-full md:w-auto"
       value={selectedProject ?? ''}
       onChange={(e) => setSelectedProject(e.target.value)}
       style={{
@@ -67,12 +74,12 @@ export default function App() {
     return (
       <DashboardLayout
         header={
-          <div className="flex items-center justify-between w-full gap-4">
+          <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
             <div className="shrink-0">
               <h1 className="sk-h1" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
               <p className="sk-mono" style={{ fontSize: 11, color: 'var(--ink-3)', maxWidth: 300 }}>加载中...</p>
             </div>
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center flex-wrap">
               {projectSelector}
               <span className="sk-chip">单人监控</span>
               <span className="sk-chip solid">● 实时</span>
@@ -114,29 +121,73 @@ export default function App() {
   return (
     <DashboardLayout
       header={
-        <div className="flex items-center justify-between w-full gap-4 flex-wrap">
+        <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
           <div className="flex items-baseline gap-4 min-w-0 flex-wrap">
             <h1 className="sk-h1 shrink-0" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
             <span className="sk-chip shrink-0">v · 经典驾驶舱</span>
           </div>
-          <div className="flex gap-2 shrink-0 items-center">
+          <div className="flex gap-2 shrink-0 items-center flex-wrap">
             {projectSelector}
             <span className="sk-chip">单人监控</span>
             <span className="sk-chip solid">● 实时</span>
           </div>
         </div>
       }
-      overview={<OverviewBar data={merged} tasks={allTasks} modules={modules} />}
-      progressTrend={<ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />}
-      currentRound={<CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />}
-      roundAnalytics={<RoundAnalytics rounds={rounds} tasks={allTasks} />}
-      stageMatrix={<StageMatrix stages={merged.allStages} />}
-      moduleDistribution={<ModuleDistribution tasks={allTasks} />}
-      priorityDonut={<PriorityDonut tasks={allTasks} />}
-      blockList={<BlockList blocks={merged.activeBlocks} />}
-      agentContribution={<AgentContribution rounds={rounds} tasks={allTasks} />}
-      dependencyGraph={<DependencyGraph tasks={allTasks} />}
-      taskTable={<TaskTable tasks={allTasks} allTasks={allTasks} />}
+      overview={
+        <ErrorBoundary fallbackName="概览">
+          <OverviewBar data={merged} tasks={allTasks} modules={modules} />
+        </ErrorBoundary>
+      }
+      progressTrend={
+        <ErrorBoundary fallbackName="进度趋势">
+          <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
+        </ErrorBoundary>
+      }
+      currentRound={
+        <ErrorBoundary fallbackName="当前回合">
+          <CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />
+        </ErrorBoundary>
+      }
+      roundAnalytics={
+        <ErrorBoundary fallbackName="回合分析">
+          <LazyRoundAnalytics rounds={rounds} tasks={allTasks} />
+        </ErrorBoundary>
+      }
+      stageMatrix={
+        <ErrorBoundary fallbackName="阶段矩阵">
+          <StageMatrix stages={merged.allStages} />
+        </ErrorBoundary>
+      }
+      moduleDistribution={
+        <ErrorBoundary fallbackName="模块分布">
+          <LazyModuleDistribution tasks={allTasks} />
+        </ErrorBoundary>
+      }
+      priorityDonut={
+        <ErrorBoundary fallbackName="优先级分布">
+          <LazyPriorityDonut tasks={allTasks} />
+        </ErrorBoundary>
+      }
+      blockList={
+        <ErrorBoundary fallbackName="阻塞列表">
+          <BlockList blocks={merged.activeBlocks} />
+        </ErrorBoundary>
+      }
+      agentContribution={
+        <ErrorBoundary fallbackName="代理贡献">
+          <LazyAgentContribution rounds={rounds} tasks={allTasks} />
+        </ErrorBoundary>
+      }
+      dependencyGraph={
+        <ErrorBoundary fallbackName="依赖图">
+          <DependencyGraph tasks={allTasks} />
+        </ErrorBoundary>
+      }
+      taskTable={
+        <ErrorBoundary fallbackName="任务列表">
+          <TaskTable tasks={allTasks} allTasks={allTasks} />
+        </ErrorBoundary>
+      }
     />
   )
 }

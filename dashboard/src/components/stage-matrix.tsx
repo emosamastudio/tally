@@ -41,7 +41,7 @@ export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) 
       </div>
 
       <CardContent className="p-0">
-        <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+        <div className="overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
         <div className="flex" style={{ minWidth: sorted.length * 110, position: 'relative' }}>
           {sorted.map((s, i, arr) => {
             const total = s.done + s.open + s.hold + s.blocked
@@ -91,7 +91,7 @@ export function StageMatrixSkeleton() {
     <Card>
       <CardHeader><CardTitle>阶段矩阵</CardTitle></CardHeader>
       <CardContent>
-        <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+        <div className="overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
         <div className="flex" style={{ minWidth: 7 * 110 }}>
           {Array.from({ length: 7 }).map((_, i) => (
             <div key={i} className="shrink-0" style={{ width: 110, padding: '8px 12px', borderRight: i < 6 ? '1.6px dashed var(--ink-4)' : 'none' }}>
