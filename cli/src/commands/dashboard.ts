@@ -49,6 +49,17 @@ function resolvePath(path: string): string {
   return path.replace(/^~/, homedir())
 }
 
+function findTallyJson(startDir: string): string | null {
+  let dir = startDir
+  while (true) {
+    const candidate = join(dir, 'tally.json')
+    if (existsSync(candidate)) return candidate
+    const parent = join(dir, '..')
+    if (parent === dir) return null  // reached root
+    dir = parent
+  }
+}
+
 export function dashboardCommand(): Command {
   const cmd = new Command('dashboard')
   cmd.description('Start visualization dashboard')
@@ -57,7 +68,7 @@ export function dashboardCommand(): Command {
     .action(async (opts: { port?: string; open: boolean }) => {
       const config = loadConfig()
       const port = Number(opts.port) || config.dashboard.port
-      const jsonPath = ledgerPath()
+      const jsonPath = findTallyJson(process.cwd()) ?? ledgerPath()
 
       // Look for dashboard dist relative to CLI package
       const distDir = join(import.meta.dirname, '..', '..', '..', 'dashboard', 'dist')

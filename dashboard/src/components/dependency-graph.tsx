@@ -29,6 +29,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 const NODE_WIDTH = 160
 const NODE_HEIGHT = 40
 const CRITICAL_COLOR = 'var(--accent)'
+const MAX_NODES = 300
 
 function truncateName(name: string, maxLen: number): string {
   if (name.length <= maxLen) return name
@@ -149,6 +150,17 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
   const [moduleFilter, setModuleFilter] = useState('')
   const [showIsolated, setShowIsolated] = useState(false)
 
+  // Performance: limit graph nodes when task count exceeds threshold
+  const isTruncated = tasks.length > MAX_NODES
+  const displayTasks = useMemo(() => {
+    if (!isTruncated) return tasks
+    // Prefer tasks that have dependencies (connected nodes)
+    const withDeps = tasks.filter((t) => t.dependencies.length > 0)
+    const isolated = tasks.filter((t) => t.dependencies.length === 0)
+    const selected = [...withDeps, ...isolated].slice(0, MAX_NODES)
+    return selected
+  }, [tasks, isTruncated])
+
   const [selectedNodeId, setSelectedNodeId] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ x: number; y: number; task: Task } | null>(null)
   const [isPanning, setIsPanning] = useState(false)
@@ -184,25 +196,25 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
   const { forwardAdj, reverseAdj } = useMemo(() => {
     const fwd = new Map<string, string[]>()
     const rev = new Map<string, string[]>()
-    for (const t of tasks) {
+    for (const t of displayTasks) {
       if (!fwd.has(t.id)) fwd.set(t.id, [])
       rev.set(t.id, t.dependencies.slice())
     }
-    for (const t of tasks) {
+    for (const t of displayTasks) {
       for (const depId of t.dependencies) {
         const list = fwd.get(depId)
         if (list) list.push(t.id)
       }
     }
     return { forwardAdj: fwd, reverseAdj: rev }
-  }, [tasks])
+  }, [displayTasks])
 
   const visibleTaskIds = useMemo(() => {
     if (!moduleFilter) {
-      return new Set(tasks.map((t) => t.id))
+      return new Set(displayTasks.map((t) => t.id))
     }
     const ids = new Set<string>()
-    for (const t of tasks) {
+    for (const t of displayTasks) {
       if (t.module === moduleFilter) {
         ids.add(t.id)
         for (const depId of t.dependencies) {
@@ -211,11 +223,11 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
       }
     }
     return ids
-  }, [tasks, moduleFilter])
+  }, [displayTasks, moduleFilter])
 
   const visibleTasks = useMemo(
-    () => tasks.filter((t) => visibleTaskIds.has(t.id)),
-    [tasks, visibleTaskIds],
+    () => displayTasks.filter((t) => visibleTaskIds.has(t.id)),
+    [displayTasks, visibleTaskIds],
   )
 
   const layoutResult = useMemo(() => {
@@ -456,7 +468,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
     setTooltip(null)
   }, [])
 
-  if (tasks.length === 0) {
+  if (displayTasks.length === 0) {
     return (
       <Card>
         <CardHeader><CardTitle>依赖关系图</CardTitle></CardHeader>
@@ -469,7 +481,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
     )
   }
 
-  const hasDependencies = tasks.some((t) => t.dependencies.length > 0)
+  const hasDependencies = displayTasks.some((t) => t.dependencies.length > 0)
   if (!hasDependencies) {
     return (
       <Card>
@@ -494,6 +506,15 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
         </div>
       </CardHeader>
       <CardContent className="space-y-3">
+        {/* Truncation warning */}
+        {isTruncated && (
+          <div className="sk-box" style={{ padding: '8px 12px', borderColor: 'var(--accent)', borderStyle: 'dashed' }}>
+            <span className="sk-body" style={{ fontSize: 12, color: 'var(--accent)' }}>
+              任务过多（{tasks.length} 个），依赖图已限制显示前 {MAX_NODES} 个
+            </span>
+          </div>
+        )}
+
         {/* Stats bar */}
         {layoutResult.nodes.size > 0 && (
           <div className="sk-box fill" style={{ padding: '8px 12px', display: 'flex', flexWrap: 'wrap', gap: '12px 24px' }}>
