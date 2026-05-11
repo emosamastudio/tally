@@ -49,6 +49,15 @@ function registerProject(cwd: string, projectName: string): void {
     } catch {
       // Corrupt config — start fresh
     }
+  } else {
+    // Create new config with full defaults
+    config = {
+      agent: { id: 'main' },
+      round: { maxTasks: 10, allowParallel: false },
+      lint: { strict: false },
+      dashboard: { port: 5173 },
+      projects: [],
+    }
   }
 
   const projects = (config['projects'] as Array<{ name: string; path: string }>) ?? []

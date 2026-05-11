@@ -27,12 +27,22 @@ export function loadConfig(cwd: string = process.cwd()): TallyConfig {
   const local = loadYaml(join(cwd, '.tallyrc.yaml')) ?? {}
   const envId = process.env['TALLY_AGENT_ID']
 
+  // Merge projects: local + global, dedup by name
+  const localProjects = local.projects ?? []
+  const globalProjects = global.projects ?? []
+  const mergedProjects = [...localProjects]
+  for (const gp of globalProjects) {
+    if (!mergedProjects.some((lp) => lp.name === gp.name)) {
+      mergedProjects.push(gp)
+    }
+  }
+
   const merged: TallyConfig = {
     agent: { id: envId ?? local.agent?.id ?? global.agent?.id ?? DEFAULTS.agent.id },
     round: { ...DEFAULTS.round, ...global.round, ...local.round },
     lint: { ...DEFAULTS.lint, ...global.lint, ...local.lint },
     dashboard: { ...DEFAULTS.dashboard, ...global.dashboard, ...local.dashboard },
-    projects: local.projects ?? global.projects ?? DEFAULTS.projects,
+    projects: mergedProjects.length > 0 ? mergedProjects : DEFAULTS.projects,
   }
   return merged
 }
