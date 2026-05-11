@@ -691,7 +691,6 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
               const colors = STATUS_COLORS[node.task.status]
               const isHighlighted = selectedNodeId ? highlightedIds.has(node.id) : true
               const isCritical = criticalPathIds.has(node.id)
-              const isSelected = selectedNodeId === node.id
               const left = node.x - node.width / 2
               const top = node.y - node.height / 2
 

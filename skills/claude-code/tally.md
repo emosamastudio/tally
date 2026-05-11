@@ -46,6 +46,15 @@ Agent reads `tally.json` via Read tool, writes via `tally <command>`.
 - Multiple tasks added: `tally task add --json '[...]'`
 - Multiple blocked: `tally task block U-001 U-002 --reason "..."`
 
+## Round Start Selection Logic
+
+`tally round start` auto-selects tasks optimized for agent execution:
+1. **Parallelism first** — tasks at the same topological depth have no mutual dependencies
+2. **Module focus second** — within the same depth, prefer same-module tasks for shared context
+3. **Order tiebreaker** — deterministic ordering
+
+This ensures an agent executing 10 tasks works on parallelizable work in a focused area.
+
 ## Concurrency
 
 - Set agent ID: `export TALLY_AGENT_ID=<id>` (must exist in `_meta.agents`)
