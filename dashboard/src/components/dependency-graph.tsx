@@ -704,21 +704,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
                   style={{ cursor: 'pointer', transition: 'opacity 0.15s' }}
                   opacity={isHighlighted ? 1 : 0.12}
                 >
-                  {/* Glow behind critical-path nodes */}
-                  {isCritical && (
-                    <rect
-                      x={left - 3}
-                      y={top - 3}
-                      width={node.width + 6}
-                      height={node.height + 6}
-                      rx={9}
-                      ry={9}
-                      fill="none"
-                      stroke={CRITICAL_COLOR}
-                      strokeWidth={2.2}
-                      opacity={0.3}
-                    />
-                  )}
+                  {/* Status-colored node body */}
                   <rect
                     x={left}
                     y={top}
@@ -726,14 +712,30 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
                     height={node.height}
                     rx={6}
                     ry={6}
-                    fill={isCritical ? 'rgba(255,210,63,0.22)' : colors.fill}
-                    stroke={isCritical ? CRITICAL_COLOR : isSelected ? colors.stroke : colors.stroke}
-                    strokeWidth={isCritical ? 2.2 : isSelected ? 2.2 : 1.6}
+                    fill={colors.fill}
+                    stroke={isCritical ? CRITICAL_COLOR : colors.stroke}
+                    strokeWidth={isCritical ? 2.2 : 1.6}
+                    strokeDasharray={isCritical ? 'none' : 'none'}
                   />
+                  {/* Critical path double-border indicator */}
+                  {isCritical && (
+                    <rect
+                      x={left - 2}
+                      y={top - 2}
+                      width={node.width + 4}
+                      height={node.height + 4}
+                      rx={8}
+                      ry={8}
+                      fill="none"
+                      stroke={CRITICAL_COLOR}
+                      strokeWidth={1.4}
+                      opacity={0.5}
+                    />
+                  )}
                   <text
                     x={left + 8}
                     y={top + 17}
-                    fill={isCritical ? 'var(--ink)' : colors.text}
+                    fill={colors.text}
                     fontSize={9}
                     fontFamily="JetBrains Mono, ui-monospace, monospace"
                     fontWeight={isCritical ? 700 : 400}
@@ -805,9 +807,14 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
           <span style={{ color: 'var(--ink-4)', margin: '0 2px' }}>|</span>
           <span className="flex items-center gap-1">
             <span
-              className="w-3 h-3 rounded-sm border-2 inline-block"
-              style={{ borderColor: CRITICAL_COLOR, backgroundColor: 'rgba(255,210,63,0.22)' }}
-            />
+              className="w-3 h-3 rounded-sm inline-block relative"
+              style={{ border: `1.6px solid ${STATUS_COLORS.completed.stroke}`, backgroundColor: STATUS_COLORS.completed.fill }}
+            >
+              <span
+                className="absolute inset-0 rounded-sm"
+                style={{ border: `1.4px solid ${CRITICAL_COLOR}`, margin: -3, opacity: 0.7 }}
+              />
+            </span>
             <span className="sk-body" style={{ fontSize: 11 }}>关键路径</span>
           </span>
           {selectedNodeId && (
