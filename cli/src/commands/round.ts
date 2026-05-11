@@ -105,12 +105,13 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
     }
     for (const t of eligible) computeDepth(t.id, new Set())
 
-    // Sort: same depth = can run in parallel. Within depth, spread across modules.
+    // Sort: same depth = can run in parallel. Within same depth, group by module
+    // for agent focus (shared context, less cognitive switching).
     eligible.sort((a, b) => {
       const depthA = depthMap.get(a.id) ?? 0
       const depthB = depthMap.get(b.id) ?? 0
       if (depthA !== depthB) return depthA - depthB  // shallow first → maximize parallelism
-      // Same depth: prefer different modules for cross-module parallelism
+      // Same depth: prefer SAME module for agent focus
       if (a.module !== b.module) return a.module.localeCompare(b.module)
       return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
     })
