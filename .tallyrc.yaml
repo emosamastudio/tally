@@ -16,3 +16,5 @@ projects:
     path: ~/workspace/tally
   - name: Polaris System
     path: ~/workspace/polaris/polaris-system
+  - name: Tally 功能展示
+    path: ~/workspace/tally-example
