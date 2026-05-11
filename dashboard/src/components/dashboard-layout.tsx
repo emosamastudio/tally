@@ -8,8 +8,7 @@ interface DashboardLayoutProps {
   currentRound: ReactNode
   roundAnalytics?: ReactNode
   stageMatrix: ReactNode
-  moduleDistribution?: ReactNode
-  priorityDonut?: ReactNode
+  distributionPanel?: ReactNode
   blockList: ReactNode
   agentContribution?: ReactNode
   dependencyGraph: ReactNode
@@ -23,8 +22,7 @@ export default function DashboardLayout({
   currentRound,
   roundAnalytics,
   stageMatrix,
-  moduleDistribution,
-  priorityDonut,
+  distributionPanel,
   blockList,
   agentContribution,
   dependencyGraph,
@@ -57,11 +55,8 @@ export default function DashboardLayout({
         {/* ROW 3b: Block List — full width, horizontal danger cards */}
         <section>{blockList}</section>
 
-        {/* ROW 3c: Priority Donut + Module Distribution — side by side with more space */}
-        <section className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-2">
-          <div className="flex">{priorityDonut}</div>
-          <div className="flex">{moduleDistribution}</div>
-        </section>
+        {/* ROW 3c: Distribution Panel — Priority + Module in a single card */}
+        {distributionPanel && <section>{distributionPanel}</section>}
 
         {/* ROW 4: Full width — AgentContribution */}
         {agentContribution && <section>{agentContribution}</section>}

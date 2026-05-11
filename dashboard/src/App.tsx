@@ -26,14 +26,11 @@ import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
+import DistributionPanel, { DistributionPanelSkeleton } from '@/components/distribution-panel'
 import {
   LazyRoundAnalytics,
-  LazyModuleDistribution,
-  LazyPriorityDonut,
   LazyAgentContribution,
   RoundAnalyticsSkeleton,
-  ModuleDistributionSkeleton,
-  PriorityDonutSkeleton,
   AgentContributionSkeleton,
 } from '@/components/lazy-wrappers'
 
@@ -215,9 +212,8 @@ export default function App() {
         currentRound={<CurrentRoundSkeleton />}
         roundAnalytics={<RoundAnalyticsSkeleton />}
         stageMatrix={<StageMatrixSkeleton />}
-        moduleDistribution={<ModuleDistributionSkeleton />}
-        priorityDonut={<PriorityDonutSkeleton />}
         blockList={<BlockListSkeleton />}
+        distributionPanel={<DistributionPanelSkeleton />}
         agentContribution={<AgentContributionSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
@@ -304,17 +300,12 @@ export default function App() {
             </ErrorBoundary>
           </section>
         }
-        moduleDistribution={
+        distributionPanel={
           <section ref={(el) => { sectionRefs.current[4] = el }}>
-            <ErrorBoundary fallbackName="模块分布">
-              <LazyModuleDistribution tasks={allTasks} />
+            <ErrorBoundary fallbackName="任务分布">
+              <DistributionPanel tasks={allTasks} />
             </ErrorBoundary>
           </section>
-        }
-        priorityDonut={
-          <ErrorBoundary fallbackName="优先级分布">
-            <LazyPriorityDonut tasks={allTasks} />
-          </ErrorBoundary>
         }
         blockList={
           <ErrorBoundary fallbackName="阻塞列表">
