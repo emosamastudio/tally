@@ -121,7 +121,7 @@ export default function DistributionPanel({ tasks }: DistributionPanelProps) {
               <Treemap
                 data={moduleData}
                 dataKey="size"
-                stroke="var(--ink)" strokeWidth={1}
+                stroke="var(--ink)"
               />
             </ResponsiveContainer>
           </div>

@@ -4,13 +4,11 @@ import type { ReactNode } from 'react'
 interface DashboardLayoutProps {
   header: ReactNode
   overview: ReactNode
-  progressTrend: ReactNode
+  blockList: ReactNode
+  chartsCarousel?: ReactNode
   currentRound: ReactNode
-  roundAnalytics?: ReactNode
   stageMatrix: ReactNode
   distributionPanel?: ReactNode
-  blockList: ReactNode
-  agentContribution?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
 }
@@ -18,13 +16,11 @@ interface DashboardLayoutProps {
 export default function DashboardLayout({
   header,
   overview,
-  progressTrend,
+  blockList,
+  chartsCarousel,
   currentRound,
-  roundAnalytics,
   stageMatrix,
   distributionPanel,
-  blockList,
-  agentContribution,
   dependencyGraph,
   taskTable,
 }: DashboardLayoutProps) {
@@ -40,31 +36,27 @@ export default function DashboardLayout({
         {/* ROW 1: KPI Strip — full width */}
         {overview && <section>{overview}</section>}
 
-        {/* ROW 2: Two columns — ProgressTrend + RoundAnalytics (left 2/3) | CurrentRound (right 1/3) */}
+        {/* ROW 2: Block List — most important, full width */}
+        <section>{blockList}</section>
+
+        {/* ROW 3: Charts Carousel (left 2/3) | Current Round (right 1/3) */}
         <section className="grid grid-cols-1 gap-4 md:gap-6 md:grid-cols-3">
-          <div className="md:col-span-2 space-y-4">
-            {progressTrend}
-            {roundAnalytics}
+          <div className="md:col-span-2">
+            {chartsCarousel}
           </div>
           <div className="md:col-span-1">{currentRound}</div>
         </section>
 
-        {/* ROW 3a: Stage Matrix — full width horizontal pipeline */}
+        {/* ROW 4: Stage Matrix — full width horizontal pipeline */}
         <section>{stageMatrix}</section>
 
-        {/* ROW 3b: Block List — full width, horizontal danger cards */}
-        <section>{blockList}</section>
-
-        {/* ROW 3c: Distribution Panel — Priority + Module in a single card */}
+        {/* ROW 5: Distribution Panel — Priority + Module in a single card */}
         {distributionPanel && <section>{distributionPanel}</section>}
 
-        {/* ROW 4: Full width — AgentContribution */}
-        {agentContribution && <section>{agentContribution}</section>}
-
-        {/* ROW 5: Full width — DependencyGraph (tall) */}
+        {/* ROW 6: DependencyGraph (tall) */}
         <section className="min-h-[400px] md:min-h-[500px]">{dependencyGraph}</section>
 
-        {/* ROW 6: Full width — TaskTable */}
+        {/* ROW 7: TaskTable */}
         <section>{taskTable}</section>
       </div>
     </div>

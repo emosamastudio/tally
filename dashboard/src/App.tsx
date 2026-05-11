@@ -20,18 +20,17 @@ import DashboardLayout from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
 import OverviewBar, { OverviewBarSkeleton } from '@/components/overview-bar'
-import ProgressTrend, { ProgressTrendSkeleton } from '@/components/progress-trend'
+import ProgressTrend from '@/components/progress-trend'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
 import DistributionPanel, { DistributionPanelSkeleton } from '@/components/distribution-panel'
+import ChartsCarousel, { ChartsCarouselSkeleton } from '@/components/charts-carousel'
 import {
   LazyRoundAnalytics,
   LazyAgentContribution,
-  RoundAnalyticsSkeleton,
-  AgentContributionSkeleton,
 } from '@/components/lazy-wrappers'
 
 function formatTime(date: Date): string {
@@ -208,13 +207,11 @@ export default function App() {
           </div>
         }
         overview={<OverviewBarSkeleton />}
-        progressTrend={<ProgressTrendSkeleton />}
-        currentRound={<CurrentRoundSkeleton />}
-        roundAnalytics={<RoundAnalyticsSkeleton />}
-        stageMatrix={<StageMatrixSkeleton />}
         blockList={<BlockListSkeleton />}
+        chartsCarousel={<ChartsCarouselSkeleton />}
+        currentRound={<CurrentRoundSkeleton />}
+        stageMatrix={<StageMatrixSkeleton />}
         distributionPanel={<DistributionPanelSkeleton />}
-        agentContribution={<AgentContributionSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
       />
@@ -276,21 +273,47 @@ export default function App() {
             </ErrorBoundary>
           </section>
         }
-        progressTrend={
+        blockList={
+          <ErrorBoundary fallbackName="阻塞列表">
+            <BlockList blocks={merged.activeBlocks} />
+          </ErrorBoundary>
+        }
+        chartsCarousel={
           <section ref={(el) => { sectionRefs.current[2] = el }}>
-            <ErrorBoundary fallbackName="进度趋势">
-              <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
-            </ErrorBoundary>
+            <ChartsCarousel tabs={[
+              {
+                key: 'trend',
+                label: '进度趋势',
+                content: (
+                  <ErrorBoundary fallbackName="进度趋势">
+                    <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
+                  </ErrorBoundary>
+                ),
+              },
+              {
+                key: 'rounds',
+                label: '回合分析',
+                content: (
+                  <ErrorBoundary fallbackName="回合分析">
+                    <LazyRoundAnalytics rounds={rounds} tasks={allTasks} />
+                  </ErrorBoundary>
+                ),
+              },
+              {
+                key: 'agents',
+                label: 'Agent 贡献',
+                content: (
+                  <ErrorBoundary fallbackName="代理贡献">
+                    <LazyAgentContribution rounds={rounds} tasks={allTasks} />
+                  </ErrorBoundary>
+                ),
+              },
+            ]} />
           </section>
         }
         currentRound={
           <ErrorBoundary fallbackName="当前回合">
             <CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />
-          </ErrorBoundary>
-        }
-        roundAnalytics={
-          <ErrorBoundary fallbackName="回合分析">
-            <LazyRoundAnalytics rounds={rounds} tasks={allTasks} />
           </ErrorBoundary>
         }
         stageMatrix={
@@ -307,20 +330,8 @@ export default function App() {
             </ErrorBoundary>
           </section>
         }
-        blockList={
-          <ErrorBoundary fallbackName="阻塞列表">
-            <BlockList blocks={merged.activeBlocks} />
-          </ErrorBoundary>
-        }
-        agentContribution={
-          <section ref={(el) => { sectionRefs.current[5] = el }}>
-            <ErrorBoundary fallbackName="代理贡献">
-              <LazyAgentContribution rounds={rounds} tasks={allTasks} />
-            </ErrorBoundary>
-          </section>
-        }
         dependencyGraph={
-          <section ref={(el) => { sectionRefs.current[6] = el }}>
+          <section ref={(el) => { sectionRefs.current[5] = el }}>
             <ErrorBoundary fallbackName="依赖图">
               <DependencyGraph tasks={allTasks} />
             </ErrorBoundary>
