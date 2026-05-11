@@ -201,8 +201,7 @@ export default function App() {
                 <span className="sk-chip shrink-0">Tally</span>
               )}
               {themeToggle}
-              <span className="sk-chip">单人监控</span>
-              <span className="sk-chip solid">● 实时</span>
+              <span className="sk-chip">加载中</span>
             </div>
           </div>
         }
@@ -261,8 +260,10 @@ export default function App() {
             </div>
             <div className="flex gap-2 shrink-0 items-center flex-wrap">
               {themeToggle}
-              <span className="sk-chip">单人监控</span>
-              <span className="sk-chip solid">● 实时</span>
+              {state.status === 'ready' && (
+                <span className="sk-chip ok">{merged.totalDone}/{merged.totalDone + merged.totalOpen + merged.activeBlocks.length} 完成</span>
+              )}
+              {refreshIndicator}
             </div>
           </div>
         }

@@ -88,16 +88,20 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
         </>
       )}
 
-      {/* Phase chips */}
-      <hr className="sk-rule dashed" style={{ margin: '4px 0' }} />
-      <div className="sk-label" style={{ fontSize: 11 }}>阶段</div>
-      <div className="flex gap-1.5 flex-wrap">
-        <span className="sk-chip solid" style={{ fontSize: 10 }}>规划 ✓</span>
-        <span className="sk-chip solid" style={{ fontSize: 10 }}>设计 ✓</span>
-        <span className="sk-chip accent" style={{ fontSize: 10 }}>实现 ●</span>
-        <span className="sk-chip" style={{ fontSize: 10 }}>校验</span>
-        <span className="sk-chip" style={{ fontSize: 10 }}>收尾</span>
-      </div>
+      {/* Phase chips — derived from actual stage data */}
+      {round.tasks.length > 0 && (
+        <>
+          <hr className="sk-rule dashed" style={{ margin: '4px 0' }} />
+          <div className="sk-label" style={{ fontSize: 11 }}>计划任务</div>
+          <div className="flex gap-1.5 flex-wrap">
+            {round.tasks.map((rt) => (
+              <span key={rt.taskId} className="sk-chip" style={{ fontSize: 10 }}>
+                {rt.taskId}
+              </span>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Collapsible Round History */}
       {timelineRounds.length > 0 && (
