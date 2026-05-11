@@ -122,7 +122,22 @@ export default function DistributionPanel({ tasks }: DistributionPanelProps) {
                 data={moduleData}
                 dataKey="size"
                 stroke="var(--ink)"
-              />
+                nameKey="name"
+              >
+                <Tooltip
+                  contentStyle={{
+                    background: 'rgba(255,255,255,0.95)',
+                    border: '2px solid var(--ink)',
+                    borderRadius: '6px',
+                    fontSize: '12px',
+                    fontFamily: 'Kalam, cursive',
+                  }}
+                  formatter={(value: any, _name: string, props: any) => {
+                    const ratio = props.payload?.ratio ?? 0
+                    return [`${value} 任务 (${Math.round(ratio * 100)}% 完成)`, props.payload?.name ?? '']
+                  }}
+                />
+              </Treemap>
             </ResponsiveContainer>
           </div>
         </div>
