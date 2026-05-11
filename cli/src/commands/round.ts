@@ -78,12 +78,42 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
   if (input.taskIds && input.taskIds.length > 0) {
     candidateIds = input.taskIds
   } else {
-    // Auto-select: pending or in_progress tasks with satisfied deps, sorted by order
+    // Auto-select: pending/in_progress tasks with satisfied deps.
+    // Sort to maximize parallelism: by topological depth → different modules → order.
     const eligible = doc.tasks
       .filter((t) => t.status === 'pending' || t.status === 'in_progress')
       .filter((t) => !isTaskClaimedByOtherActiveRound(doc, t))
       .filter((t) => areDepsSatisfied(doc, t))
-      .sort((a, b) => (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER))
+
+    // Compute topological depth for each task (longest path from any root)
+    const depthMap = new Map<string, number>()
+    const computeDepth = (taskId: string, visited: Set<string>): number => {
+      if (depthMap.has(taskId)) return depthMap.get(taskId)!
+      if (visited.has(taskId)) return 0 // cycle guard
+      visited.add(taskId)
+      const task = findTaskByEitherPrefix(doc, taskId)
+      if (!task || task.deps.length === 0) {
+        depthMap.set(taskId, 0)
+        return 0
+      }
+      let maxDep = 0
+      for (const depId of task.deps) {
+        maxDep = Math.max(maxDep, computeDepth(depId, new Set(visited)) + 1)
+      }
+      depthMap.set(taskId, maxDep)
+      return maxDep
+    }
+    for (const t of eligible) computeDepth(t.id, new Set())
+
+    // Sort: same depth = can run in parallel. Within depth, spread across modules.
+    eligible.sort((a, b) => {
+      const depthA = depthMap.get(a.id) ?? 0
+      const depthB = depthMap.get(b.id) ?? 0
+      if (depthA !== depthB) return depthA - depthB  // shallow first → maximize parallelism
+      // Same depth: prefer different modules for cross-module parallelism
+      if (a.module !== b.module) return a.module.localeCompare(b.module)
+      return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+    })
 
     candidateIds = eligible.slice(0, config.round.maxTasks).map((t) => t.id)
 
