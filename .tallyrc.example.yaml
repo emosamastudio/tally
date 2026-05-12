@@ -1,0 +1,22 @@
+# .tallyrc.yaml — Tally project configuration
+#
+# Copy this file to .tallyrc.yaml and customize.
+# .tallyrc.yaml is gitignored — each developer keeps their own.
+
+agent:
+  id: main                       # Must match _meta.agents[].id
+
+round:
+  maxTasks: 10                   # Tasks auto-selected per round
+  allowParallel: false           # Allow one agent to hold multiple active rounds
+
+lint:
+  strict: false                  # Treat warnings as errors
+
+dashboard:
+  port: 5173                     # Default dashboard port
+
+# Multi-project dashboard (optional)
+# projects:
+#   - name: Project Name
+#     path: ~/workspace/my-project
