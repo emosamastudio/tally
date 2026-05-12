@@ -1,8 +1,8 @@
 {
   "name": "tally-use",
-  "skill_version": "0.1.0",
-  "aligned_release": "tally_v0.1",
-  "entrypoint": "SKILL.md",
+  "skill_version": "0.1.3",
+  "aligned_release": "tally_v0.1.3",
+  "entrypoint": "tally.md",
   "compatibility": {
     "tally_v": 1,
     "tally_json_schema": "1.0"
