@@ -62,6 +62,18 @@ function makeTask(
     claimedAt: null,
     createdAt: '2026-05-10',
     completedAt: null,
+    writeScopes: [],
+    acceptanceCriteria: null,
+    executionPlan: null,
+    riskLevel: 'medium',
+    rollbackPlan: null,
+    executionLane: null,
+    assignedAgent: null,
+    requiresReview: false,
+    resourceRequirements: [],
+    repos: [],
+    deliveryNode: null,
+    approvedBy: null,
   }
 }
 

@@ -5,6 +5,33 @@
 export type TaskStatus = 'pending' | 'in_progress' | 'blocked' | 'hold' | 'deferred' | 'done'
 export type Priority = 'P0' | 'P1' | 'P2'
 export type RoundStatus = 'active' | 'completed'
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical'
+export type ExecutionLane = 'contract' | 'writer' | 'runtime' | 'ui' | 'test' | 'review'
+export type FeatureStatus = 'design' | 'contract_frozen' | 'implementing' | 'stable'
+
+// ── Structured sub-types ──
+
+export interface AcceptanceCriteria {
+  requiredTests?: string[]
+  passConditions?: string[]
+  forbiddenSideEffects?: string[]
+  negativeCases?: string[]
+}
+
+export interface ExecutionPlan {
+  inputs?: string[]
+  outputs?: string[]
+  steps?: string[]
+}
+
+export interface StructuredEvidence {
+  test?: string
+  commit?: string
+  review?: string
+  artifact?: string
+  provider?: string
+  notes?: string
+}
 
 // ── Meta ──
 
@@ -28,6 +55,10 @@ export interface FeatureEntry {
   id: string
   module: string
   name: string
+  status: FeatureStatus
+  specRefs: string[]
+  dependsOn: string[]
+  owner: string | null
 }
 
 export interface TallyMeta {
@@ -64,6 +95,19 @@ export interface Task {
   claimedAt: string | null
   createdAt: string
   completedAt: string | null
+  // ── Scheduling & safety fields ──
+  writeScopes: string[]
+  acceptanceCriteria: AcceptanceCriteria | null
+  executionPlan: ExecutionPlan | null
+  riskLevel: RiskLevel
+  rollbackPlan: string | null
+  executionLane: ExecutionLane | null
+  assignedAgent: string | null
+  requiresReview: boolean
+  resourceRequirements: string[]
+  repos: string[]
+  deliveryNode: string | null
+  approvedBy: string | null
 }
 
 // ── Round ──
@@ -131,6 +175,13 @@ export interface TallyConfig {
   lint: { strict: boolean }
   dashboard: { port: number }
   projects: ProjectEntry[]
+  gates: {
+    requireFeature: boolean
+    requireReview: boolean
+    featureFreeze: string[]
+    maxRisk: RiskLevel
+    detectWriteConflicts: boolean
+  }
 }
 
 // ── CLI results ──

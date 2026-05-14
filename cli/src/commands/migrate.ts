@@ -149,6 +149,18 @@ function parseMarkdownTasks(markdown: string): Task[] {
       claimedAt: null,
       createdAt,
       completedAt,
+      writeScopes: [],
+      acceptanceCriteria: null,
+      executionPlan: null,
+      riskLevel: 'medium',
+      rollbackPlan: null,
+      executionLane: null,
+      assignedAgent: null,
+      requiresReview: false,
+      resourceRequirements: [],
+      repos: [],
+      deliveryNode: null,
+      approvedBy: null,
     })
   }
 

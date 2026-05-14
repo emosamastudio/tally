@@ -213,6 +213,10 @@ describe('tally end-to-end', () => {
       nextAction: 'do it', evidence: null, rule: null, feature: 'f1', tags: [],
       order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
+      writeScopes: [], acceptanceCriteria: null, executionPlan: null,
+      riskLevel: 'medium', rollbackPlan: null, executionLane: null,
+      assignedAgent: null, requiresReview: false, resourceRequirements: [],
+      repos: [], deliveryNode: null, approvedBy: null,
     })
     writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
     const out = runLax(['check', '--json'], dir)
@@ -236,16 +240,24 @@ describe('tally end-to-end', () => {
         {
           id: 'D-001', status: 'done', priority: 'P0', stage: 'S1', module: 'core',
           name: 'Old Done', acceptance: 'ok', deps: [], blocks: null,
-          nextAction: null, evidence: 'done', rule: null, tags: [],
+          nextAction: null, evidence: 'done', rule: null, feature: null, tags: [],
           order: null, completedOrder: 1, claimedBy: null, claimedAt: null,
           createdAt: '2026-05-10', completedAt: '2026-05-10',
+          writeScopes: [], acceptanceCriteria: null, executionPlan: null,
+          riskLevel: 'medium', rollbackPlan: null, executionLane: null,
+          assignedAgent: null, requiresReview: false, resourceRequirements: [],
+          repos: [], deliveryNode: null, approvedBy: null,
         },
         {
           id: 'U-002', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
           name: 'Old Pending', acceptance: 'ok', deps: [], blocks: null,
-          nextAction: 'do it', evidence: null, rule: null, tags: [],
+          nextAction: 'do it', evidence: null, rule: null, feature: null, tags: [],
           order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
           createdAt: '2026-05-10', completedAt: null,
+          writeScopes: [], acceptanceCriteria: null, executionPlan: null,
+          riskLevel: 'medium', rollbackPlan: null, executionLane: null,
+          assignedAgent: null, requiresReview: false, resourceRequirements: [],
+          repos: [], deliveryNode: null, approvedBy: null,
         },
       ],
       rounds: [],

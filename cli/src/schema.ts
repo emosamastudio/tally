@@ -71,8 +71,12 @@ export const TALLY_JSON_SCHEMA = {
               id: { type: 'string' },
               module: { type: 'string' },
               name: { type: 'string' },
+              status: { enum: ['design', 'contract_frozen', 'implementing', 'stable'] },
+              specRefs: { type: 'array', items: { type: 'string' } },
+              dependsOn: { type: 'array', items: { type: 'string' } },
+              owner: { type: ['string', 'null'] },
             },
-            required: ['id', 'module', 'name'],
+            required: ['id', 'module', 'name', 'status', 'specRefs', 'dependsOn', 'owner'],
             additionalProperties: false,
           },
         },
@@ -107,6 +111,35 @@ export const TALLY_JSON_SCHEMA = {
           claimedAt: { type: ['string', 'null'] },
           createdAt: { type: 'string' },
           completedAt: { type: ['string', 'null'] },
+          writeScopes: { type: 'array', items: { type: 'string' } },
+          acceptanceCriteria: {
+            type: ['object', 'null'],
+            properties: {
+              requiredTests: { type: 'array', items: { type: 'string' } },
+              passConditions: { type: 'array', items: { type: 'string' } },
+              forbiddenSideEffects: { type: 'array', items: { type: 'string' } },
+              negativeCases: { type: 'array', items: { type: 'string' } },
+            },
+            additionalProperties: false,
+          },
+          executionPlan: {
+            type: ['object', 'null'],
+            properties: {
+              inputs: { type: 'array', items: { type: 'string' } },
+              outputs: { type: 'array', items: { type: 'string' } },
+              steps: { type: 'array', items: { type: 'string' } },
+            },
+            additionalProperties: false,
+          },
+          riskLevel: { enum: ['low', 'medium', 'high', 'critical'] },
+          rollbackPlan: { type: ['string', 'null'] },
+          executionLane: { enum: ['contract', 'writer', 'runtime', 'ui', 'test', 'review', null] },
+          assignedAgent: { type: ['string', 'null'] },
+          requiresReview: { type: 'boolean' },
+          resourceRequirements: { type: 'array', items: { type: 'string' } },
+          repos: { type: 'array', items: { type: 'string' } },
+          deliveryNode: { type: ['string', 'null'] },
+          approvedBy: { type: ['string', 'null'] },
         },
         required: [
           'id',
@@ -129,6 +162,18 @@ export const TALLY_JSON_SCHEMA = {
           'claimedAt',
           'createdAt',
           'completedAt',
+          'writeScopes',
+          'acceptanceCriteria',
+          'executionPlan',
+          'riskLevel',
+          'rollbackPlan',
+          'executionLane',
+          'assignedAgent',
+          'requiresReview',
+          'resourceRequirements',
+          'repos',
+          'deliveryNode',
+          'approvedBy',
         ],
         additionalProperties: false,
       },
@@ -771,6 +816,73 @@ export function validateDocument(doc: unknown): CheckResult {
                 message: `Task "${tasks[i].id}" feature "${taskFeature}" belongs to module "${featureModule}" but task is in module "${taskModule}"`,
                 path: formatPath('tasks', i, 'feature'),
               })
+            }
+          }
+        }
+
+        // Feature-required warnings
+        if (Array.isArray(tasksRaw)) {
+          for (const rawTask of tasksRaw) {
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              const status = t.status as string | undefined
+              const feature = t.feature as string | null | undefined
+              if (status !== 'done' && status !== 'hold' && (feature === null || feature === undefined)) {
+                warnings.push({
+                  code: 'FEATURE_REQUIRED',
+                  message: `Open task "${t.id}" should have a non-null feature`,
+                })
+              }
+            }
+          }
+        }
+
+        // Risk gating warnings
+        if (Array.isArray(tasksRaw)) {
+          for (const rawTask of tasksRaw) {
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              const riskLevel = t.riskLevel as string | undefined
+              const requiresReview = t.requiresReview as boolean | undefined
+              const rollbackPlan = t.rollbackPlan as string | null | undefined
+              if (riskLevel === 'high' || riskLevel === 'critical') {
+                if (!requiresReview) {
+                  warnings.push({
+                    code: 'REVIEW_RECOMMENDED',
+                    message: `High/critical risk task "${t.id}" should require review`,
+                  })
+                }
+                if (!rollbackPlan) {
+                  warnings.push({
+                    code: 'ROLLBACK_RECOMMENDED',
+                    message: `High/critical risk task "${t.id}" should have a rollback plan`,
+                  })
+                }
+              }
+            }
+          }
+        }
+
+        // Stale task warnings
+        if (Array.isArray(tasksRaw)) {
+          const doneIds = new Set<string>()
+          for (const rawTask of tasksRaw) {
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              if (t.status === 'done') doneIds.add(t.id as string)
+            }
+          }
+          for (const rawTask of tasksRaw) {
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              const status = t.status as string | undefined
+              const deps = t.deps as string[] | undefined
+              if (status === 'pending' && deps && deps.length > 0 && deps.every((d: string) => doneIds.has(d))) {
+                warnings.push({
+                  code: 'STALE_TASK',
+                  message: `Task "${t.id}" is pending but all dependencies are done`,
+                })
+              }
             }
           }
         }

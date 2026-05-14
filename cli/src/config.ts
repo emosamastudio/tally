@@ -11,6 +11,13 @@ const DEFAULTS: TallyConfig = {
   lint: { strict: false },
   dashboard: { port: 5173 },
   projects: [],
+  gates: {
+    requireFeature: true,
+    requireReview: false,
+    featureFreeze: [],
+    maxRisk: 'high',
+    detectWriteConflicts: true,
+  },
 }
 
 function loadYaml(path: string): Partial<TallyConfig> | null {
@@ -43,6 +50,7 @@ export function loadConfig(cwd: string = process.cwd()): TallyConfig {
     lint: { ...DEFAULTS.lint, ...global.lint, ...local.lint },
     dashboard: { ...DEFAULTS.dashboard, ...global.dashboard, ...local.dashboard },
     projects: mergedProjects.length > 0 ? mergedProjects : DEFAULTS.projects,
+    gates: { ...DEFAULTS.gates, ...global.gates, ...local.gates },
   }
   return merged
 }

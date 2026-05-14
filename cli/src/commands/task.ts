@@ -53,6 +53,17 @@ export interface AddTaskInput {
   deps?: string[]
   tags?: string[]
   feature?: string
+  writeScopes?: string[]
+  acceptanceCriteria?: Record<string, unknown>
+  executionPlan?: Record<string, unknown>
+  riskLevel?: string
+  rollbackPlan?: string
+  executionLane?: string
+  assignedAgent?: string
+  requiresReview?: boolean
+  resourceRequirements?: string[]
+  repos?: string[]
+  deliveryNode?: string
 }
 
 export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
@@ -82,6 +93,18 @@ export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
       claimedAt: null,
       createdAt: today(),
       completedAt: null,
+      writeScopes: input.writeScopes ?? [],
+      acceptanceCriteria: (input.acceptanceCriteria as Task['acceptanceCriteria']) ?? null,
+      executionPlan: (input.executionPlan as Task['executionPlan']) ?? null,
+      riskLevel: (input.riskLevel as Task['riskLevel']) ?? 'medium',
+      rollbackPlan: input.rollbackPlan ?? null,
+      executionLane: (input.executionLane as Task['executionLane']) ?? null,
+      assignedAgent: input.assignedAgent ?? null,
+      requiresReview: input.requiresReview ?? false,
+      resourceRequirements: input.resourceRequirements ?? [],
+      repos: input.repos ?? [],
+      deliveryNode: input.deliveryNode ?? null,
+      approvedBy: null,
     }
 
     doc.tasks.push(task)
@@ -177,6 +200,29 @@ export function editTask(doc: TallyDocument, id: string, fields: Record<string, 
   if (fields.nextAction !== undefined) task.nextAction = fields.nextAction as string | null
   if (fields.tags !== undefined) task.tags = fields.tags as string[]
   if (fields.feature !== undefined) task.feature = fields.feature as string | null
+  if (fields.writeScopes !== undefined) task.writeScopes = fields.writeScopes as string[]
+  if (fields.acceptanceCriteria !== undefined) task.acceptanceCriteria = fields.acceptanceCriteria as Task['acceptanceCriteria']
+  if (fields.executionPlan !== undefined) task.executionPlan = fields.executionPlan as Task['executionPlan']
+  if (fields.riskLevel !== undefined) {
+    const rl = fields.riskLevel as string
+    if (!['low', 'medium', 'high', 'critical'].includes(rl)) {
+      throw new Error(`Invalid riskLevel "${rl}". Must be low, medium, high, or critical.`)
+    }
+    task.riskLevel = rl as Task['riskLevel']
+  }
+  if (fields.rollbackPlan !== undefined) task.rollbackPlan = fields.rollbackPlan as string | null
+  if (fields.executionLane !== undefined) {
+    const lane = fields.executionLane as string
+    if (!['contract', 'writer', 'runtime', 'ui', 'test', 'review'].includes(lane)) {
+      throw new Error(`Invalid executionLane "${lane}". Must be contract, writer, runtime, ui, test, or review.`)
+    }
+    task.executionLane = lane as Task['executionLane']
+  }
+  if (fields.assignedAgent !== undefined) task.assignedAgent = fields.assignedAgent as string | null
+  if (fields.requiresReview !== undefined) task.requiresReview = !!fields.requiresReview
+  if (fields.resourceRequirements !== undefined) task.resourceRequirements = fields.resourceRequirements as string[]
+  if (fields.repos !== undefined) task.repos = fields.repos as string[]
+  if (fields.deliveryNode !== undefined) task.deliveryNode = fields.deliveryNode as string | null
 
   return task
 }
@@ -361,6 +407,26 @@ function formatTaskDetail(detail: TaskDetail): string {
   lines.push(`Evidence:    ${t.evidence ?? '(none)'}`)
   lines.push(`Rule:        ${t.rule ?? '(none)'}`)
   lines.push(`Feature:     ${t.feature ?? '(none)'}`)
+  lines.push(`Risk:        ${t.riskLevel}`)
+  lines.push(`Lane:        ${t.executionLane ?? '(none)'}`)
+  lines.push(`Write Scopes: ${t.writeScopes.length > 0 ? t.writeScopes.join(', ') : '(none)'}`)
+  lines.push(`Repos:       ${t.repos.length > 0 ? t.repos.join(', ') : '(none)'}`)
+  lines.push(`Delivery:    ${t.deliveryNode ?? '(none)'}`)
+  lines.push(`Review:      ${t.requiresReview ? 'Yes' : 'No'}`)
+  lines.push(`Assigned:    ${t.assignedAgent ?? '(none)'}`)
+  lines.push(`Approved:    ${t.approvedBy ?? '(none)'}`)
+  if (t.executionPlan) {
+    lines.push(`Exec Plan:   inputs=[${(t.executionPlan.inputs ?? []).join(', ')}] outputs=[${(t.executionPlan.outputs ?? []).join(', ')}] steps=[${(t.executionPlan.steps ?? []).join('; ')}]`)
+  }
+  if (t.acceptanceCriteria) {
+    const ac = t.acceptanceCriteria
+    if (ac.requiredTests?.length) lines.push(`Tests:       ${ac.requiredTests.join(', ')}`)
+    if (ac.passConditions?.length) lines.push(`Pass:        ${ac.passConditions.join('; ')}`)
+    if (ac.forbiddenSideEffects?.length) lines.push(`Forbidden:   ${ac.forbiddenSideEffects.join('; ')}`)
+    if (ac.negativeCases?.length) lines.push(`Negatives:   ${ac.negativeCases.join('; ')}`)
+  }
+  if (t.rollbackPlan) lines.push(`Rollback:    ${t.rollbackPlan}`)
+  lines.push(`Resources:   ${t.resourceRequirements.length > 0 ? t.resourceRequirements.join(', ') : '(none)'}`)
   lines.push(`Tags:        ${t.tags.length > 0 ? t.tags.join(', ') : '(none)'}`)
   lines.push(`Order:       ${t.order ?? '(none)'}`)
   lines.push(`Comp.Order:  ${t.completedOrder ?? '(none)'}`)
@@ -456,7 +522,16 @@ export function taskCommand(): Command {
     .option('--next-action <action>', 'Next action text')
     .option('--tags <tags>', 'Comma-separated tags')
     .option('--feature <feature>', 'Feature name')
-    .action((id: string, opts: Record<string, string | undefined>) => {
+    .option('--risk-level <level>', 'Risk: low, medium, high, critical')
+    .option('--execution-lane <lane>', 'Lane: contract, writer, runtime, ui, test, review')
+    .option('--write-scopes <scopes>', 'Comma-separated write scope paths')
+    .option('--assigned-agent <agent>', 'Assigned agent ID')
+    .option('--requires-review', 'Task requires code review')
+    .option('--rollback-plan <plan>', 'Rollback plan for high-risk tasks')
+    .option('--repos <repos>', 'Comma-separated repo names')
+    .option('--delivery-node <node>', 'Delivery milestone node')
+    .option('--resource-requirements <resources>', 'Comma-separated resource requirements')
+    .action((id: string, opts: Record<string, string | boolean | undefined>) => {
       try {
         const doc = readLedger()
         const fields: Record<string, unknown> = {}
@@ -467,20 +542,41 @@ export function taskCommand(): Command {
         if (opts.module !== undefined) fields.module = opts.module
         if (opts.acceptance !== undefined) fields.acceptance = opts.acceptance
         if (opts.deps !== undefined) {
-          fields.deps = opts.deps.split(',').map((d) => d.trim()).filter(Boolean)
+          fields.deps = (opts.deps as string).split(',').map((d: string) => d.trim()).filter(Boolean)
         }
         if (opts.nextAction !== undefined) {
           fields.nextAction = opts.nextAction === '' ? null : opts.nextAction
         }
         if (opts.tags !== undefined) {
-          fields.tags = opts.tags.split(',').map((t) => t.trim()).filter(Boolean)
+          fields.tags = (opts.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean)
         }
         if (opts.feature !== undefined) {
           fields.feature = opts.feature === '' ? null : opts.feature
         }
+        if (opts.riskLevel !== undefined) fields.riskLevel = opts.riskLevel
+        if (opts.executionLane !== undefined) fields.executionLane = opts.executionLane
+        if (opts.writeScopes !== undefined) {
+          fields.writeScopes = (opts.writeScopes as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+        }
+        if (opts.assignedAgent !== undefined) {
+          fields.assignedAgent = opts.assignedAgent === '' ? null : opts.assignedAgent
+        }
+        if (opts.requiresReview !== undefined) fields.requiresReview = true
+        if (opts.rollbackPlan !== undefined) {
+          fields.rollbackPlan = opts.rollbackPlan === '' ? null : opts.rollbackPlan
+        }
+        if (opts.repos !== undefined) {
+          fields.repos = (opts.repos as string).split(',').map((r: string) => r.trim()).filter(Boolean)
+        }
+        if (opts.deliveryNode !== undefined) {
+          fields.deliveryNode = opts.deliveryNode === '' ? null : opts.deliveryNode
+        }
+        if (opts.resourceRequirements !== undefined) {
+          fields.resourceRequirements = (opts.resourceRequirements as string).split(',').map((r: string) => r.trim()).filter(Boolean)
+        }
 
         if (Object.keys(fields).length === 0) {
-          throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, --tags, or --feature.')
+          throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, --tags, --feature, --risk-level, --execution-lane, --write-scopes, etc.')
         }
 
         const task = editTask(doc, id, fields)
@@ -492,16 +588,29 @@ export function taskCommand(): Command {
       }
     })
 
-  // tally task done <id...> --evidence "..." [--rule "..."]
+  // tally task done <id...> --evidence "..." [--rule "..."] [--test "..."] [--commit "..."] [--review "..."] [--provider "..."]
   cmd.command('done')
     .description('Batch mark tasks as done')
     .argument('<id...>', 'Task IDs to mark as done')
     .requiredOption('--evidence <evidence>', 'Evidence of completion')
     .option('--rule <rule>', 'Rule that verified completion')
-    .action((ids: string[], opts: { evidence: string; rule?: string }) => {
+    .option('--test <test>', 'Test results or test command output')
+    .option('--commit <commit>', 'Commit SHA or reference')
+    .option('--review <review>', 'Review reference or reviewer')
+    .option('--provider <provider>', 'Provider/model/usage evidence')
+    .option('--notes <notes>', 'Additional completion notes')
+    .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string }) => {
       try {
         const doc = readLedger()
-        const results = markTasksDone(doc, ids, opts.evidence, opts.rule)
+        // Build structured evidence string from flags
+        const parts: string[] = [opts.evidence]
+        if (opts.test) parts.push(`[test: ${opts.test}]`)
+        if (opts.commit) parts.push(`[commit: ${opts.commit}]`)
+        if (opts.review) parts.push(`[review: ${opts.review}]`)
+        if (opts.provider) parts.push(`[provider: ${opts.provider}]`)
+        if (opts.notes) parts.push(`[notes: ${opts.notes}]`)
+        const evidence = parts.join(' ')
+        const results = markTasksDone(doc, ids, evidence, opts.rule)
         writeLedger(doc)
 
         console.log(`Marked ${results.length} task(s) as done:`)
@@ -549,6 +658,26 @@ export function taskCommand(): Command {
         for (const t of results) {
           console.log(`  ${t.id}  ${t.name}`)
         }
+      } catch (e) {
+        console.error((e as Error).message)
+        process.exit(1)
+      }
+    })
+
+  // tally task approve <id> --by <human>
+  cmd.command('approve')
+    .description('Approve a high-risk task for round inclusion')
+    .argument('<id>', 'Task ID to approve')
+    .requiredOption('--by <name>', 'Approver name')
+    .action((id: string, opts: { by: string }) => {
+      try {
+        const doc = readLedger()
+        const task = doc.tasks.find((t) => t.id === id)
+        if (!task) throw new Error(`Task "${id}" not found`)
+        if (task.status === 'done') throw new Error(`Task "${id}" is already done`)
+        task.approvedBy = opts.by
+        writeLedger(doc)
+        console.log(`Approved ${task.id} by ${opts.by}`)
       } catch (e) {
         console.error((e as Error).message)
         process.exit(1)
