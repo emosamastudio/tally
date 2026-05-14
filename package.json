@@ -1,10 +1,16 @@
 {
   "name": "tally-monorepo",
   "private": true,
-  "workspaces": ["cli", "dashboard"],
+  "workspaces": [
+    "cli",
+    "dashboard"
+  ],
   "scripts": {
     "test": "npm run test -w cli",
     "build": "npm run build -w cli && npm run build -w dashboard",
     "lint": "npm run lint -w cli"
+  },
+  "devDependencies": {
+    "@vitest/coverage-v8": "^4.1.6"
   }
 }

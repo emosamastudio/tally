@@ -9,10 +9,11 @@ function run(args: string[], cwd: string): string {
   return execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf-8' })
 }
 
-/** Run a CLI command that may exit with non-zero code. Returns stdout. */
+/** Run a CLI command that may exit with non-zero code. Returns combined stdout+stderr. */
 function runLax(args: string[], cwd: string): string {
+  const cmd = `node ${CLI} ${args.join(' ')} 2>&1`
   try {
-    return execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })
+    return execFileSync(cmd, { cwd, encoding: 'utf-8', shell: true })
   } catch (e: any) {
     return e.stdout ?? ''
   }
@@ -363,5 +364,263 @@ describe('tally end-to-end', () => {
     const out = runLax(['check', '--json'], dir)
     const result = JSON.parse(out)
     expect(result.warnings.some((w: any) => w.code === 'FEATURE_REQUIRED')).toBe(true)
+  })
+
+  // ── Error path e2e ──
+
+  it('task approve on done task fails', () => {
+    run(['init', 'e2e-approve-done', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Will Be Done', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'finished'], dir)
+    // After done, task id is D-001 and status is done
+    const out = runLax(['task', 'approve', 'D-001', '--by', 'reviewer'], dir)
+    expect(out).toContain('already done')
+  })
+
+  it('task approve on missing task fails', () => {
+    run(['init', 'e2e-approve-missing', '--no-hook'], dir)
+    const out = runLax(['task', 'approve', 'U-999', '--by', 'reviewer'], dir)
+    expect(out).toContain('not found')
+  })
+
+  it('task edit with invalid riskLevel fails', () => {
+    run(['init', 'e2e-edit-risk', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Edit Risk', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = runLax(['task', 'edit', 'U-001', '--risk-level', 'extreme'], dir)
+    expect(out).toContain('Invalid riskLevel')
+  })
+
+  it('task edit with invalid executionLane fails', () => {
+    run(['init', 'e2e-edit-lane', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Edit Lane', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = runLax(['task', 'edit', 'U-001', '--execution-lane', 'designer'], dir)
+    expect(out).toContain('Invalid executionLane')
+  })
+
+  it('round start with conflicting writeScopes fails', () => {
+    run(['init', 'e2e-write-conflict', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Writer A', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok',
+        writeScopes: ['src/shared/**'] },
+      { name: 'Writer B', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok',
+        writeScopes: ['src/shared/**'] },
+    ])], dir)
+    const out = runLax(['round', 'start', 'conflict-round', '--tasks', 'U-001', 'U-002'], dir)
+    expect(out).toContain('write scope')
+  })
+
+  it('round start with unsatisfied deps fails', () => {
+    run(['init', 'e2e-unsat-deps', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Depends On Ghost', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok',
+        deps: ['U-999'] },
+    ])], dir)
+    const out = runLax(['round', 'start', 'deps-round', '--tasks', 'U-001'], dir)
+    expect(out).toContain('unsatisfied')
+  })
+
+  it('export with unknown format fails', () => {
+    run(['init', 'e2e-export-bad', '--no-hook'], dir)
+    const out = runLax(['export', '--format', 'xml'], dir)
+    expect(out).toContain('Unknown format')
+  })
+
+  // ── task show with all new fields ──
+
+  it('task show displays all new fields (writeScopes, riskLevel, executionLane, requiresReview, rollbackPlan, repos, deliveryNode, acceptanceCriteria, executionPlan)', () => {
+    run(['init', 'e2e-show-all', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([{
+      name: 'Full Detail Task',
+      stage: 'S1',
+      module: 'core',
+      priority: 'P0',
+      acceptance: 'all fields visible',
+      writeScopes: ['src/core/**', 'src/shared/**'],
+      riskLevel: 'high',
+      executionLane: 'writer',
+      requiresReview: true,
+      rollbackPlan: 'revert via git',
+      repos: ['repo-a'],
+      deliveryNode: 'V1',
+      acceptanceCriteria: {
+        requiredTests: ['unit', 'integration'],
+        passConditions: ['no regressions'],
+        forbiddenSideEffects: ['no file corruption'],
+        negativeCases: ['empty input'],
+      },
+      executionPlan: {
+        inputs: ['task spec'],
+        outputs: ['completed module'],
+        steps: ['design', 'implement', 'review'],
+      },
+    }])], dir)
+
+    const out = run(['task', 'show', 'U-001'], dir)
+    expect(out).toContain('Full Detail Task')
+    expect(out).toContain('Risk:        high')
+    expect(out).toContain('Lane:        writer')
+    expect(out).toContain('Write Scopes: src/core/**, src/shared/**')
+    expect(out).toContain('Repos:       repo-a')
+    expect(out).toContain('Delivery:    V1')
+    expect(out).toContain('Review:      Yes')
+    expect(out).toContain('Rollback:    revert via git')
+    expect(out).toContain('unit')
+    expect(out).toContain('integration')
+    expect(out).toContain('no regressions')
+    expect(out).toContain('no file corruption')
+    expect(out).toContain('empty input')
+    expect(out).toContain('Exec Plan:')
+    expect(out).toContain('task spec')
+    expect(out).toContain('completed module')
+    expect(out).toContain('design')
+  })
+
+  // ── task list --json ──
+
+  it('task list --json outputs valid JSON array', () => {
+    run(['init', 'e2e-list-json', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'JSON Task 1', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'JSON Task 2', stage: 'S1', module: 'core', priority: 'P1', acceptance: 'ok' },
+    ])], dir)
+
+    const out = run(['task', 'list', '--json'], dir)
+    const parsed = JSON.parse(out)
+    expect(Array.isArray(parsed)).toBe(true)
+    expect(parsed.length).toBe(2)
+    expect(parsed[0].name).toBe('JSON Task 1')
+    expect(parsed[1].name).toBe('JSON Task 2')
+  })
+
+  // ── task done with --rule flag ──
+
+  it('task done --rule stores rule on completed task', () => {
+    run(['init', 'e2e-done-rule', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Rule Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    run(['task', 'done', 'U-001', '--evidence', 'completed by rule', '--rule', 'custom-rule-check'], dir)
+    const doc = readDoc(dir)
+    const done = doc.tasks.find((t: any) => t.status === 'done')
+    expect(done).toBeTruthy()
+    expect(done.rule).toBe('custom-rule-check')
+  })
+
+  // ── task block and unblock cycle ──
+
+  it('task block then unblock cycles status correctly', () => {
+    run(['init', 'e2e-block-unblock', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Blockable Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    // Block
+    run(['task', 'block', 'U-001', '--reason', 'waiting for dependency'], dir)
+    let doc = readDoc(dir)
+    expect(doc.tasks[0].status).toBe('blocked')
+    expect(doc.tasks[0].blocks).toBe('waiting for dependency')
+
+    // Unblock
+    run(['task', 'unblock', 'U-001'], dir)
+    doc = readDoc(dir)
+    expect(doc.tasks[0].status).toBe('pending')
+    expect(doc.tasks[0].blocks).toBeNull()
+  })
+
+  // ── task list with combined filters ──
+
+  it('task list --module --status filters correctly with combined criteria', () => {
+    run(['init', 'e2e-combined-filters', '--no-hook'], dir)
+    // Add a second module and stage to _meta so we can create tasks in different modules
+    const doc = readDoc(dir)
+    doc._meta.modules.push({ id: 'other', name: 'Other' })
+    doc._meta.stages.push({ id: 'S2', name: 'Stage 2', modules: ['other'] })
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Core Pending', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Core Done', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Other Pending', stage: 'S2', module: 'other', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    // Mark Core Done as done
+    run(['task', 'done', 'U-002', '--evidence', 'done'], dir)
+
+    // Filter: module=core + status=pending → should only get U-001
+    const out = run(['task', 'list', '--module', 'core', '--status', 'pending'], dir)
+    expect(out).toContain('Core Pending')
+    expect(out).not.toContain('Core Done')
+    expect(out).not.toContain('Other Pending')
+  })
+
+  // ── task add rejects empty JSON array ──
+
+  it('task add --json rejects empty array', () => {
+    run(['init', 'e2e-empty-add', '--no-hook'], dir)
+    const out = runLax(['task', 'add', '--json', '[]'], dir)
+    expect(out).toContain('empty')
+  })
+
+  // ── round close with no active round ──
+
+  it('round close fails when no active round exists', () => {
+    run(['init', 'e2e-round-close-empty', '--no-hook'], dir)
+    const out = runLax(['round', 'close'], dir)
+    expect(out).toContain('No active round found')
+  })
+
+  // ── round report --json ──
+
+  it('round report --json outputs valid JSON', () => {
+    run(['init', 'e2e-round-report-json', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Report Task 1', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Report Task 2', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    run(['round', 'start', 'report-round', '--tasks', 'U-001', 'U-002'], dir)
+    const out = run(['round', 'report', '--json'], dir)
+    const parsed = JSON.parse(out)
+
+    expect(parsed.roundId).toBeTruthy()
+    expect(parsed.tasks.length).toBe(2)
+    expect(parsed.totalCount).toBe(2)
+    expect(parsed.doneCount).toBe(0)
+    expect(Array.isArray(parsed.remaining)).toBe(true)
+  })
+
+  // ── round report on specific round ID ──
+
+  it('round report on a specific closed round by ID', () => {
+    run(['init', 'e2e-round-report-by-id', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Round1 Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Round2 Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    // Start and close round 1
+    const round1Out = run(['round', 'start', 'round-one', '--tasks', 'U-001'], dir)
+    const round1Id = round1Out.match(/R-\S+/)?.[0]
+    expect(round1Id).toBeTruthy()
+    run(['task', 'done', 'U-001', '--evidence', 'round1 done'], dir)
+    run(['round', 'close'], dir)
+
+    // Start round 2 (makes it the latest round)
+    run(['round', 'start', 'round-two', '--tasks', 'U-002'], dir)
+
+    // Report on round 1 by ID (should be completed, not the active round 2)
+    const out = run(['round', 'report', '--json', '--round', round1Id!], dir)
+    const parsed = JSON.parse(out)
+
+    expect(parsed.roundId).toBe(round1Id)
+    expect(parsed.doneCount).toBe(1)
+    expect(parsed.totalCount).toBe(1)
   })
 })

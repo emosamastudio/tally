@@ -370,7 +370,7 @@ export function listTasks(doc: TallyDocument, filters: ListFilters): Task[] {
 
 // ── Formatting ──
 
-function formatTaskTable(tasks: Task[]): string {
+export function formatTaskTable(tasks: Task[]): string {
   if (tasks.length === 0) return '(no tasks)'
 
   const lines: string[] = []
@@ -390,7 +390,7 @@ function formatTaskTable(tasks: Task[]): string {
   return lines.join('\n')
 }
 
-function formatTaskDetail(detail: TaskDetail): string {
+export function formatTaskDetail(detail: TaskDetail): string {
   const t = detail.task
   const lines: string[] = []
 

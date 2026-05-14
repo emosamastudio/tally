@@ -28,7 +28,7 @@ function areDepsSatisfied(doc: TallyDocument, task: Task): boolean {
   })
 }
 
-function generateRoundId(doc: TallyDocument): string {
+export function generateRoundId(doc: TallyDocument): string {
   const prefix = `R-${today()}-`
   const existing = doc.rounds
     .filter((r) => r.id.startsWith(prefix))
@@ -446,7 +446,7 @@ export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
 
 // ── Formatting ──
 
-function formatRoundStart(result: StartRoundResult): string {
+export function formatRoundStart(result: StartRoundResult): string {
   const lines: string[] = []
   lines.push(`Round started: ${result.roundId}`)
   lines.push(`Tasks claimed: ${result.selected.length}`)

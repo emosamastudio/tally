@@ -76,6 +76,21 @@ describe('lintDocument', () => {
     expect(result.valid).toBe(false)
     expect(result.errors.some((e) => e.path.includes('nextAction'))).toBe(true)
   })
+
+  it('should fail when non-done task has non-null evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].evidence = 'premature evidence'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(false)
+    expect(
+      result.errors.some(
+        (e) =>
+          e.path.includes('evidence') &&
+          e.message.includes('Non-done task must have null evidence'),
+      ),
+    ).toBe(true)
+  })
 })
 
 describe('validateDocument', () => {
@@ -192,6 +207,74 @@ describe('validateDocument', () => {
     const result = validateDocument(doc)
     expect(result.valid).toBe(false)
     expect(result.errors.some((e) => e.code === 'SCHEMA_INVALID' && e.message.includes('Duplicate round ID'))).toBe(true)
+  })
+
+  it('should warn REVIEW_RECOMMENDED when riskLevel is high and requiresReview is false', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].riskLevel = 'high'
+    tasks[0].requiresReview = false
+    const result = validateDocument(doc)
+    expect(result.warnings).toBeDefined()
+    expect(result.warnings.some((w) => w.code === 'REVIEW_RECOMMENDED')).toBe(true)
+  })
+
+  it('should warn ROLLBACK_RECOMMENDED when riskLevel is critical and rollbackPlan is null', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].riskLevel = 'critical'
+    tasks[0].rollbackPlan = null
+    const result = validateDocument(doc)
+    expect(result.warnings).toBeDefined()
+    expect(result.warnings.some((w) => w.code === 'ROLLBACK_RECOMMENDED')).toBe(true)
+  })
+
+  it('should warn STALE_TASK when pending task has all deps done', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+
+    // Add a done task that the pending task will depend on
+    tasks.push({
+      id: 'U-002',
+      status: 'done',
+      priority: 'P1',
+      stage: 'S1',
+      module: 'core',
+      name: 'Done dependency task',
+      acceptance: 'passes',
+      deps: [],
+      blocks: null,
+      nextAction: null,
+      evidence: 'commit abc123',
+      rule: null,
+      feature: null,
+      tags: [],
+      order: null,
+      completedOrder: 1,
+      claimedBy: null,
+      claimedAt: null,
+      createdAt: '2026-05-10',
+      completedAt: '2026-05-11',
+      writeScopes: [],
+      acceptanceCriteria: null,
+      executionPlan: null,
+      riskLevel: 'low',
+      rollbackPlan: null,
+      executionLane: null,
+      assignedAgent: null,
+      requiresReview: false,
+      resourceRequirements: [],
+      repos: [],
+      deliveryNode: null,
+      approvedBy: null,
+    })
+
+    // U-001 depends on U-002 which is done → all deps are done
+    tasks[0].deps = ['U-002']
+
+    const result = validateDocument(doc)
+    expect(result.warnings).toBeDefined()
+    expect(result.warnings.some((w) => w.code === 'STALE_TASK')).toBe(true)
   })
 })
 

@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { startRound, closeRound, generateRoundReport } from '../src/commands/round.js'
+import { startRound, closeRound, generateRoundReport, generateRoundId, formatRoundStart } from '../src/commands/round.js'
+import type { StartRoundResult } from '../src/commands/round.js'
 import { readLedger } from '../src/ledger-reader.js'
 import { writeLedger } from '../src/ledger-writer.js'
 import type { TallyDocument } from '../src/types.js'
@@ -598,5 +599,193 @@ describe('round close', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+// ── generateRoundId ──
+
+describe('generateRoundId', () => {
+  it('returns R-YYYY-MM-DD-001 when no rounds exist', () => {
+    const doc = testDoc()
+    doc.rounds = []
+    const id = generateRoundId(doc)
+    expect(id).toMatch(/^R-\d{4}-\d{2}-\d{2}-001$/)
+  })
+
+  it('increments sequence number from existing same-day rounds', () => {
+    const doc = testDoc()
+    const dateStr = new Date().toISOString().slice(0, 10)
+    doc.rounds.push({
+      id: `R-${dateStr}-001`,
+      start: dateStr,
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    doc.rounds.push({
+      id: `R-${dateStr}-002`,
+      start: dateStr,
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    const id = generateRoundId(doc)
+    expect(id).toBe(`R-${dateStr}-003`)
+  })
+
+  it('ignores rounds from other dates when computing sequence', () => {
+    const doc = testDoc()
+    const dateStr = new Date().toISOString().slice(0, 10)
+    doc.rounds.push({
+      id: 'R-2020-01-01-005',
+      start: '2020-01-01',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    const id = generateRoundId(doc)
+    expect(id).toBe(`R-${dateStr}-001`)
+  })
+})
+
+// ── formatRoundStart ──
+
+describe('formatRoundStart', () => {
+  it('includes round ID, task count, and warnings when present', () => {
+    const result: StartRoundResult = {
+      roundId: 'R-2026-05-15-001',
+      selected: [
+        { taskId: 'U-001', goal: 'Task One', criteria: 'pass' },
+        { taskId: 'U-002', goal: 'Task Two', criteria: 'pass' },
+      ],
+      warnings: ['Lane distribution: writer=1, test=1'],
+    }
+    const output = formatRoundStart(result)
+    expect(output).toContain('Round started: R-2026-05-15-001')
+    expect(output).toContain('Tasks claimed: 2')
+    expect(output).toContain('Warnings:')
+    expect(output).toContain('Lane distribution')
+    expect(output).toContain('U-001  Task One')
+    expect(output).toContain('U-002  Task Two')
+  })
+
+  it('omits warnings section when none present', () => {
+    const result: StartRoundResult = {
+      roundId: 'R-2026-05-15-001',
+      selected: [{ taskId: 'U-001', goal: 'Task One', criteria: 'pass' }],
+      warnings: [],
+    }
+    const output = formatRoundStart(result)
+    expect(output).toContain('Round started: R-2026-05-15-001')
+    expect(output).toContain('Tasks claimed: 1')
+    expect(output).not.toContain('Warnings')
+  })
+})
+
+// ── closeRound: already completed edge case ──
+
+describe('closeRound already completed', () => {
+  it('throws when round is already completed', () => {
+    const dir = mkdtempSync('/tmp/tally-close-complete-')
+    try {
+      writeLedger(testDoc(), dir)
+
+      const { roundId } = startRound('test', {
+        cwd: dir,
+        agentId: 'main',
+        taskIds: ['U-001'],
+      })
+
+      // Close it once
+      closeRound({ cwd: dir, agentId: 'main' })
+
+      // Attempt to close the same round again — should throw
+      expect(() => closeRound({ cwd: dir, roundId })).toThrow(/already completed/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('throws when no rounds exist at all', () => {
+    const dir = mkdtempSync('/tmp/tally-close-zero-')
+    try {
+      writeLedger(testDoc(), dir)
+      // testDoc() produces rounds: [] — the ledger has tasks but zero rounds
+      expect(() => closeRound({ cwd: dir, agentId: 'main' })).toThrow(/no active round/i)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ── generateRoundReport: mixed statuses ──
+
+describe('generateRoundReport mixed statuses', () => {
+  it('reports done, pending, blocked, and hold tasks with correct counts', () => {
+    const doc = testDoc()
+    doc.rounds.push({
+      id: 'R-2026-05-15-001',
+      start: '2026-05-15',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [
+        { taskId: 'U-001', goal: 'Task U-001', criteria: 'pass' },
+        { taskId: 'U-003', goal: 'Task U-003', criteria: 'pass' },
+        { taskId: 'U-004', goal: 'Task U-004', criteria: 'pass' },
+        { taskId: 'U-005', goal: 'Task U-005', criteria: 'pass' },
+      ],
+      completedAt: null,
+      status: 'active',
+    })
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedAt = '2026-05-15'
+    // U-003 stays pending (index 2)
+    // U-004 stays blocked (index 3)
+    // U-005 stays hold (index 4)
+
+    const report = generateRoundReport(doc, 'R-2026-05-15-001')
+    expect(report.doneCount).toBe(1)
+    expect(report.totalCount).toBe(4)
+    expect(report.tasks[0].status).toBe('done')
+    expect(report.tasks[1].status).toBe('pending')
+    expect(report.tasks[2].status).toBe('blocked')
+    expect(report.tasks[3].status).toBe('hold')
+    expect(report.remaining).toEqual(['U-003', 'U-004', 'U-005'])
+  })
+
+  it('finds task by D-xxx prefix when id was rewritten after completion', () => {
+    const doc = testDoc()
+    doc.rounds.push({
+      id: 'R-2026-05-15-002',
+      start: '2026-05-15',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [
+        { taskId: 'U-001', goal: 'Task U-001', criteria: 'pass' },
+      ],
+      completedAt: null,
+      status: 'active',
+    })
+    // Simulate task done → id rewritten from U-001 to D-001
+    doc.tasks[0].id = 'D-001'
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedAt = '2026-05-15'
+
+    const report = generateRoundReport(doc, 'R-2026-05-15-002')
+    expect(report.tasks[0].taskId).toBe('U-001')
+    expect(report.tasks[0].status).toBe('done')
+    expect(report.doneCount).toBe(1)
+    expect(report.remaining).toEqual([])
   })
 })
