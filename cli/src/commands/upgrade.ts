@@ -25,7 +25,9 @@ type LegacyTallyDocument = TallyDocument & {
 }
 
 function needsFeatureBackfill(doc: LegacyTallyDocument): boolean {
-  return !Array.isArray(doc._meta.features) || doc.tasks.some((task) => !('feature' in task))
+  return !Array.isArray(doc._meta.features) ||
+    doc._meta.features.some((feature) => needsFeatureEntryBackfill(feature as unknown as Record<string, unknown>)) ||
+    doc.tasks.some((task) => !('feature' in task))
 }
 
 function backfillFeatureSchema(doc: LegacyTallyDocument): TallyDocument {
@@ -33,10 +35,59 @@ function backfillFeatureSchema(doc: LegacyTallyDocument): TallyDocument {
     doc._meta.features = []
   }
 
+  for (const feature of doc._meta.features as unknown as Array<Record<string, unknown>>) {
+    if (!('status' in feature)) feature.status = 'design'
+    if (!('specRefs' in feature)) feature.specRefs = []
+    if (!('dependsOn' in feature)) feature.dependsOn = []
+    if (!('owner' in feature)) feature.owner = null
+  }
+
   for (const task of doc.tasks) {
     const mutableTask = task as Record<string, unknown>
     if (!('feature' in mutableTask)) {
       mutableTask.feature = null
+    }
+  }
+
+  return doc as TallyDocument
+}
+
+const TASK_SAFETY_FIELD_DEFAULTS: Record<string, unknown> = {
+  writeScopes: [],
+  acceptanceCriteria: null,
+  executionPlan: null,
+  riskLevel: 'medium',
+  rollbackPlan: null,
+  executionLane: null,
+  assignedAgent: null,
+  requiresReview: false,
+  resourceRequirements: [],
+  repos: [],
+  deliveryNode: null,
+  approvedBy: null,
+}
+
+function needsFeatureEntryBackfill(feature: Record<string, unknown>): boolean {
+  return !('status' in feature) ||
+    !('specRefs' in feature) ||
+    !('dependsOn' in feature) ||
+    !('owner' in feature)
+}
+
+function needsSafetyFieldBackfill(doc: LegacyTallyDocument): boolean {
+  return doc.tasks.some((task) => {
+    const mutableTask = task as unknown as Record<string, unknown>
+    return Object.keys(TASK_SAFETY_FIELD_DEFAULTS).some((field) => !(field in mutableTask))
+  })
+}
+
+function backfillSafetyFields(doc: LegacyTallyDocument): TallyDocument {
+  for (const task of doc.tasks) {
+    const mutableTask = task as unknown as Record<string, unknown>
+    for (const [field, value] of Object.entries(TASK_SAFETY_FIELD_DEFAULTS)) {
+      if (!(field in mutableTask)) {
+        mutableTask[field] = Array.isArray(value) ? [...value] : value
+      }
     }
   }
 
@@ -62,8 +113,18 @@ function applyMigrations(doc: TallyDocument): { doc: TallyDocument; applied: str
 
   if (startNum >= currentNum) {
     const legacyDoc = doc as LegacyTallyDocument
+    const applied: string[] = []
+    let current = doc
     if (needsFeatureBackfill(legacyDoc)) {
-      return { doc: backfillFeatureSchema(legacyDoc), applied: ['feature-schema-backfill'] }
+      current = backfillFeatureSchema(legacyDoc)
+      applied.push('feature-schema-backfill')
+    }
+    if (needsSafetyFieldBackfill(current as LegacyTallyDocument)) {
+      current = backfillSafetyFields(current as LegacyTallyDocument)
+      applied.push('v0.2-safety-field-backfill')
+    }
+    if (applied.length > 0) {
+      return { doc: current, applied }
     }
     return { doc, applied: [] }
   }
@@ -92,6 +153,10 @@ function applyMigrations(doc: TallyDocument): { doc: TallyDocument; applied: str
     current = backfillFeatureSchema(withFeatureSchema)
     applied.push('feature-schema-backfill')
   }
+  if (needsSafetyFieldBackfill(current as LegacyTallyDocument)) {
+    current = backfillSafetyFields(current as LegacyTallyDocument)
+    applied.push('v0.2-safety-field-backfill')
+  }
 
   return { doc: current, applied }
 }
@@ -107,14 +172,15 @@ export function upgradeCommand(): Command {
         const currentVersion = doc._meta.tally_version
 
         const needsBackfill = needsFeatureBackfill(doc as LegacyTallyDocument)
-        if (currentVersion === CURRENT_VERSION && !needsBackfill) {
+        const needsSafetyBackfill = needsSafetyFieldBackfill(doc as LegacyTallyDocument)
+        if (currentVersion === CURRENT_VERSION && !needsBackfill && !needsSafetyBackfill) {
           console.log(`tally.json is already at the latest version (${CURRENT_VERSION})`)
           process.exit(0)
         }
 
         // Run lint first to ensure clean starting state.  When the only issue
         // is an older feature-less v1.0 document, allow the backfill below.
-        if (!needsBackfill) {
+        if (!needsBackfill && !needsSafetyBackfill) {
           const preLint = lintDocument(doc)
           if (!preLint.valid) {
             console.error('tally.json has lint errors. Fix them before upgrading:')

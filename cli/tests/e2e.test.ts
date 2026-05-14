@@ -19,6 +19,14 @@ function runLax(args: string[], cwd: string): string {
   }
 }
 
+function runLaxSafe(args: string[], cwd: string): string {
+  try {
+    return execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf-8', stderr: 'pipe' })
+  } catch (e: any) {
+    return `${e.stdout ?? ''}${e.stderr ?? ''}`
+  }
+}
+
 function readDoc(cwd: string): any {
   return JSON.parse(readFileSync(join(cwd, 'tally.json'), 'utf-8'))
 }
@@ -277,6 +285,77 @@ describe('tally end-to-end', () => {
     expect(JSON.parse(lintOut).valid).toBe(true)
   })
 
+  it('upgrade backfills v0.2 safety fields for legacy v1.0 ledgers', () => {
+    const legacy = {
+      _meta: {
+        project: 'legacy-v02',
+        tally_version: '1.0',
+        created: '2026-05-10',
+        updated: '2026-05-10',
+        agents: [{ id: 'main', name: 'Main' }],
+        stages: [{ id: 'S1', name: 'Stage 1', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [{ id: 'f-core', module: 'core', name: 'Core Feature' }],
+      },
+      tasks: [
+        {
+          id: 'U-001',
+          status: 'pending',
+          priority: 'P0',
+          stage: 'S1',
+          module: 'core',
+          feature: 'f-core',
+          name: 'Legacy Pending',
+          acceptance: 'ok',
+          deps: [],
+          blocks: null,
+          nextAction: 'do it',
+          evidence: null,
+          rule: null,
+          tags: [],
+          order: 1,
+          completedOrder: null,
+          claimedBy: null,
+          claimedAt: null,
+          createdAt: '2026-05-10',
+          completedAt: null,
+        },
+      ],
+      rounds: [],
+      blocks: [],
+      progress: [],
+    }
+
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(legacy, null, 2))
+    const out = run(['upgrade'], dir)
+    const doc = readDoc(dir)
+
+    expect(out).toContain('v0.2-safety-field-backfill')
+    expect(doc._meta.features[0]).toMatchObject({
+      id: 'f-core',
+      status: 'design',
+      specRefs: [],
+      dependsOn: [],
+      owner: null,
+    })
+    expect(doc.tasks[0]).toMatchObject({
+      writeScopes: [],
+      acceptanceCriteria: null,
+      executionPlan: null,
+      riskLevel: 'medium',
+      rollbackPlan: null,
+      executionLane: null,
+      assignedAgent: null,
+      requiresReview: false,
+      resourceRequirements: [],
+      repos: [],
+      deliveryNode: null,
+      approvedBy: null,
+    })
+    const lintOut = run(['lint', '--json'], dir)
+    expect(JSON.parse(lintOut).valid).toBe(true)
+  })
+
   // ── v0.2.0 feature e2e ──
 
   it('task edit --risk-level and --execution-lane', () => {
@@ -288,6 +367,132 @@ describe('tally end-to-end', () => {
     const doc = readDoc(dir)
     expect(doc.tasks[0].riskLevel).toBe('critical')
     expect(doc.tasks[0].executionLane).toBe('writer')
+  })
+
+  it('task edit accepts structured acceptance criteria and execution plan JSON', () => {
+    run(['init', 'e2e-edit-structured-fields', '--no-hook'], dir)
+    const initialized = readDoc(dir)
+    initialized._meta.features.push({
+      id: 'f-structured',
+      module: 'core',
+      name: 'Structured Fields',
+      status: 'design',
+      specRefs: [],
+      dependsOn: [],
+      owner: null,
+    })
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(initialized, null, 2))
+    run(['task', 'add', '--json', JSON.stringify([
+      {
+        name: 'Structured',
+        stage: 'S1',
+        module: 'core',
+        feature: 'f-structured',
+        priority: 'P0',
+        acceptance: 'ok',
+      },
+    ])], dir)
+
+    const acceptanceCriteria = {
+      requiredTests: ['npm test -w cli'],
+      passConditions: ['structured fields are persisted'],
+      forbiddenSideEffects: ['no direct tally.json edits'],
+      negativeCases: ['invalid JSON is rejected'],
+    }
+    const executionPlan = {
+      inputs: ['task id'],
+      outputs: ['updated task'],
+      steps: ['parse JSON', 'persist fields', 'run lint'],
+    }
+
+    run([
+      'task',
+      'edit',
+      'U-001',
+      '--next-action',
+      'Use structured fields during round selection',
+      '--acceptance-criteria-json',
+      JSON.stringify(acceptanceCriteria),
+      '--execution-plan-json',
+      JSON.stringify(executionPlan),
+    ], dir)
+
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].acceptanceCriteria).toEqual(acceptanceCriteria)
+    expect(doc.tasks[0].executionPlan).toEqual(executionPlan)
+    const lintOut = run(['lint', '--json'], dir)
+    expect(JSON.parse(lintOut).valid).toBe(true)
+  })
+
+  it('task edit rejects malformed structured JSON without writing it', () => {
+    run(['init', 'e2e-edit-bad-structured-fields', '--no-hook'], dir)
+    const initialized = readDoc(dir)
+    initialized._meta.features.push({
+      id: 'f-structured',
+      module: 'core',
+      name: 'Structured Fields',
+      status: 'design',
+      specRefs: [],
+      dependsOn: [],
+      owner: null,
+    })
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(initialized, null, 2))
+    run(['task', 'add', '--json', JSON.stringify([
+      {
+        name: 'Structured',
+        stage: 'S1',
+        module: 'core',
+        feature: 'f-structured',
+        priority: 'P0',
+        acceptance: 'ok',
+      },
+    ])], dir)
+    run(['task', 'edit', 'U-001', '--next-action', 'Keep the ledger lint-clean before bad edit'], dir)
+
+    const arrayOut = runLaxSafe([
+      'task',
+      'edit',
+      'U-001',
+      '--acceptance-criteria-json',
+      '[]',
+    ], dir)
+
+    expect(arrayOut).toContain('Invalid acceptance criteria')
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].acceptanceCriteria).toBeNull()
+
+    const nonArrayFieldOut = runLaxSafe([
+      'task',
+      'edit',
+      'U-001',
+      '--acceptance-criteria-json',
+      JSON.stringify({ requiredTests: 'not-array' }),
+    ], dir)
+    expect(nonArrayFieldOut).toContain('requiredTests')
+
+    const unknownFieldOut = runLaxSafe([
+      'task',
+      'edit',
+      'U-001',
+      '--acceptance-criteria-json',
+      JSON.stringify({ unknownField: [] }),
+    ], dir)
+    expect(unknownFieldOut).toContain('unknown field')
+
+    const badExecutionPlanOut = runLaxSafe([
+      'task',
+      'edit',
+      'U-001',
+      '--execution-plan-json',
+      JSON.stringify({ steps: [123] }),
+    ], dir)
+    expect(badExecutionPlanOut).toContain('Invalid execution plan')
+
+    const afterRejectedEdits = readDoc(dir)
+    expect(afterRejectedEdits.tasks[0].acceptanceCriteria).toBeNull()
+    expect(afterRejectedEdits.tasks[0].executionPlan).toBeNull()
+    const lintOut = run(['lint', '--json'], dir)
+    expect(JSON.parse(lintOut).valid).toBe(true)
   })
 
   it('task approve --by', () => {

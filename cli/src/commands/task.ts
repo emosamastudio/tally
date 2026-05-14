@@ -2,7 +2,7 @@
 import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
-import type { Task, TallyDocument } from '../types.js'
+import type { AcceptanceCriteria, ExecutionPlan, Task, TallyDocument } from '../types.js'
 
 // ── Helpers ──
 
@@ -40,6 +40,48 @@ function validateMetaRefs(doc: TallyDocument, stage: string, module: string): vo
   if (!doc._meta.modules.some((m) => m.id === module)) {
     throw new Error(`Module "${module}" not found in _meta.modules`)
   }
+}
+
+function parseJsonOption<T>(label: string, raw: string): T {
+  try {
+    return JSON.parse(raw) as T
+  } catch {
+    throw new Error(`Invalid JSON for ${label}`)
+  }
+}
+
+function isStringArray(value: unknown): value is string[] {
+  return Array.isArray(value) && value.every((item) => typeof item === 'string')
+}
+
+function assertStructuredOptionObject(label: string, value: unknown): asserts value is Record<string, unknown> {
+  if (value === null || Array.isArray(value) || typeof value !== 'object') {
+    throw new Error(`Invalid ${label}: expected a JSON object`)
+  }
+}
+
+function validateAcceptanceCriteria(value: unknown): AcceptanceCriteria {
+  assertStructuredOptionObject('acceptance criteria', value)
+  const allowed = new Set(['requiredTests', 'passConditions', 'forbiddenSideEffects', 'negativeCases'])
+  for (const [key, fieldValue] of Object.entries(value)) {
+    if (!allowed.has(key)) throw new Error(`Invalid acceptance criteria: unknown field "${key}"`)
+    if (!isStringArray(fieldValue)) {
+      throw new Error(`Invalid acceptance criteria: "${key}" must be an array of strings`)
+    }
+  }
+  return value
+}
+
+function validateExecutionPlan(value: unknown): ExecutionPlan {
+  assertStructuredOptionObject('execution plan', value)
+  const allowed = new Set(['inputs', 'outputs', 'steps'])
+  for (const [key, fieldValue] of Object.entries(value)) {
+    if (!allowed.has(key)) throw new Error(`Invalid execution plan: unknown field "${key}"`)
+    if (!isStringArray(fieldValue)) {
+      throw new Error(`Invalid execution plan: "${key}" must be an array of strings`)
+    }
+  }
+  return value
 }
 
 // ── Task manipulation functions (exported for testing) ──
@@ -525,6 +567,8 @@ export function taskCommand(): Command {
     .option('--risk-level <level>', 'Risk: low, medium, high, critical')
     .option('--execution-lane <lane>', 'Lane: contract, writer, runtime, ui, test, review')
     .option('--write-scopes <scopes>', 'Comma-separated write scope paths')
+    .option('--acceptance-criteria-json <json>', 'AcceptanceCriteria JSON object')
+    .option('--execution-plan-json <json>', 'ExecutionPlan JSON object')
     .option('--assigned-agent <agent>', 'Assigned agent ID')
     .option('--requires-review', 'Task requires code review')
     .option('--rollback-plan <plan>', 'Rollback plan for high-risk tasks')
@@ -557,6 +601,16 @@ export function taskCommand(): Command {
         if (opts.executionLane !== undefined) fields.executionLane = opts.executionLane
         if (opts.writeScopes !== undefined) {
           fields.writeScopes = (opts.writeScopes as string).split(',').map((s: string) => s.trim()).filter(Boolean)
+        }
+        if (opts.acceptanceCriteriaJson !== undefined) {
+          fields.acceptanceCriteria = validateAcceptanceCriteria(
+            parseJsonOption<unknown>('acceptance criteria', opts.acceptanceCriteriaJson as string),
+          )
+        }
+        if (opts.executionPlanJson !== undefined) {
+          fields.executionPlan = validateExecutionPlan(
+            parseJsonOption<unknown>('execution plan', opts.executionPlanJson as string),
+          )
         }
         if (opts.assignedAgent !== undefined) {
           fields.assignedAgent = opts.assignedAgent === '' ? null : opts.assignedAgent
