@@ -234,6 +234,48 @@ describe('addTasks', () => {
     expect(task.feature).toBe('f-login')
   })
 
+  it('defaults new scheduling fields', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{ name: 'Defaults', stage: 'S1', module: 'core' }])
+    expect(task.writeScopes).toEqual([])
+    expect(task.acceptanceCriteria).toBeNull()
+    expect(task.executionPlan).toBeNull()
+    expect(task.riskLevel).toBe('medium')
+    expect(task.rollbackPlan).toBeNull()
+    expect(task.executionLane).toBeNull()
+    expect(task.assignedAgent).toBeNull()
+    expect(task.requiresReview).toBe(false)
+    expect(task.resourceRequirements).toEqual([])
+    expect(task.repos).toEqual([])
+    expect(task.deliveryNode).toBeNull()
+    expect(task.approvedBy).toBeNull()
+  })
+
+  it('accepts scheduling fields', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{
+      name: 'Scheduled',
+      stage: 'S1',
+      module: 'core',
+      writeScopes: ['src/auth/**'],
+      riskLevel: 'high',
+      executionLane: 'writer',
+      rollbackPlan: 'git revert',
+      requiresReview: true,
+      resourceRequirements: ['openai/gpt-4o'],
+      repos: ['polaris-impl'],
+      deliveryNode: 'D6',
+    }])
+    expect(task.writeScopes).toEqual(['src/auth/**'])
+    expect(task.riskLevel).toBe('high')
+    expect(task.executionLane).toBe('writer')
+    expect(task.rollbackPlan).toBe('git revert')
+    expect(task.requiresReview).toBe(true)
+    expect(task.resourceRequirements).toEqual(['openai/gpt-4o'])
+    expect(task.repos).toEqual(['polaris-impl'])
+    expect(task.deliveryNode).toBe('D6')
+  })
+
   it('defaults feature to null when not specified', () => {
     const doc = validDoc()
     const [task] = addTasks(doc, [{ name: 'No Feature', stage: 'S1', module: 'core' }])
@@ -388,6 +430,50 @@ describe('editTask', () => {
     doc.tasks[0].feature = 'f-old'
     const task = editTask(doc, 'U-001', { feature: null })
     expect(task.feature).toBeNull()
+  })
+
+  it('modifies riskLevel', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { riskLevel: 'critical' })
+    expect(task.riskLevel).toBe('critical')
+  })
+
+  it('rejects invalid riskLevel', () => {
+    const doc = validDoc()
+    expect(() => editTask(doc, 'U-001', { riskLevel: 'extreme' }))
+      .toThrow(/Invalid riskLevel/)
+  })
+
+  it('modifies executionLane', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { executionLane: 'test' })
+    expect(task.executionLane).toBe('test')
+  })
+
+  it('rejects invalid executionLane', () => {
+    const doc = validDoc()
+    expect(() => editTask(doc, 'U-001', { executionLane: 'designer' }))
+      .toThrow(/Invalid executionLane/)
+  })
+
+  it('modifies writeScopes', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { writeScopes: ['src/**', 'test/**'] })
+    expect(task.writeScopes).toEqual(['src/**', 'test/**'])
+  })
+
+  it('modifies requiresReview and rollbackPlan', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { requiresReview: true, rollbackPlan: 'revert commit' })
+    expect(task.requiresReview).toBe(true)
+    expect(task.rollbackPlan).toBe('revert commit')
+  })
+
+  it('modifies repos and deliveryNode', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { repos: ['repo-a'], deliveryNode: 'V1' })
+    expect(task.repos).toEqual(['repo-a'])
+    expect(task.deliveryNode).toBe('V1')
   })
 
   it('refuses to edit done tasks', () => {

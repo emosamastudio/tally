@@ -275,4 +275,93 @@ describe('tally end-to-end', () => {
     const lintOut = run(['lint', '--json'], dir)
     expect(JSON.parse(lintOut).valid).toBe(true)
   })
+
+  // ── v0.2.0 feature e2e ──
+
+  it('task edit --risk-level and --execution-lane', () => {
+    run(['init', 'e2e-edit-sched', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Risky', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'edit', 'U-001', '--risk-level', 'critical', '--execution-lane', 'writer'], dir)
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].riskLevel).toBe('critical')
+    expect(doc.tasks[0].executionLane).toBe('writer')
+  })
+
+  it('task approve --by', () => {
+    run(['init', 'e2e-approve', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Approve Me', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok', riskLevel: 'high' },
+    ])], dir)
+    run(['task', 'approve', 'U-001', '--by', 'human-reviewer'], dir)
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].approvedBy).toBe('human-reviewer')
+  })
+
+  it('task done with structured evidence', () => {
+    run(['init', 'e2e-str-evid', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Evidence Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'Implemented', '--test', 'npm test', '--commit', 'abc123'], dir)
+    const doc = readDoc(dir)
+    const done = doc.tasks.find((t: any) => t.evidence?.includes('[test: npm test]'))
+    expect(done).toBeTruthy()
+    expect(done.evidence).toContain('[commit: abc123]')
+  })
+
+  it('graph --level feature outputs feature graph', () => {
+    run(['init', 'e2e-fgraph', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'A1', stage: 'S1', module: 'core', feature: 'f-auth', priority: 'P0', acceptance: 'ok' },
+      { name: 'A2', stage: 'S1', module: 'core', feature: 'f-auth', priority: 'P0', acceptance: 'ok', deps: ['U-001'] },
+      { name: 'B1', stage: 'S1', module: 'core', feature: 'f-core', priority: 'P0', acceptance: 'ok', deps: ['U-001'] },
+    ])], dir)
+    const out = run(['graph', '--format', 'json', '--level', 'feature'], dir)
+    const result = JSON.parse(out)
+    expect(result.nodes.length).toBeGreaterThanOrEqual(1)
+  })
+
+  it('export --format agent-brief', () => {
+    run(['init', 'e2e-abrief', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Brief Task', stage: 'S1', module: 'core', feature: 'f-brief', priority: 'P0', acceptance: 'ok',
+        writeScopes: ['src/**'], riskLevel: 'medium', executionLane: 'writer' },
+    ])], dir)
+    const out = run(['export', '--format', 'agent-brief'], dir)
+    expect(out).toContain('Brief Task')
+    expect(out).toContain('Write Scopes')
+    expect(out).toContain('src/**')
+  })
+
+  it('round start --strategy feature-focused', () => {
+    run(['init', 'e2e-rstrat', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'F1', stage: 'S1', module: 'core', feature: 'f-a', priority: 'P0', acceptance: 'ok' },
+      { name: 'F2', stage: 'S1', module: 'core', feature: 'f-b', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = run(['round', 'start', 'feature-round', '--strategy', 'feature-focused'], dir)
+    expect(out).toContain('Round started')
+  })
+
+  it('check shows FEATURE_REQUIRED warning for open task without feature', () => {
+    run(['init', 'e2e-freq', '--no-hook'], dir)
+    const doc = readDoc(dir)
+    doc.tasks.push({
+      id: 'U-001', status: 'pending', priority: 'P0', stage: 'S1', module: 'core',
+      name: 'No Feature', acceptance: 'ok', deps: [], blocks: null,
+      nextAction: 'do it', evidence: null, rule: null, feature: null, tags: [],
+      order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
+      createdAt: '2026-05-15', completedAt: null,
+      writeScopes: [], acceptanceCriteria: null, executionPlan: null,
+      riskLevel: 'medium', rollbackPlan: null, executionLane: null,
+      assignedAgent: null, requiresReview: false, resourceRequirements: [],
+      repos: [], deliveryNode: null, approvedBy: null,
+    })
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+    const out = runLax(['check', '--json'], dir)
+    const result = JSON.parse(out)
+    expect(result.warnings.some((w: any) => w.code === 'FEATURE_REQUIRED')).toBe(true)
+  })
 })
