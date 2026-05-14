@@ -1,7 +1,7 @@
 {
   "name": "tally-use",
-  "skill_version": "0.1.4",
-  "aligned_release": "tally_v0.1.4",
+  "skill_version": "0.2.0",
+  "aligned_release": "tally_v0.2.0",
   "entrypoint": "tally.md",
   "compatibility": {
     "tally_v": 1,
