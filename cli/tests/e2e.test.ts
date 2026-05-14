@@ -220,4 +220,47 @@ describe('tally end-to-end', () => {
     expect(result.valid).toBe(false)
     expect(result.errors.some((e: any) => e.code === 'FEATURE_MODULE_MISMATCH')).toBe(true)
   })
+
+  it('upgrade backfills feature schema for legacy v1.0 ledgers', () => {
+    const legacy = {
+      _meta: {
+        project: 'legacy',
+        tally_version: '1.0',
+        created: '2026-05-10',
+        updated: '2026-05-10',
+        agents: [{ id: 'main', name: 'Main' }],
+        stages: [{ id: 'S1', name: 'Stage 1', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+      },
+      tasks: [
+        {
+          id: 'D-001', status: 'done', priority: 'P0', stage: 'S1', module: 'core',
+          name: 'Old Done', acceptance: 'ok', deps: [], blocks: null,
+          nextAction: null, evidence: 'done', rule: null, tags: [],
+          order: null, completedOrder: 1, claimedBy: null, claimedAt: null,
+          createdAt: '2026-05-10', completedAt: '2026-05-10',
+        },
+        {
+          id: 'U-002', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
+          name: 'Old Pending', acceptance: 'ok', deps: [], blocks: null,
+          nextAction: 'do it', evidence: null, rule: null, tags: [],
+          order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
+          createdAt: '2026-05-10', completedAt: null,
+        },
+      ],
+      rounds: [],
+      blocks: [],
+      progress: [],
+    }
+
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(legacy, null, 2))
+    const out = run(['upgrade'], dir)
+    const doc = readDoc(dir)
+
+    expect(out).toContain('feature-schema-backfill')
+    expect(doc._meta.features).toEqual([])
+    expect(doc.tasks.map((t: any) => t.feature)).toEqual([null, null])
+    const lintOut = run(['lint', '--json'], dir)
+    expect(JSON.parse(lintOut).valid).toBe(true)
+  })
 })
