@@ -209,3 +209,41 @@ describe('dependency-cycle.json fixture', () => {
     expect(result.errors.some((e) => e.code === 'DEPENDENCY_CYCLE')).toBe(true)
   })
 })
+
+describe('feature reference validation', () => {
+  it('should pass when task feature is null', () => {
+    const doc = loadFixture('valid-tally.json')
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should fail lintDocument when task feature not in _meta.features', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].feature = 'nonexistent-feature'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.path.includes('feature') && e.message.includes('not found'))).toBe(true)
+  })
+
+  it('should pass lintDocument when task feature exists in _meta.features', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const meta = doc._meta as Record<string, unknown>
+    meta.features = [{ id: 'f1', module: 'core', name: 'Feature 1' }]
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].feature = 'f1'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should detect feature-module mismatch in validateDocument', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const meta = doc._meta as Record<string, unknown>
+    meta.features = [{ id: 'f1', module: 'other-module', name: 'Feature 1' }]
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].feature = 'f1'
+    const result = validateDocument(doc)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.code === 'FEATURE_MODULE_MISMATCH')).toBe(true)
+  })
+})

@@ -25,6 +25,12 @@
       { "id": "provider", "name": "Provider层" },
       { "id": "runtime", "name": "Runtime/Task" },
       { "id": "speech", "name": "Speech/Voice" }
+    ],
+    "features": [
+      { "id": "identity-scaffold", "module": "identity", "name": "项目身份脚手架" },
+      { "id": "bridge-contract", "module": "contracts", "name": "Bridge契约定义" },
+      { "id": "runtime-engine", "module": "runtime", "name": "Runtime引擎" },
+      { "id": "speech-tts", "module": "speech", "name": "语音合成" }
     ]
   },
   "tasks": [
@@ -35,7 +41,7 @@
       "acceptance": "Repo 结构就绪，AGENTS.md/MEMORY.md 就位",
       "deps": [], "blocks": null, "nextAction": null,
       "evidence": "仓库初始化完成，CLAUDE.md 引导正确",
-      "rule": null, "tags": [], "order": 1, "completedOrder": 1,
+      "rule": null, "feature": null, "tags": [], "order": 1, "completedOrder": 1,
       "claimedBy": "main", "claimedAt": "2026-05-01", "createdAt": "2026-05-01", "completedAt": "2026-05-01"
     },
     {
@@ -45,7 +51,7 @@
       "acceptance": "openapi/inori-bridge.v1.json 通过 npm run contracts:validate",
       "deps": ["D-001"], "blocks": null, "nextAction": null,
       "evidence": "契约验证通过，JSON Schema 合法",
-      "rule": null, "tags": ["blocking-release"], "order": 2, "completedOrder": 2,
+      "rule": null, "feature": null, "tags": ["blocking-release"], "order": 2, "completedOrder": 2,
       "claimedBy": "main", "claimedAt": "2026-05-01", "createdAt": "2026-05-01", "completedAt": "2026-05-02"
     },
     {
@@ -55,7 +61,7 @@
       "acceptance": "所有 fixture 通过 schema 验证",
       "deps": ["D-002"], "blocks": null, "nextAction": null,
       "evidence": "npm run contracts:validate 全绿",
-      "rule": null, "tags": ["blocking-release"], "order": 3, "completedOrder": 3,
+      "rule": null, "feature": null, "tags": ["blocking-release"], "order": 3, "completedOrder": 3,
       "claimedBy": "main", "claimedAt": "2026-05-02", "createdAt": "2026-05-02", "completedAt": "2026-05-03"
     },
     {
@@ -65,7 +71,7 @@
       "acceptance": "profile-memory-architecture.json 编译通过",
       "deps": ["D-001"], "blocks": null, "nextAction": null,
       "evidence": "AODS compile 输出正确",
-      "rule": null, "tags": ["design-needed"], "order": 4, "completedOrder": 4,
+      "rule": null, "feature": null, "tags": ["design-needed"], "order": 4, "completedOrder": 4,
       "claimedBy": "app-dev", "claimedAt": "2026-05-02", "createdAt": "2026-05-02", "completedAt": "2026-05-04"
     },
     {
@@ -75,7 +81,7 @@
       "acceptance": "fixture experience-profile-speech.v1.json 合法",
       "deps": ["D-003"], "blocks": null, "nextAction": null,
       "evidence": "字段对齐 IFA 三层层模型",
-      "rule": null, "tags": ["design-needed"], "order": 5, "completedOrder": 5,
+      "rule": null, "feature": null, "tags": ["design-needed"], "order": 5, "completedOrder": 5,
       "claimedBy": "main", "claimedAt": "2026-05-03", "createdAt": "2026-05-03", "completedAt": "2026-05-03"
     },
     {
@@ -85,7 +91,7 @@
       "acceptance": "FastAPI 启动，POST /interaction/front/inputs 可路由",
       "deps": ["D-002", "D-003"], "blocks": null, "nextAction": null,
       "evidence": "uvicorn 启动成功，health check 返回 200",
-      "rule": null, "tags": ["blocking-release"], "order": 6, "completedOrder": 6,
+      "rule": null, "feature": null, "tags": ["blocking-release"], "order": 6, "completedOrder": 6,
       "claimedBy": "main", "claimedAt": "2026-05-03", "createdAt": "2026-05-03", "completedAt": "2026-05-04"
     },
     {
@@ -95,7 +101,7 @@
       "acceptance": "Episode append/query 通过单元测试",
       "deps": ["U-006"], "blocks": null, "nextAction": null,
       "evidence": "105 tests pass",
-      "rule": null, "tags": [], "order": 7, "completedOrder": 7,
+      "rule": null, "feature": null, "tags": [], "order": 7, "completedOrder": 7,
       "claimedBy": "main", "claimedAt": "2026-05-04", "createdAt": "2026-05-04", "completedAt": "2026-05-05"
     },
     {
@@ -105,7 +111,7 @@
       "acceptance": "Profile/Experience/Tool/Provider 从 state.py 剥离",
       "deps": ["U-007"], "blocks": null, "nextAction": null,
       "evidence": "state.py 从 3905 行减少到 ~2800 行",
-      "rule": null, "tags": [], "order": 8, "completedOrder": 8,
+      "rule": null, "feature": null, "tags": [], "order": 8, "completedOrder": 8,
       "claimedBy": "main", "claimedAt": "2026-05-05", "createdAt": "2026-05-05", "completedAt": "2026-05-06"
     },
     {
@@ -114,7 +120,7 @@
       "name": "Provider 抽象层 DI 容器设计",
       "acceptance": "CoreDependencyContainer 可注入 clock/id_provider/audit_sink",
       "deps": ["U-008"], "blocks": null, "nextAction": "完成 Leihuo provider adapter",
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 9, "completedOrder": null,
       "claimedBy": "main", "claimedAt": "2026-05-06", "createdAt": "2026-05-06", "completedAt": null
     },
@@ -124,7 +130,7 @@
       "name": "Provider Stability Gate — 容错与重试策略",
       "acceptance": "3 次重试 + circuit breaker 通过集成测试",
       "deps": ["U-009"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 10, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-06", "completedAt": null
     },
@@ -135,7 +141,7 @@
       "acceptance": "Leihuo local gateway 连接成功，不走 Claw Router",
       "deps": ["U-009"], "blocks": null, "nextAction": null,
       "evidence": "端到端延迟 < 800ms，token 流正确",
-      "rule": null, "tags": ["quick-win"], "order": 11, "completedOrder": 9,
+      "rule": null, "feature": null, "tags": ["quick-win"], "order": 11, "completedOrder": 9,
       "claimedBy": "main", "claimedAt": "2026-05-07", "createdAt": "2026-05-07", "completedAt": "2026-05-07"
     },
     {
@@ -144,7 +150,7 @@
       "name": "Huoshan TTS 语音合成集成",
       "acceptance": "voice ID 可配置，合成延迟 < 500ms",
       "deps": ["U-009"], "blocks": null, "nextAction": "调通 Huoshan auth token 刷新逻辑",
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 12, "completedOrder": null,
       "claimedBy": "app-dev", "claimedAt": "2026-05-07", "createdAt": "2026-05-07", "completedAt": null
     },
@@ -154,7 +160,7 @@
       "name": "Runtime Harness 最小验证环境",
       "acceptance": "fixture 模式下 IFA agent loop 可完整执行一轮",
       "deps": ["U-009"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 13, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-07", "completedAt": null
     },
@@ -164,7 +170,7 @@
       "name": "IFA Agent Loop 核心引擎",
       "acceptance": "Immediate → Meaningful → Complex 三层响应正确分流",
       "deps": ["U-012"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 14, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-08", "completedAt": null
     },
@@ -174,7 +180,7 @@
       "name": "Conversation Concurrency Model",
       "acceptance": "多轮并发不丢消息，ordering 正确",
       "deps": ["U-013"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 15, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-08", "completedAt": null
     },
@@ -184,7 +190,7 @@
       "name": "Progress Event Stream 替换 Timeout 模型",
       "acceptance": "所有 async 操作通过 progress event 上报状态",
       "deps": ["U-013"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["design-needed"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["design-needed"],
       "order": 16, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-08", "completedAt": null
     },
@@ -195,7 +201,7 @@
       "acceptance": "文档覆盖 TTS → 流式 → 客户端播放全链路",
       "deps": ["U-011"], "blocks": null, "nextAction": null,
       "evidence": "架构评审通过，无阻塞意见",
-      "rule": null, "tags": ["design-needed", "quick-win"], "order": 17, "completedOrder": 10,
+      "rule": null, "feature": null, "tags": ["design-needed", "quick-win"], "order": 17, "completedOrder": 10,
       "claimedBy": "app-dev", "claimedAt": "2026-05-08", "createdAt": "2026-05-08", "completedAt": "2026-05-08"
     },
     {
@@ -205,7 +211,7 @@
       "acceptance": "iOS/macOS 端可播放 Huoshan TTS 流",
       "deps": ["U-016"], "blocks": "B-001",
       "nextAction": "等待 Leihuo gateway 恢复后联调",
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 18, "completedOrder": null,
       "claimedBy": "app-dev", "claimedAt": "2026-05-08", "createdAt": "2026-05-08", "completedAt": null
     },
@@ -216,7 +222,7 @@
       "acceptance": "Task 完成事件触发 announcement 推送",
       "deps": ["U-017", "U-013"], "blocks": "B-001",
       "nextAction": null,
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 19, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -226,7 +232,7 @@
       "name": "App 契约 parity 检查自动化",
       "acceptance": "npm run python:app-contract:check 集成到 CI",
       "deps": ["D-002", "U-009"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 20, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -236,7 +242,7 @@
       "name": "Bridge v1.1 生命周期种类扩展",
       "acceptance": "Accept-Version: v1.1 下新 lifecycle kind 可用",
       "deps": ["U-006", "U-019"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 21, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -246,7 +252,7 @@
       "name": "端到端 Smoke Test Suite",
       "acceptance": "npm run v1:scenarios:smoke 覆盖核心场景",
       "deps": ["U-013", "U-014"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 22, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -256,7 +262,7 @@
       "name": "Module Boundary Contract 完整文档",
       "acceptance": "全部 7 个模块边界契约写清并通过 review",
       "deps": ["D-004"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["design-needed", "blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["design-needed", "blocking-release"],
       "order": 23, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -266,7 +272,7 @@
       "name": "多语言 Profile 模板系统",
       "acceptance": "zh-CN / en-US profile 可切换",
       "deps": ["D-004"], "blocks": null, "nextAction": "待 v1 稳定后启用",
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 24, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-09", "completedAt": null
     },
@@ -276,7 +282,7 @@
       "name": "Emotion Signal 情感元数据分析",
       "acceptance": "情感信号仅作 evidence/metadata，不做 truth",
       "deps": ["U-016"], "blocks": null, "nextAction": "v2 功能，暂不启动",
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 25, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-10", "completedAt": null
     },
@@ -286,7 +292,7 @@
       "name": "Claw Router 迁移至直连方案",
       "acceptance": "Leihuo 走直连，不再依赖 Claw Router",
       "deps": ["U-010"], "blocks": null, "nextAction": "待 Leihuo 稳定后评估",
-      "evidence": null, "rule": null, "tags": ["quick-win"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["quick-win"],
       "order": 26, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-10", "completedAt": null
     },
@@ -297,7 +303,7 @@
       "acceptance": "每 30s ping 一次，失败自动降级到 fixture",
       "deps": ["U-010", "U-011"], "blocks": "B-001",
       "nextAction": "Gateway 恢复后联调健康检查端点",
-      "evidence": null, "rule": null, "tags": ["blocking-release"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
       "order": 27, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-10", "completedAt": null
     },
@@ -307,7 +313,7 @@
       "name": "Task Ledger 持久化迁移 (JSON → SQLite)",
       "acceptance": "ledger 数据从 .md 迁移到 sqlite，查询延迟 < 10ms",
       "deps": ["U-012"], "blocks": null, "nextAction": "设计 schema migration 策略",
-      "evidence": null, "rule": null, "tags": [],
+      "evidence": null, "rule": null, "feature": null, "tags": [],
       "order": 28, "completedOrder": null,
       "claimedBy": "main", "claimedAt": "2026-05-10", "createdAt": "2026-05-10", "completedAt": null
     },
@@ -317,7 +323,7 @@
       "name": "Inori Personality Growth Journal",
       "acceptance": "personality 变更记录可追溯，通过 audit_sink 落盘",
       "deps": ["D-004", "U-023"], "blocks": null, "nextAction": null,
-      "evidence": null, "rule": null, "tags": ["design-needed"],
+      "evidence": null, "rule": null, "feature": null, "tags": ["design-needed"],
       "order": 29, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-10", "completedAt": null
     },
@@ -328,7 +334,7 @@
       "acceptance": "voice_id 通过 env var 注入，不 hardcode",
       "deps": ["U-011"], "blocks": null, "nextAction": null,
       "evidence": "INORI_HUOSHAN_VOICE_ID 从 .env 读取成功",
-      "rule": null, "tags": ["quick-win"], "order": 30, "completedOrder": 11,
+      "rule": null, "feature": null, "tags": ["quick-win"], "order": 30, "completedOrder": 11,
       "claimedBy": "app-dev", "claimedAt": "2026-05-09", "createdAt": "2026-05-09", "completedAt": "2026-05-09"
     }
   ],

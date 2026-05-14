@@ -28,6 +28,7 @@ interface TallyTaskRaw {
   nextAction: string | null
   evidence: string | null
   rule: string | null
+  feature: string | null
   tags: string[]
   order: number | null
   completedOrder: number | null
@@ -152,6 +153,7 @@ function adaptTask(raw: TallyTaskRaw, source: TaskSource, order: number): Task {
     nextAction: raw.nextAction ?? undefined,
     evidence: raw.evidence ?? undefined,
     followUpRule: raw.rule ?? undefined,
+    feature: raw.feature ?? undefined,
     tags: raw.tags ?? [],
     claimedBy: raw.claimedBy,
     claimedAt: raw.claimedAt,

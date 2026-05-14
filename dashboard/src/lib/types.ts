@@ -15,6 +15,7 @@ export interface Task {
   source: TaskSource
   stage: string
   module: string
+  feature?: string
   name: string
   priority: Priority
   status: TaskStatus

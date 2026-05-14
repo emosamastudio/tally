@@ -17,6 +17,7 @@ function testDoc(): TallyDocument {
       agents: [{ id: 'main', name: '主会话' }],
       stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
       modules: [{ id: 'core', name: 'Core Module' }],
+      features: [],
     },
     tasks: [
       makeTask('U-001', 'pending', [], 1),
@@ -37,13 +38,15 @@ function makeTask(
   deps: string[],
   order: number,
   blocks?: string,
+  module?: string,
+  feature?: string,
 ) {
   return {
     id,
     status,
     priority: 'P1' as const,
     stage: 'S1',
-    module: 'core',
+    module: module ?? 'core',
     name: `Task ${id}`,
     acceptance: 'pass',
     deps,
@@ -51,6 +54,7 @@ function makeTask(
     nextAction: 'do it',
     evidence: null,
     rule: null,
+    feature: feature ?? null,
     tags: [],
     order,
     completedOrder: null,
@@ -174,6 +178,43 @@ describe('round start', () => {
     const doc = readLedger(dir)
     const u3 = doc.tasks.find((t) => t.id === 'U-003')!
     expect(u3.claimedBy).toBeNull()
+  })
+
+  it('groups auto-selected tasks by module then feature within same depth', () => {
+    // Create tasks at depth 0 with mixed modules and features.
+    // Expected sort order: module alpha → feature alpha → order asc
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['auth', 'core'] }],
+        modules: [{ id: 'auth', name: 'Auth' }, { id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        // module=core, feature=f2
+        makeTask('U-001', 'pending', [], 1, undefined, 'core', 'f2'),
+        // module=core, feature=f1 (same module, earlier feature → should come before U-001)
+        makeTask('U-002', 'pending', [], 2, undefined, 'core', 'f1'),
+        // module=auth, feature=f2
+        makeTask('U-003', 'pending', [], 3, undefined, 'auth', 'f2'),
+        // module=auth, feature=f1 (earliest module, earliest feature → should come first)
+        makeTask('U-004', 'pending', [], 4, undefined, 'auth', 'f1'),
+        // module=core, no feature (null sorts before non-null in localeCompare)
+        makeTask('U-005', 'pending', [], 5, undefined, 'core'),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-feature-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('feature-sort', { cwd: dir2, agentId: 'main' })
+      const ids = result.selected.map((s) => s.taskId)
+      // auth sorts before core; within auth: f1 before f2; within core: null before f1 before f2
+      expect(ids).toEqual(['U-004', 'U-003', 'U-005', 'U-002', 'U-001'])
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
   })
 })
 

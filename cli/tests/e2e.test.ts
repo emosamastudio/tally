@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 
@@ -7,6 +7,15 @@ const CLI = join(__dirname, '..', 'dist', 'index.js')
 
 function run(args: string[], cwd: string): string {
   return execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf-8' })
+}
+
+/** Run a CLI command that may exit with non-zero code. Returns stdout. */
+function runLax(args: string[], cwd: string): string {
+  try {
+    return execFileSync('node', [CLI, ...args], { cwd, encoding: 'utf-8', stdio: ['ignore', 'pipe', 'pipe'] })
+  } catch (e: any) {
+    return e.stdout ?? ''
+  }
 }
 
 function readDoc(cwd: string): any {
@@ -111,5 +120,104 @@ describe('tally end-to-end', () => {
     ])], dir)
     const out = run(['export', '--format', 'csv'], dir)
     expect(out).toContain('id,name,status,priority,stage,module')
+  })
+
+  // ── Feature-related e2e ──
+
+  it('init creates features: [] in _meta', () => {
+    run(['init', 'feature-init', '--no-hook'], dir)
+    const doc = readDoc(dir)
+    expect(doc._meta.features).toEqual([])
+  })
+
+  it('task add --json accepts feature field', () => {
+    run(['init', 'feature-add', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Login', stage: 'S1', module: 'core', feature: 'f-login', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].feature).toBe('f-login')
+  })
+
+  it('task edit --feature sets feature on task', () => {
+    run(['init', 'feature-edit', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Edit Me', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'edit', 'U-001', '--feature', 'f-edit'], dir)
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].feature).toBe('f-edit')
+  })
+
+  it('task list --feature filters by feature', () => {
+    run(['init', 'feature-list', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Auth Task', stage: 'S1', module: 'core', feature: 'f-auth', priority: 'P0', acceptance: 'ok' },
+      { name: 'Core Task', stage: 'S1', module: 'core', feature: 'f-core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = run(['task', 'list', '--feature', 'f-auth'], dir)
+    expect(out).toContain('Auth Task')
+    expect(out).not.toContain('Core Task')
+  })
+
+  it('graph --format json includes feature in nodes', () => {
+    run(['init', 'feature-graph', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'A', stage: 'S1', module: 'core', feature: 'f1', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = run(['graph', '--format', 'json'], dir)
+    const result = JSON.parse(out)
+    expect(result.nodes[0].feature).toBe('f1')
+  })
+
+  it('export --format csv includes feature column', () => {
+    run(['init', 'feature-csv', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'CSV Task', stage: 'S1', module: 'core', feature: 'f-csv', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = run(['export', '--format', 'csv'], dir)
+    expect(out).toContain('feature')
+    expect(out).toContain('f-csv')
+  })
+
+  it('export --format markdown includes feature column', () => {
+    run(['init', 'feature-md', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'MD Task', stage: 'S1', module: 'core', feature: 'f-md', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = run(['export', '--format', 'markdown'], dir)
+    expect(out).toContain('功能')
+    expect(out).toContain('f-md')
+  })
+
+  it('lint catches invalid feature reference', () => {
+    run(['init', 'feature-lint', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Bad Feature', stage: 'S1', module: 'core', feature: 'no-such-feature', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    const out = runLax(['lint', '--json'], dir)
+    const result = JSON.parse(out)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e: any) => e.path?.includes('feature'))).toBe(true)
+  })
+
+  it('check catches feature-module mismatch', () => {
+    run(['init', 'feature-mismatch', '--no-hook'], dir)
+    // Manually inject a features registry and a task with mismatched feature module
+    const doc = readDoc(dir)
+    doc._meta.features = [{ id: 'f1', module: 'auth', name: 'Auth Feature' }]
+    doc._meta.modules.push({ id: 'auth', name: 'Auth' })
+    doc.tasks.push({
+      id: 'U-001', status: 'pending', priority: 'P0', stage: 'S1', module: 'core',
+      name: 'Mismatch Task', acceptance: 'ok', deps: [], blocks: null,
+      nextAction: 'do it', evidence: null, rule: null, feature: 'f1', tags: [],
+      order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
+      createdAt: '2026-05-10', completedAt: null,
+    })
+    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+    const out = runLax(['check', '--json'], dir)
+    const result = JSON.parse(out)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e: any) => e.code === 'FEATURE_MODULE_MISMATCH')).toBe(true)
   })
 })

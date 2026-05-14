@@ -6,7 +6,8 @@
     "updated": "2026-05-10",
     "agents": [{ "id": "main", "name": "主会话" }],
     "stages": [{ "id": "S1", "name": "Core", "modules": ["core"] }],
-    "modules": [{ "id": "core", "name": "Core Module" }]
+    "modules": [{ "id": "core", "name": "Core Module" }],
+    "features": []
   },
   "tasks": [
     {
@@ -22,6 +23,7 @@
       "nextAction": "do it",
       "evidence": null,
       "rule": null,
+"feature": null,
       "tags": [],
       "order": 1,
       "completedOrder": null,
@@ -43,6 +45,7 @@
       "nextAction": "do it",
       "evidence": null,
       "rule": null,
+"feature": null,
       "tags": [],
       "order": 2,
       "completedOrder": null,

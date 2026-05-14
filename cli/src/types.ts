@@ -24,6 +24,12 @@ export interface ModuleEntry {
   name: string
 }
 
+export interface FeatureEntry {
+  id: string
+  module: string
+  name: string
+}
+
 export interface TallyMeta {
   project: string
   tally_version: string
@@ -32,6 +38,7 @@ export interface TallyMeta {
   agents: AgentEntry[]
   stages: StageEntry[]
   modules: ModuleEntry[]
+  features: FeatureEntry[]
 }
 
 // ── Task ──
@@ -49,6 +56,7 @@ export interface Task {
   nextAction: string | null
   evidence: string | null
   rule: string | null
+  feature: string | null
   tags: string[]
   order: number | null
   completedOrder: number | null
@@ -159,7 +167,7 @@ export interface StatusResult {
 }
 
 export interface GraphResult {
-  nodes: { id: string; name: string; status: string; depth: number; criticalPath: boolean }[]
+  nodes: { id: string; name: string; status: string; depth: number; criticalPath: boolean; feature: string | null }[]
   edges: { from: string; to: string }[]
   criticalPathLength: number
   maxDepth: number

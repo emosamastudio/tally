@@ -251,6 +251,9 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
           <span className="sk-mono block truncate" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.module}</span>
         </TableCell>
         <TableCell>
+          <span className="sk-mono block truncate" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.feature ?? '—'}</span>
+        </TableCell>
+        <TableCell>
           <span className={`sk-chip shrink-0 ${PRIORITY_CHIP[task.priority]}`} style={{ fontSize: 10 }}>
             {PRIORITY_LABEL[task.priority]}
           </span>
@@ -273,7 +276,7 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
       </TableRow>
       {expanded && (
         <TableRow>
-          <TableCell colSpan={9} style={{ background: 'var(--paper-2)', padding: '14px 24px' }}>
+          <TableCell colSpan={10} style={{ background: 'var(--paper-2)', padding: '14px 24px' }}>
             <div className="space-y-3" style={{ fontSize: 12 }}>
               {/* Task name as header */}
               <div>
@@ -555,6 +558,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
                   <TableHead>名称</TableHead>
                   <TableHead>阶段</TableHead>
                   <TableHead>模块</TableHead>
+                  <TableHead>功能</TableHead>
                   <TableHead>优先级</TableHead>
                   <TableHead>状态</TableHead>
                   <TableHead>依赖</TableHead>

@@ -14,6 +14,7 @@ const validDoc: TallyDocument = {
     agents: [{ id: 'main', name: '主会话' }],
     stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
     modules: [{ id: 'core', name: 'Core Module' }],
+    features: [],
   },
   tasks: [],
   rounds: [],

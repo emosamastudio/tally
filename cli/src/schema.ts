@@ -63,8 +63,21 @@ export const TALLY_JSON_SCHEMA = {
             additionalProperties: false,
           },
         },
+        features: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              module: { type: 'string' },
+              name: { type: 'string' },
+            },
+            required: ['id', 'module', 'name'],
+            additionalProperties: false,
+          },
+        },
       },
-      required: ['project', 'tally_version', 'created', 'updated', 'agents', 'stages', 'modules'],
+      required: ['project', 'tally_version', 'created', 'updated', 'agents', 'stages', 'modules', 'features'],
       additionalProperties: false,
     },
     tasks: {
@@ -86,6 +99,7 @@ export const TALLY_JSON_SCHEMA = {
           nextAction: { type: ['string', 'null'] },
           evidence: { type: ['string', 'null'] },
           rule: { type: ['string', 'null'] },
+          feature: { type: ['string', 'null'] },
           tags: { type: 'array', items: { type: 'string' } },
           order: { type: ['integer', 'null'] },
           completedOrder: { type: ['integer', 'null'] },
@@ -107,6 +121,7 @@ export const TALLY_JSON_SCHEMA = {
           'nextAction',
           'evidence',
           'rule',
+          'feature',
           'tags',
           'order',
           'completedOrder',
@@ -560,6 +575,39 @@ function checkAgentReferences(
   return errors
 }
 
+/** Check that task.feature references a valid _meta.features[].id. */
+function checkFeatureReferences(doc: Record<string, unknown>): LintError[] {
+  const errors: LintError[] = []
+  const meta = safeGet(doc, '_meta')
+  const features = meta != null && typeof meta === 'object'
+    ? (meta as Record<string, unknown>).features
+    : undefined
+  const featureIds = new Set<string>()
+  if (Array.isArray(features)) {
+    for (const f of features) {
+      if (f != null && typeof f === 'object') {
+        const fid = (f as Record<string, unknown>).id as string | undefined
+        if (fid) featureIds.add(fid)
+      }
+    }
+  }
+
+  const tasks = safeGet(doc, 'tasks')
+  if (!Array.isArray(tasks)) return errors
+
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i] as Record<string, unknown>
+    const feature = t.feature as string | null | undefined
+    if (feature != null && !featureIds.has(feature)) {
+      errors.push({
+        path: formatPath('tasks', i, 'feature'),
+        message: `Task feature "${feature}" not found in _meta.features`,
+      })
+    }
+  }
+  return errors
+}
+
 // ── Public API ──
 
 /**
@@ -596,6 +644,9 @@ export function lintDocument(doc: unknown): LintResult {
 
     // 4. Order uniqueness
     errors.push(...checkOrderUniqueness(record))
+
+    // 5. Feature references
+    errors.push(...checkFeatureReferences(record))
   }
 
   return {
@@ -692,6 +743,37 @@ export function validateDocument(doc: unknown): CheckResult {
           }
         }
         checkErrors.push(...checkAgentReferences(rounds, agentIds))
+
+        // Feature-module mismatch check
+        const featureMap = new Map<string, string>() // feature id → module
+        const featuresRaw = meta != null && typeof meta === 'object'
+          ? (meta as Record<string, unknown>).features
+          : undefined
+        if (Array.isArray(featuresRaw)) {
+          for (const f of featuresRaw) {
+            if (f != null && typeof f === 'object') {
+              const fr = f as Record<string, unknown>
+              const fid = fr.id as string | undefined
+              const fmod = fr.module as string | undefined
+              if (fid && fmod) featureMap.set(fid, fmod)
+            }
+          }
+        }
+        for (let i = 0; i < tasks.length; i++) {
+          const t = tasksRaw[i] as Record<string, unknown>
+          const taskFeature = t.feature as string | null | undefined
+          const taskModule = t.module as string | undefined
+          if (taskFeature != null && taskModule != null) {
+            const featureModule = featureMap.get(taskFeature)
+            if (featureModule != null && featureModule !== taskModule) {
+              checkErrors.push({
+                code: 'FEATURE_MODULE_MISMATCH',
+                message: `Task "${tasks[i].id}" feature "${taskFeature}" belongs to module "${featureModule}" but task is in module "${taskModule}"`,
+                path: formatPath('tasks', i, 'feature'),
+              })
+            }
+          }
+        }
       }
     }
   }

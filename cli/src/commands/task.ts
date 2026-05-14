@@ -52,6 +52,7 @@ export interface AddTaskInput {
   acceptance?: string
   deps?: string[]
   tags?: string[]
+  feature?: string
 }
 
 export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
@@ -73,6 +74,7 @@ export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
       nextAction: null,
       evidence: null,
       rule: null,
+      feature: input.feature ?? null,
       tags: input.tags ?? [],
       order: nextOrder(doc),
       completedOrder: null,
@@ -174,6 +176,7 @@ export function editTask(doc: TallyDocument, id: string, fields: Record<string, 
   if (fields.deps !== undefined) task.deps = fields.deps as string[]
   if (fields.nextAction !== undefined) task.nextAction = fields.nextAction as string | null
   if (fields.tags !== undefined) task.tags = fields.tags as string[]
+  if (fields.feature !== undefined) task.feature = fields.feature as string | null
 
   return task
 }
@@ -286,6 +289,7 @@ export interface ListFilters {
   stage?: string
   priority?: string
   tag?: string
+  feature?: string
   search?: string
 }
 
@@ -306,6 +310,9 @@ export function listTasks(doc: TallyDocument, filters: ListFilters): Task[] {
   }
   if (filters.tag) {
     tasks = tasks.filter((t) => t.tags.includes(filters.tag!))
+  }
+  if (filters.feature) {
+    tasks = tasks.filter((t) => t.feature === filters.feature)
   }
   if (filters.search) {
     const s = filters.search.toLowerCase()
@@ -353,6 +360,7 @@ function formatTaskDetail(detail: TaskDetail): string {
   lines.push(`Next Action: ${t.nextAction ?? '(none)'}`)
   lines.push(`Evidence:    ${t.evidence ?? '(none)'}`)
   lines.push(`Rule:        ${t.rule ?? '(none)'}`)
+  lines.push(`Feature:     ${t.feature ?? '(none)'}`)
   lines.push(`Tags:        ${t.tags.length > 0 ? t.tags.join(', ') : '(none)'}`)
   lines.push(`Order:       ${t.order ?? '(none)'}`)
   lines.push(`Comp.Order:  ${t.completedOrder ?? '(none)'}`)
@@ -447,6 +455,7 @@ export function taskCommand(): Command {
     .option('--deps <deps>', 'Comma-separated dependency IDs')
     .option('--next-action <action>', 'Next action text')
     .option('--tags <tags>', 'Comma-separated tags')
+    .option('--feature <feature>', 'Feature name')
     .action((id: string, opts: Record<string, string | undefined>) => {
       try {
         const doc = readLedger()
@@ -466,9 +475,12 @@ export function taskCommand(): Command {
         if (opts.tags !== undefined) {
           fields.tags = opts.tags.split(',').map((t) => t.trim()).filter(Boolean)
         }
+        if (opts.feature !== undefined) {
+          fields.feature = opts.feature === '' ? null : opts.feature
+        }
 
         if (Object.keys(fields).length === 0) {
-          throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, or --tags.')
+          throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, --tags, or --feature.')
         }
 
         const task = editTask(doc, id, fields)
@@ -551,9 +563,10 @@ export function taskCommand(): Command {
     .option('--stage <stage>', 'Filter by stage ID')
     .option('--priority <priority>', 'Filter by priority (P0, P1, P2)')
     .option('--tag <tag>', 'Filter by tag')
+    .option('--feature <feature>', 'Filter by feature ID')
     .option('--search <text>', 'Search by name or ID')
     .option('--json', 'Output as JSON')
-    .action((opts: { status?: string; module?: string; stage?: string; priority?: string; tag?: string; search?: string; json?: boolean }) => {
+    .action((opts: { status?: string; module?: string; stage?: string; priority?: string; tag?: string; feature?: string; search?: string; json?: boolean }) => {
       try {
         const doc = readLedger()
         const tasks = listTasks(doc, {
@@ -562,6 +575,7 @@ export function taskCommand(): Command {
           stage: opts.stage,
           priority: opts.priority,
           tag: opts.tag,
+          feature: opts.feature,
           search: opts.search,
         })
 

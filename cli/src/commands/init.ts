@@ -19,6 +19,7 @@ const TEMPLATE: TallyDocument = {
     modules: [
       { id: 'core', name: 'Core' },
     ],
+    features: [],
   },
   tasks: [],
   rounds: [],

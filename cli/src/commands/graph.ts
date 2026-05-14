@@ -10,6 +10,7 @@ interface GraphNode {
   status: string
   depth: number
   criticalPath: boolean
+  feature: string | null
 }
 
 interface GraphEdge {
@@ -187,6 +188,7 @@ function buildGraph(doc: TallyDocument, computeCritical: boolean): InternalGraph
     status: t.status,
     depth: depths.get(t.id) ?? 0,
     criticalPath: criticalNodes.has(t.id),
+    feature: t.feature,
   }))
 
   // Build edges: dep → dependent
@@ -222,6 +224,7 @@ function formatJson(g: InternalGraph): string {
       status: n.status,
       depth: n.depth,
       criticalPath: n.criticalPath,
+      feature: n.feature,
     })),
     edges: g.edges.map((e) => ({ from: e.from, to: e.to })),
     criticalPathLength: g.criticalPathLength,

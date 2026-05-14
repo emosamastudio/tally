@@ -25,6 +25,7 @@ function validDoc(): TallyDocument {
       agents: [{ id: 'main', name: '主会话' }],
       stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
       modules: [{ id: 'core', name: 'Core Module' }],
+      features: [],
     },
     tasks: [
       {
@@ -40,6 +41,7 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        feature: null,
         tags: [],
         order: 1,
         completedOrder: null,
@@ -61,6 +63,7 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        feature: null,
         tags: [],
         order: 2,
         completedOrder: null,
@@ -194,6 +197,23 @@ describe('addTasks', () => {
     expect(task.acceptance).toBe('must work')
     expect(task.deps).toEqual(['U-001'])
     expect(task.tags).toEqual(['bug', 'urgent'])
+  })
+
+  it('accepts feature field', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{
+      name: 'Feature Task',
+      stage: 'S1',
+      module: 'core',
+      feature: 'f-login',
+    }])
+    expect(task.feature).toBe('f-login')
+  })
+
+  it('defaults feature to null when not specified', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{ name: 'No Feature', stage: 'S1', module: 'core' }])
+    expect(task.feature).toBeNull()
   })
 
   it('rejects invalid stage reference', () => {
@@ -331,6 +351,19 @@ describe('editTask', () => {
     const doc = validDoc()
     const task = editTask(doc, 'U-001', { tags: ['a', 'b'] })
     expect(task.tags).toEqual(['a', 'b'])
+  })
+
+  it('modifies feature', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { feature: 'f-auth' })
+    expect(task.feature).toBe('f-auth')
+  })
+
+  it('clears feature when set to empty string', () => {
+    const doc = validDoc()
+    doc.tasks[0].feature = 'f-old'
+    const task = editTask(doc, 'U-001', { feature: null })
+    expect(task.feature).toBeNull()
   })
 
   it('refuses to edit done tasks', () => {
@@ -579,6 +612,15 @@ describe('listTasks', () => {
     const tasks = listTasks(doc, { status: 'pending', priority: 'P1', tag: 'bug' })
     expect(tasks).toHaveLength(1)
     expect(tasks[0].id).toBe('U-003')
+  })
+
+  it('filters by feature', () => {
+    const doc = validDoc()
+    doc.tasks[0].feature = 'f-auth'
+    doc.tasks[1].feature = 'f-core'
+    const tasks = listTasks(doc, { feature: 'f-auth' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-001')
   })
 
   it('returns empty array when no matches', () => {

@@ -20,7 +20,7 @@ function csvEscape(value: unknown): string {
 
 function exportCsv(doc: TallyDocument): string {
   const headers = [
-    'id', 'name', 'status', 'priority', 'stage', 'module',
+    'id', 'name', 'status', 'priority', 'stage', 'module', 'feature',
     'deps', 'evidence', 'createdAt', 'completedAt',
   ]
   const lines: string[] = [headers.join(',')]
@@ -33,6 +33,7 @@ function exportCsv(doc: TallyDocument): string {
       csvEscape(t.priority),
       csvEscape(t.stage),
       csvEscape(t.module),
+      csvEscape(t.feature),
       csvEscape(t.deps.join(';')),
       csvEscape(t.evidence),
       csvEscape(t.createdAt),
@@ -63,7 +64,7 @@ const PRIORITY_LABELS: Record<string, string> = {
 
 function exportMarkdown(doc: TallyDocument): string {
   const headers = [
-    'ID', '阶段', '任务', '优先级', '状态', '验收标准', '依赖关系', '阻塞/风险', '下一步动作',
+    'ID', '阶段', '模块', '功能', '任务', '优先级', '状态', '验收标准', '依赖关系', '阻塞/风险', '下一步动作',
   ]
   const lines: string[] = [
     `| ${headers.join(' | ')} |`,
@@ -74,6 +75,8 @@ function exportMarkdown(doc: TallyDocument): string {
     const cols = [
       t.id,
       t.stage,
+      t.module,
+      t.feature ?? '-',
       t.name,
       PRIORITY_LABELS[t.priority] ?? t.priority,
       STATUS_LABELS[t.status] ?? t.status,
