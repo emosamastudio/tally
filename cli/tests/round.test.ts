@@ -423,6 +423,94 @@ describe('round start', () => {
       rmSync(dir2, { recursive: true, force: true })
     }
   })
+
+  it('auto-selects by depth with nested dependencies', () => {
+    // U-001: pending, no deps → depth 0
+    // U-002: done, no deps → not eligible, but satisfies U-006's dep
+    // U-003: pending, no deps → depth 0
+    // U-004: done, no deps → not eligible, but satisfies U-005's dep
+    // U-005: pending, deps=[U-004] → depth 1 (U-004 depth 0 + 1)
+    // U-006: pending, deps=[U-002] → depth 1 (U-002 depth 0 + 1)
+    // Expected sort: depth 0 first (U-001, U-003), then depth 1 (U-005, U-006)
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+        makeTask('U-002', 'done', [], 2),
+        makeTask('U-003', 'pending', [], 3),
+        makeTask('U-004', 'done', [], 4),
+        makeTask('U-005', 'pending', ['U-004'], 5),
+        makeTask('U-006', 'pending', ['U-002'], 6),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-depth-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('depth-sort', { cwd: dir2, agentId: 'main' })
+      const ids = result.selected.map((s) => s.taskId)
+      // Depth 0 tasks first (U-001, U-003 by module then order),
+      // then depth 1 tasks (U-005, U-006 by module then order)
+      expect(ids).toEqual(['U-001', 'U-003', 'U-005', 'U-006'])
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('throws when no eligible tasks found (all deps unsatisfied)', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', ['U-999'], 1),
+        makeTask('U-002', 'pending', ['U-001'], 2),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-noeligible-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('no-eligible', { cwd: dir2, agentId: 'main' }))
+        .toThrow(/No eligible tasks found/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects task with non-pending status when explicitly specified', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'done', [], 1),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-done-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('done-task', { cwd: dir2, agentId: 'main', taskIds: ['U-001'] }))
+        .toThrow(/has status "done"/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
 })
 
 // ── generateRoundReport ──
@@ -546,7 +634,7 @@ describe('round close', () => {
     try {
       writeLedger(testDoc(), dir)
       expect(() => closeRound({ cwd: dir, agentId: 'main' })).toThrow(
-        /no active round/i,
+        'No active round found.',
       )
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -571,6 +659,75 @@ describe('round close', () => {
 
       const final = readLedger(dir)
       expect(final.rounds[0].status).toBe('completed')
+      // Verify task claims are released after close
+      const u1 = final.tasks.find((t) => t.id === 'U-001')!
+      expect(u1.claimedBy).toBeNull()
+      expect(u1.claimedAt).toBeNull()
+      expect(u1.status).toBe('pending')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('closes round with mixed done and reverted tasks', () => {
+    const dir = mkdtempSync('/tmp/tally-close-mixed-')
+    try {
+      const doc: TallyDocument = {
+        _meta: {
+          project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+          agents: [{ id: 'main', name: '主会话' }],
+          stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+          modules: [{ id: 'core', name: 'Core Module' }],
+          features: [],
+        },
+        tasks: [
+          makeTask('U-001', 'pending', [], 1),
+          makeTask('U-002', 'pending', [], 2),
+          makeTask('U-003', 'pending', [], 3),
+        ],
+        rounds: [], blocks: [], progress: [],
+      }
+      writeLedger(doc, dir)
+
+      const { roundId } = startRound('mixed', {
+        cwd: dir,
+        agentId: 'main',
+        taskIds: ['U-001', 'U-002', 'U-003'],
+      })
+
+      // Mark U-001 and U-002 as done (simulating task done command)
+      const doc2 = readLedger(dir)
+      const t1 = doc2.tasks.find((t) => t.id === 'U-001')!
+      t1.status = 'done'
+      t1.evidence = 'done 1'
+      t1.completedAt = '2026-05-10'
+      const t2 = doc2.tasks.find((t) => t.id === 'U-002')!
+      t2.status = 'done'
+      t2.evidence = 'done 2'
+      t2.completedAt = '2026-05-10'
+      writeLedger(doc2, dir)
+
+      const result = closeRound({ cwd: dir, roundId })
+      expect(result.done).toBe(2)
+      expect(result.reverted).toBe(1)
+
+      const final = readLedger(dir)
+      expect(final.rounds[0].status).toBe('completed')
+      expect(final.progress.length).toBe(1)
+
+      // Done tasks should have released claims but keep done status
+      const d1 = final.tasks.find((t) => t.id === 'U-001')!
+      expect(d1.claimedBy).toBeNull()
+      expect(d1.status).toBe('done')
+      const d2 = final.tasks.find((t) => t.id === 'U-002')!
+      expect(d2.claimedBy).toBeNull()
+      expect(d2.status).toBe('done')
+
+      // Reverted task should be released and reset to pending
+      const u3 = final.tasks.find((t) => t.id === 'U-003')!
+      expect(u3.claimedBy).toBeNull()
+      expect(u3.claimedAt).toBeNull()
+      expect(u3.status).toBe('pending')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }

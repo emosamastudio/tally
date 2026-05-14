@@ -1,6 +1,6 @@
 # Tally
 
-Agent-native task management — a CLI-driven task ledger with round discipline, dependency tracking, and visualization. Tally is designed for AI agents and human developers to collaboratively manage work through a structured round-based workflow.
+Agent-native task management — a CLI-driven task ledger with round discipline, multi-agent safety checks, and visualization. Tally is designed for AI agents and human developers to collaboratively manage work through a structured round-based workflow with write-scope conflict detection, risk gating, and feature-level organization.
 
 ## Installation
 
@@ -22,22 +22,22 @@ Initialize a new tally ledger in your project:
 tally init
 ```
 
-Add your first task:
+Add your first task with feature and scheduling fields:
 
 ```bash
-tally task add --name "Setup project" --stage foundation --module core
+tally task add --json '[{"name":"Setup project","stage":"S1","module":"core","feature":"scaffold","priority":"P0","acceptance":"Repo created"}]'
 ```
 
-Start a work round:
+Start a work round (auto-selects tasks, checks for conflicts):
 
 ```bash
-tally round start "Initial setup" --tasks U-001
+tally round start "Initial setup"
 ```
 
-Mark a task done with evidence:
+Mark a task done with structured evidence:
 
 ```bash
-tally task done U-001 --evidence "Project scaffold created and configured"
+tally task done U-001 --evidence "Project scaffold created" --test "npm test" --commit "abc1234"
 ```
 
 Close the round:
@@ -52,19 +52,22 @@ tally round close
 |---------|-------------|
 | `tally init` | Initialize a new tally.json in the current directory |
 | `tally status` | Show current task state summary |
-| `tally check` | Validate project readiness before starting a round |
-| `tally lint` | Validate tally.json structural integrity |
-| `tally task add` | Add one or more new tasks (JSON or interactive) |
-| `tally task done <ids...>` | Mark tasks as done with evidence |
+| `tally check` | Deep validation with semantic checks and warnings |
+| `tally lint` | Fast structural validation (pre-commit) |
+| `tally task add` | Add one or more new tasks (JSON) |
+| `tally task edit <id>` | Modify task fields (14+ fields supported) |
+| `tally task done <ids...>` | Mark tasks as done with structured evidence |
 | `tally task block <ids...>` | Block tasks with a reason |
 | `tally task unblock <ids...>` | Unblock tasks |
-| `tally task show <id>` | Show task detail |
-| `tally round start <scope>` | Start a new work round claiming tasks |
+| `tally task show <id>` | Show full task detail with dependency tree |
+| `tally task list` | Filterable task list (--status, --module, --feature, --priority, --tag, --search) |
+| `tally task approve <id> --by <name>` | Human approval for high-risk tasks |
+| `tally round start <scope>` | Start a round with safety checks (--strategy feature-focused\|risk-first\|parallel-max) |
 | `tally round report` | Show mid-round progress report |
 | `tally round close` | Close the current round |
-| `tally export` | Export ledger data (markdown, JSON) |
+| `tally export` | Export ledger data (json, csv, markdown, agent-brief) |
 | `tally sync` | Sync tally.json via git pull/push |
-| `tally graph` | Visualize task dependency graph |
+| `tally graph` | Visualize dependency graph (--level task\|feature) |
 | `tally upgrade` | Upgrade tally.json schema version |
 | `tally migrate` | Migrate legacy task data into tally format |
 | `tally dashboard` | Start the dashboard HTTP server |
@@ -86,6 +89,13 @@ lint:
 
 dashboard:
   port: 5173
+
+gates:
+  requireFeature: true
+  requireReview: false
+  featureFreeze: []
+  maxRisk: high
+  detectWriteConflicts: true
 ```
 
 | Key | Default | Description |
@@ -95,6 +105,38 @@ dashboard:
 | `round.allowParallel` | `false` | Allow parallel task execution |
 | `lint.strict` | `false` | Enable strict lint mode |
 | `dashboard.port` | `5173` | Dashboard HTTP server port |
+| `gates.requireFeature` | `true` | Open tasks must have a feature |
+| `gates.requireReview` | `false` | Require review for all tasks |
+| `gates.featureFreeze` | `[]` | Frozen feature IDs (only contract/test allowed) |
+| `gates.maxRisk` | `high` | Maximum risk level allowed in rounds |
+| `gates.detectWriteConflicts` | `true` | Detect overlapping write scopes |
+
+## Round Safety Checks
+
+When starting a round, Tally enforces multi-agent safety:
+
+1. **Write scope conflict detection** — overlapping `writeScopes` rejected
+2. **Risk gating** — tasks above `gates.maxRisk` rejected
+3. **Feature freeze gating** — only contract/test tasks on frozen features
+4. **Approval gate** — unapproved high/critical risk tasks rejected
+5. **Dependency satisfaction** — all `deps` must be `done`
+
+Round strategies:
+- `parallel-max` (default): maximize parallelism, group by module → feature
+- `feature-focused`: complete one feature before moving to the next
+- `risk-first`: highest risk tasks first
+
+## Structured Evidence
+
+```bash
+tally task done U-001 \
+  --evidence "Implemented feature" \
+  --test "pnpm test --filter=auth" \
+  --commit "abc1234" \
+  --review "PR #42 approved" \
+  --provider "openai/gpt-4o for code generation" \
+  --notes "Edge case handled in U-005"
+```
 
 ## Multi-Agent Setup
 
@@ -124,6 +166,15 @@ If a round start fails due to a claim conflict, re-read `tally.json`, adjust tas
 
 See `standard/templates/tally-schema.md` for the full data model reference.
 
+Key task fields (v0.2.0):
+
+| Category | Fields |
+|----------|--------|
+| Core | `id`, `status`, `priority`, `stage`, `module`, `name`, `acceptance`, `feature` |
+| Scheduling | `writeScopes`, `riskLevel`, `executionLane`, `requiresReview`, `rollbackPlan`, `assignedAgent`, `approvedBy` |
+| Planning | `acceptanceCriteria`, `executionPlan` |
+| Tracking | `resourceRequirements`, `repos`, `deliveryNode` |
+
 ## Development
 
 ```bash
@@ -133,11 +184,11 @@ npm install
 # Build both CLI and dashboard
 npm run build
 
-# Run tests
+# Run tests (236 tests, 77.3% coverage)
 npm test
 
-# Lint
-npm run lint
+# Coverage report
+npx vitest run --coverage
 ```
 
 ## Project Structure
