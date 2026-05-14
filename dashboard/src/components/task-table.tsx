@@ -386,6 +386,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
   const [status, setStatus] = useState<'all' | TaskStatus>('all')
   const [stage, setStage] = useState('')
   const [moduleFilter, setModuleFilter] = useState('')
+  const [featureFilter, setFeatureFilter] = useState('')
   const [search, setSearch] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
@@ -439,13 +440,14 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
       if (status !== 'all' && t.status !== status) return false
       if (stage && t.stage !== stage) return false
       if (moduleFilter && t.module !== moduleFilter) return false
+      if (featureFilter && t.feature !== featureFilter) return false
       if (search) {
         const q = search.toLowerCase()
         if (!t.name.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q)) return false
       }
       return true
     })
-  }, [tasks, source, status, stage, moduleFilter, search])
+  }, [tasks, source, status, stage, moduleFilter, featureFilter, search])
 
   const stages = useMemo(
     () => [...new Set(tasks.map((t) => t.stage))].sort(),
@@ -459,6 +461,19 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
       .map((t) => ({ id: t.module, name: t.module }))
       .sort((a, b) => a.id.localeCompare(b.id))
   }, [tasks])
+
+  const features = useMemo(() => {
+    const seen = new Set<string>()
+    const base = moduleFilter ? tasks.filter((t) => t.module === moduleFilter) : tasks
+    return base
+      .filter((t) => {
+        if (!t.feature || seen.has(t.feature)) return false
+        seen.add(t.feature)
+        return true
+      })
+      .map((t) => ({ id: t.feature!, name: t.feature! }))
+      .sort((a, b) => a.id.localeCompare(b.id))
+  }, [tasks, moduleFilter])
 
   const completionRate = tasks.length > 0
     ? Math.round((tasks.filter((t) => t.status === 'completed').length / tasks.length) * 100)
@@ -529,6 +544,16 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
             <option value="">全部模块</option>
             {modules.map((m) => (
               <option key={m.id} value={m.id}>{m.name}</option>
+            ))}
+          </select>
+          <select
+            value={featureFilter}
+            onChange={(e) => setFeatureFilter(e.target.value)}
+            className="sk-select w-full sm:w-auto"
+          >
+            <option value="">全部功能</option>
+            {features.map((f) => (
+              <option key={f.id} value={f.id}>{f.name}</option>
             ))}
           </select>
           <div className="relative flex-1 min-w-0 w-full sm:w-auto sm:min-w-[160px]">

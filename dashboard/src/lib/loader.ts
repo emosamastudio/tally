@@ -10,6 +10,7 @@ import type {
   ProgressPoint,
   StageStatus,
   ModuleMeta,
+  FeatureMeta,
   ProjectInfo,
 } from './types'
 
@@ -77,9 +78,16 @@ interface TallyModuleRaw {
   name: string
 }
 
+interface TallyFeatureRaw {
+  id: string
+  module: string
+  name: string
+}
+
 interface TallyMetaRaw {
   project?: string
   modules?: TallyModuleRaw[]
+  features?: TallyFeatureRaw[]
   updated?: string
 }
 
@@ -217,6 +225,30 @@ function adaptModules(meta: TallyMetaRaw | undefined): ModuleMeta[] {
   return meta.modules.map((m) => ({ id: m.id, name: m.name }))
 }
 
+function adaptFeatures(meta: TallyMetaRaw | undefined, tasks: Task[]): FeatureMeta[] {
+  const featMap = new Map<string, { name: string; module: string; total: number; done: number; blocked: number }>()
+  // First, register features from meta
+  if (meta?.features) {
+    for (const f of meta.features) {
+      featMap.set(f.id, { name: f.name, module: f.module, total: 0, done: 0, blocked: 0 })
+    }
+  }
+  // Then count tasks
+  for (const t of tasks) {
+    if (t.feature) {
+      const f = featMap.get(t.feature)
+      if (f) {
+        f.total++
+        if (t.status === 'completed') f.done++
+        else if (t.status === 'blocked') f.blocked++
+      } else {
+        featMap.set(t.feature, { name: t.feature, module: t.module, total: 1, done: t.status === 'completed' ? 1 : 0, blocked: t.status === 'blocked' ? 1 : 0 })
+      }
+    }
+  }
+  return [...featMap.entries()].map(([id, f]) => ({ id, ...f }))
+}
+
 // ── Main adapter ──
 
 export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
@@ -226,6 +258,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
   const progressHistory: ProgressPoint[] = (raw.progress ?? []).map(adaptProgress)
   const stages: StageStatus[] = computeStages(tasks)
   const modules: ModuleMeta[] = adaptModules(raw._meta)
+  const features: FeatureMeta[] = adaptFeatures(raw._meta, tasks)
 
   const activeRound = rounds.find((r) => r.status === 'active') ?? null
   const activeBlocks = blocks
@@ -258,6 +291,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
     merged,
     rounds,
     modules,
+    features,
     projectName: raw._meta?.project ?? 'Tally',
     updated: raw._meta?.updated ?? null,
   }

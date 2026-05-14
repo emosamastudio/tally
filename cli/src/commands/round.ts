@@ -50,11 +50,13 @@ export interface StartRoundInput {
   cwd?: string
   agentId?: string
   taskIds?: string[]
+  strategy?: 'parallel-max' | 'feature-focused' | 'risk-first'
 }
 
 export interface StartRoundResult {
   roundId: string
   selected: { taskId: string; goal: string; criteria: string }[]
+  warnings: string[]
 }
 
 export function startRound(scope: string, input: StartRoundInput = {}): StartRoundResult {
@@ -79,7 +81,8 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
     candidateIds = input.taskIds
   } else {
     // Auto-select: pending/in_progress tasks with satisfied deps.
-    // Sort to maximize parallelism: by topological depth → different modules → order.
+    // Sort based on strategy: feature-focused groups by feature, risk-first by risk, parallel-max by depth.
+    const strategy = input.strategy ?? 'parallel-max'
     const eligible = doc.tasks
       .filter((t) => t.status === 'pending' || t.status === 'in_progress')
       .filter((t) => !isTaskClaimedByOtherActiveRound(doc, t))
@@ -105,18 +108,35 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
     }
     for (const t of eligible) computeDepth(t.id, new Set())
 
-    // Sort: same depth = can run in parallel. Within same depth, group by module
-    // then feature for agent focus (shared context, less cognitive switching).
-    eligible.sort((a, b) => {
-      const depthA = depthMap.get(a.id) ?? 0
-      const depthB = depthMap.get(b.id) ?? 0
-      if (depthA !== depthB) return depthA - depthB  // shallow first → maximize parallelism
-      // Same depth: prefer SAME module for agent focus
-      if (a.module !== b.module) return a.module.localeCompare(b.module)
-      // Same module: group by feature
-      if ((a.feature ?? '') !== (b.feature ?? '')) return (a.feature ?? '').localeCompare(b.feature ?? '')
-      return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
-    })
+    // Sort based on strategy
+    const riskOrder = { low: 0, medium: 1, high: 2, critical: 3 }
+    if (strategy === 'feature-focused') {
+      // Group all eligible tasks by feature, pick tasks from one feature at a time
+      eligible.sort((a, b) => {
+        if ((a.feature ?? '') !== (b.feature ?? '')) return (a.feature ?? '').localeCompare(b.feature ?? '')
+        if (a.module !== b.module) return a.module.localeCompare(b.module)
+        return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+      })
+    } else if (strategy === 'risk-first') {
+      // Highest risk tasks first
+      eligible.sort((a, b) => {
+        const ra = riskOrder[a.riskLevel] ?? 1
+        const rb = riskOrder[b.riskLevel] ?? 1
+        if (ra !== rb) return rb - ra  // critical first
+        if (a.module !== b.module) return a.module.localeCompare(b.module)
+        return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+      })
+    } else {
+      // parallel-max: shallow depth first, group by module then feature
+      eligible.sort((a, b) => {
+        const depthA = depthMap.get(a.id) ?? 0
+        const depthB = depthMap.get(b.id) ?? 0
+        if (depthA !== depthB) return depthA - depthB
+        if (a.module !== b.module) return a.module.localeCompare(b.module)
+        if ((a.feature ?? '') !== (b.feature ?? '')) return (a.feature ?? '').localeCompare(b.feature ?? '')
+        return (a.order ?? Number.MAX_SAFE_INTEGER) - (b.order ?? Number.MAX_SAFE_INTEGER)
+      })
+    }
 
     candidateIds = eligible.slice(0, config.round.maxTasks).map((t) => t.id)
 
@@ -160,6 +180,55 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
       continue
     }
 
+    // Write scope conflict: reject if overlaps with any already-selected task
+    if (config.gates.detectWriteConflicts && task.writeScopes.length > 0) {
+      for (const s of selected) {
+        const other = findTaskByEitherPrefix(doc, s.taskId)
+        if (other && other.writeScopes.length > 0) {
+          const overlap = task.writeScopes.filter((ws) => other.writeScopes.includes(ws))
+          if (overlap.length > 0) {
+            errors.push(
+              `Task "${task.id}" write scope conflicts with "${other.id}": ${overlap.join(', ')}`,
+            )
+            break
+          }
+        }
+      }
+      if (errors.length > 0 && errors[errors.length - 1].includes('write scope')) continue
+    }
+
+    // Risk gating: reject tasks above configured max risk threshold
+    const riskOrder = { low: 0, medium: 1, high: 2, critical: 3 }
+    if (riskOrder[task.riskLevel] > riskOrder[config.gates.maxRisk]) {
+      errors.push(
+        `Task "${task.id}" has risk level "${task.riskLevel}" exceeding max "${config.gates.maxRisk}"`,
+      )
+      continue
+    }
+
+    // Feature freeze: only allow design/contract tasks on unfrozen features
+    if (task.feature && config.gates.featureFreeze.length > 0) {
+      const feat = doc._meta.features.find((f) => f.id === task.feature)
+      if (feat) {
+        const isFrozen = config.gates.featureFreeze.includes(task.feature)
+        const isFrozenInMeta = feat.status === 'contract_frozen' || feat.status === 'stable'
+        if ((isFrozen || isFrozenInMeta) && task.executionLane !== 'contract' && task.executionLane !== 'test') {
+          errors.push(
+            `Task "${task.id}" belongs to frozen feature "${task.feature}" — only contract/test tasks allowed`,
+          )
+          continue
+        }
+      }
+    }
+
+    // Approval gate: skip unapproved high/critical risk tasks
+    if ((task.riskLevel === 'high' || task.riskLevel === 'critical') && !task.approvedBy) {
+      errors.push(
+        `Task "${task.id}" is ${task.riskLevel} risk but not approved — use "tally task approve ${task.id} --by <name>"`,
+      )
+      continue
+    }
+
     selected.push({
       taskId: task.id,
       goal: task.name,
@@ -174,6 +243,9 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
         errors.map((e) => `  - ${e}`).join('\n'),
     )
   }
+
+  // Collect warnings (non-blocking issues)
+  const warnings: string[] = []
 
   // Generate round ID
   const roundId = generateRoundId(doc)
@@ -200,7 +272,17 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
   doc.rounds.push(round)
   writeLedger(doc, cwd)
 
-  return { roundId, selected }
+  // Add lane distribution warning
+  const lanes = new Map<string, number>()
+  for (const s of selected) {
+    const t = findTaskByEitherPrefix(doc, s.taskId)
+    if (t?.executionLane) lanes.set(t.executionLane, (lanes.get(t.executionLane) ?? 0) + 1)
+  }
+  if (lanes.size > 0) {
+    warnings.push(`Lane distribution: ${[...lanes.entries()].map(([l, c]) => `${l}=${c}`).join(', ')}`)
+  }
+
+  return { roundId, selected, warnings }
 }
 
 // ── generateRoundReport ──
@@ -368,6 +450,12 @@ function formatRoundStart(result: StartRoundResult): string {
   const lines: string[] = []
   lines.push(`Round started: ${result.roundId}`)
   lines.push(`Tasks claimed: ${result.selected.length}`)
+  if (result.warnings.length > 0) {
+    lines.push(`Warnings:`)
+    for (const w of result.warnings) {
+      lines.push(`  ⚠ ${w}`)
+    }
+  }
   lines.push('')
   for (const s of result.selected) {
     lines.push(`  ${s.taskId}  ${s.goal}`)
@@ -415,11 +503,13 @@ export function roundCommand(): Command {
     .argument('<scope>', 'Round scope description')
     .option('--tasks <ids...>', 'Specific task IDs to claim')
     .option('--agent <id>', 'Executor agent ID')
-    .action((scope: string, opts: { tasks?: string[]; agent?: string }) => {
+    .option('--strategy <strategy>', 'Round strategy: parallel-max, feature-focused, or risk-first')
+    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string }) => {
       try {
         const result = startRound(scope, {
           agentId: opts.agent,
           taskIds: opts.tasks,
+          strategy: opts.strategy as StartRoundInput['strategy'],
         })
         console.log(formatRoundStart(result))
       } catch (e) {
