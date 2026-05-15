@@ -9,6 +9,7 @@ import type {
   BlockItem,
   ProgressPoint,
   StageStatus,
+  ModuleBreakdown,
   ModuleMeta,
   FeatureMeta,
   ProjectInfo,
@@ -78,6 +79,12 @@ interface TallyModuleRaw {
   name: string
 }
 
+interface TallyStageRaw {
+  id: string
+  name: string
+  modules: string[]
+}
+
 interface TallyFeatureRaw {
   id: string
   module: string
@@ -86,6 +93,7 @@ interface TallyFeatureRaw {
 
 interface TallyMetaRaw {
   project?: string
+  stages?: TallyStageRaw[]
   modules?: TallyModuleRaw[]
   features?: TallyFeatureRaw[]
   updated?: string
@@ -122,26 +130,83 @@ function mapRoundStatus(raw: string): 'active' | 'completed' {
   return raw === 'active' ? 'active' : 'completed'
 }
 
-function computeStages(tasks: Task[]): StageStatus[] {
-  const map = new Map<string, { done: number; open: number; hold: number; blocked: number }>()
+function computeStages(
+  tasks: Task[],
+  stagesMeta: TallyStageRaw[] | undefined,
+  modulesMeta: TallyModuleRaw[] | undefined,
+): StageStatus[] {
+  const moduleNameById = new Map<string, string>()
+  for (const m of modulesMeta ?? []) moduleNameById.set(m.id, m.name)
+
+  const stageNameById = new Map<string, string>()
+  const stageOrder = new Map<string, number>()
+  ;(stagesMeta ?? []).forEach((s, i) => {
+    stageNameById.set(s.id, s.name)
+    stageOrder.set(s.id, i)
+  })
+
+  type StageAcc = {
+    done: number
+    open: number
+    inProgress: number
+    hold: number
+    blocked: number
+    modules: Map<string, { done: number; inProgress: number; total: number }>
+  }
+  const map = new Map<string, StageAcc>()
 
   for (const task of tasks) {
     const stage = task.stage
     if (!map.has(stage)) {
-      map.set(stage, { done: 0, open: 0, hold: 0, blocked: 0 })
+      map.set(stage, { done: 0, open: 0, inProgress: 0, hold: 0, blocked: 0, modules: new Map() })
     }
     const s = map.get(stage)!
     if (task.status === 'completed') s.done++
     else if (task.status === 'hold') s.hold++
     else if (task.status === 'blocked') s.blocked++
     else s.open++
+    if (task.status === 'in_progress') s.inProgress++
+
+    const moduleId = task.module || '?'
+    if (!s.modules.has(moduleId)) s.modules.set(moduleId, { done: 0, inProgress: 0, total: 0 })
+    const mb = s.modules.get(moduleId)!
+    mb.total++
+    if (task.status === 'completed') mb.done++
+    else if (task.status === 'in_progress') mb.inProgress++
   }
 
-  return Array.from(map.entries()).map(([stageId, counts]) => ({
-    stageId,
-    name: stageId,
-    ...counts,
-  }))
+  const stages: StageStatus[] = Array.from(map.entries()).map(([stageId, acc]) => {
+    const modules: ModuleBreakdown[] = Array.from(acc.modules.entries())
+      .map(([moduleId, c]) => ({
+        moduleId,
+        moduleName: moduleNameById.get(moduleId) ?? moduleId,
+        done: c.done,
+        inProgress: c.inProgress,
+        total: c.total,
+      }))
+      .sort((a, b) => a.moduleName.localeCompare(b.moduleName, 'zh-Hans-CN'))
+    return {
+      stageId,
+      name: stageNameById.get(stageId) ?? stageId,
+      done: acc.done,
+      open: acc.open,
+      inProgress: acc.inProgress,
+      hold: acc.hold,
+      blocked: acc.blocked,
+      modules,
+    }
+  })
+
+  stages.sort((a, b) => {
+    const oa = stageOrder.get(a.stageId)
+    const ob = stageOrder.get(b.stageId)
+    if (oa !== undefined && ob !== undefined) return oa - ob
+    if (oa !== undefined) return -1
+    if (ob !== undefined) return 1
+    return a.stageId.localeCompare(b.stageId)
+  })
+
+  return stages
 }
 
 // ── Adapters ──
@@ -256,7 +321,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
   const rounds: Round[] = (raw.rounds ?? []).map((r) => adaptRound(r, 'os'))
   const blocks: BlockItem[] = (raw.blocks ?? []).map((b) => adaptBlock(b, 'os'))
   const progressHistory: ProgressPoint[] = (raw.progress ?? []).map(adaptProgress)
-  const stages: StageStatus[] = computeStages(tasks)
+  const stages: StageStatus[] = computeStages(tasks, raw._meta?.stages, raw._meta?.modules)
   const modules: ModuleMeta[] = adaptModules(raw._meta)
   const features: FeatureMeta[] = adaptFeatures(raw._meta, tasks)
 

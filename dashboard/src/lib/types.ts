@@ -73,13 +73,23 @@ export interface ProgressPoint {
   notes: string
 }
 
+export interface ModuleBreakdown {
+  moduleId: string
+  moduleName: string
+  done: number
+  inProgress: number
+  total: number
+}
+
 export interface StageStatus {
   stageId: string
   name: string
   done: number
   open: number
+  inProgress: number
   hold: number
   blocked: number
+  modules: ModuleBreakdown[]
 }
 
 export interface ModuleMeta {

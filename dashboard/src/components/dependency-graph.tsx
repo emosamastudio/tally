@@ -26,8 +26,8 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   deferred: '暂缓',
 }
 
-const NODE_WIDTH = 160
-const NODE_HEIGHT = 40
+const NODE_WIDTH = 126
+const NODE_HEIGHT = 60
 const CRITICAL_COLOR = 'var(--accent)'
 const MAX_NODES = 300
 
@@ -233,12 +233,12 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
   const layoutResult = useMemo(() => {
     const graph = new dagre.graphlib.Graph()
     graph.setGraph({
-      rankdir: 'TB',
-      nodesep: 80,
-      ranksep: 60,
-      edgesep: 20,
-      marginx: 30,
-      marginy: 30,
+      rankdir: 'LR',
+      nodesep: 18,    // perpendicular-axis spacing (vertical gap between siblings in LR)
+      ranksep: 42,    // rank-axis spacing (horizontal gap between layers in LR) — compact
+      edgesep: 10,
+      marginx: 20,
+      marginy: 20,
     })
     graph.setDefaultEdgeLabel(() => ({}))
 
@@ -338,23 +338,24 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
     const nodesArr = [...layoutResult.nodes.values()]
     if (nodesArr.length === 0 || depthMap.size === 0) return []
 
-    const byY = new Map<number, string[]>()
+    // LR layout: group by X (each rank/layer shares an X coordinate)
+    const byX = new Map<number, string[]>()
     for (const n of nodesArr) {
-      const roundedY = Math.round(n.y)
-      const existing = byY.get(roundedY)
+      const roundedX = Math.round(n.x)
+      const existing = byX.get(roundedX)
       if (existing) existing.push(n.id)
-      else byY.set(roundedY, [n.id])
+      else byX.set(roundedX, [n.id])
     }
 
-    const yValues = [...byY.keys()].sort((a, b) => a - b)
+    const xValues = [...byX.keys()].sort((a, b) => a - b)
 
-    return yValues.map((y) => {
-      const idsAtY = byY.get(y)!
+    return xValues.map((x) => {
+      const idsAtX = byX.get(x)!
       let maxD = 0
-      for (const id of idsAtY) {
+      for (const id of idsAtX) {
         maxD = Math.max(maxD, depthMap.get(id) ?? 0)
       }
-      return { y, maxDepth: maxD, count: idsAtY.length }
+      return { x, maxDepth: maxD, count: idsAtX.length }
     })
   }, [layoutResult.nodes, depthMap])
 
@@ -382,12 +383,12 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
   useEffect(() => {
     if (!graphBounds || svgSize.w === 0) return
     const pad = 40
-    const leftPad = pad + (depthRows.length > 0 ? 36 : 0)
-    const vbW = graphBounds.maxX - graphBounds.minX + leftPad + pad
-    const vbH = graphBounds.maxY - graphBounds.minY + pad * 2
+    const topPad = pad + (depthRows.length > 0 ? 24 : 0)
+    const vbW = graphBounds.maxX - graphBounds.minX + pad * 2
+    const vbH = graphBounds.maxY - graphBounds.minY + topPad + pad
     setViewBox({
-      x: graphBounds.minX - leftPad,
-      y: graphBounds.minY - pad,
+      x: graphBounds.minX - pad,
+      y: graphBounds.minY - topPad,
       w: vbW,
       h: vbH,
     })
@@ -449,6 +450,16 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
     }
     // Regular scroll (no ctrlKey) — let it pass through to browser for natural page scroll
   }, [viewBox, svgSize])
+
+  // Container height: match natural vertical extent of the laid-out graph so SVG renders ~1:1.
+  // Falls back to a parallelism-based estimate before bounds are available.
+  const containerHeight = useMemo(() => {
+    if (graphBounds) {
+      const natural = graphBounds.maxY - graphBounds.minY + 120
+      return Math.min(820, Math.max(460, natural))
+    }
+    return Math.max(460, criticalStats.parallelMax * (NODE_HEIGHT + 30) + 120)
+  }, [graphBounds, criticalStats.parallelMax])
 
   useEffect(() => {
     const up = () => setIsPanning(false)
@@ -574,7 +585,8 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
           className="sk-box fill"
           style={{
             padding: 0,
-            height: Math.min(700, Math.max(300, layoutResult.nodes.size * 1.8)),
+            // LR layout: vertical extent = max parallelism (nodes per layer); width overflows → user pans
+            height: containerHeight,
             overflow: 'hidden',
             position: 'relative',
           }}
@@ -617,29 +629,29 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
               </filter>
             </defs>
 
-            {/* Depth background bands */}
+            {/* Depth background bands (LR: vertical bands per layer) */}
             {graphBounds && depthRows.length > 1 && (() => {
-              const bands: { y: number; height: number; alternate: boolean }[] = []
+              const bands: { x: number; width: number; alternate: boolean }[] = []
               for (let i = 0; i < depthRows.length; i += 2) {
-                const topY = depthRows[i].y - NODE_HEIGHT / 2 - 8
-                const botRow = depthRows[i + 1] ?? depthRows[i]
-                const botY = botRow.y + NODE_HEIGHT / 2 + 8
+                const leftX = depthRows[i].x - NODE_WIDTH / 2 - 8
+                const rightRow = depthRows[i + 1] ?? depthRows[i]
+                const rightX = rightRow.x + NODE_WIDTH / 2 + 8
                 bands.push({
-                  y: topY,
-                  height: botY - topY,
+                  x: leftX,
+                  width: rightX - leftX,
                   alternate: (i / 2) % 2 === 1,
                 })
               }
-              const bandLeft = graphBounds.minX - 10
-              const bandWidth = graphBounds.maxX - graphBounds.minX + 20
+              const bandTop = graphBounds.minY - 10
+              const bandHeight = graphBounds.maxY - graphBounds.minY + 20
               return bands.map((band, idx) =>
                 band.alternate ? (
                   <rect
                     key={`band-${idx}`}
-                    x={bandLeft}
-                    y={band.y}
-                    width={bandWidth}
-                    height={band.height}
+                    x={band.x}
+                    y={bandTop}
+                    width={band.width}
+                    height={bandHeight}
                     fill="rgba(0,0,0,0.03)"
                     rx={6}
                     ry={6}
@@ -648,17 +660,17 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
               )
             })()}
 
-            {/* Depth labels */}
+            {/* Depth labels (LR: above each layer) */}
             {graphBounds && depthRows.map((row) => (
               <text
-                key={`depth-${row.y}`}
-                x={graphBounds.minX - 14}
-                y={row.y}
+                key={`depth-${row.x}`}
+                x={row.x}
+                y={graphBounds.minY - 14}
                 fill="var(--ink-4)"
                 fontSize={9}
                 fontFamily="Kalam, cursive"
-                textAnchor="end"
-                dominantBaseline="central"
+                textAnchor="middle"
+                dominantBaseline="alphabetic"
               >
                 第{row.maxDepth}层
               </text>
@@ -732,23 +744,23 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
                     />
                   )}
                   <text
-                    x={left + 8}
-                    y={top + 17}
+                    x={left + 10}
+                    y={top + 24}
                     fill={colors.text}
-                    fontSize={9}
+                    fontSize={16}
                     fontFamily="JetBrains Mono, ui-monospace, monospace"
-                    fontWeight={isCritical ? 700 : 400}
+                    fontWeight={isCritical ? 800 : 700}
                   >
                     {node.task.id}
                   </text>
                   <text
-                    x={left + 8}
-                    y={top + 31}
+                    x={left + 10}
+                    y={top + 46}
                     fill={isCritical ? 'var(--ink)' : colors.text}
-                    fontSize={11}
+                    fontSize={13}
                     fontFamily="Kalam, cursive"
                   >
-                    {truncateName(node.task.name, 16)}
+                    {truncateName(node.task.name, 8)}
                   </text>
                 </g>
               )
