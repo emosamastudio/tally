@@ -3,6 +3,7 @@ import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
 import type { AcceptanceCriteria, ExecutionPlan, Task, TallyDocument } from '../types.js'
+import { loadTemplate, applyTemplate } from './template.js'
 
 // ── Helpers ──
 
@@ -274,6 +275,7 @@ export function markTasksDone(
   ids: string[],
   evidence: string,
   rule?: string,
+  noForbidden?: boolean,
 ): Task[] {
   const results: Task[] = []
 
@@ -290,6 +292,9 @@ export function markTasksDone(
     task.status = 'done'
     task.evidence = evidence
     if (rule !== undefined) task.rule = rule
+    if (noForbidden) {
+      task.evidence += ' [no-forbidden: confirmed]'
+    }
     task.completedAt = today()
     task.completedOrder = nextCompletedOrder(doc)
     task.order = null
@@ -502,15 +507,39 @@ export function taskCommand(): Command {
   const cmd = new Command('task')
   cmd.description('Task CRUD operations')
 
-  // tally task add --json '[...]'
+  // tally task add --json '[...]' | --template <file>
   cmd.command('add')
-    .description('Batch create tasks from a JSON array')
-    .requiredOption('--json <json>', 'JSON array of task objects')
-    .action((opts: { json: string }) => {
+    .description('Batch create tasks from a JSON array or template file')
+    .option('--json <json>', 'JSON array of task objects')
+    .option('--template <file>', 'JSON template file for batch task creation')
+    .action((opts: { json?: string; template?: string }) => {
       try {
+        if (opts.template && opts.json) {
+          throw new Error('--template and --json are mutually exclusive')
+        }
+        if (!opts.template && !opts.json) {
+          throw new Error('Either --json or --template must be provided')
+        }
+
+        if (opts.template) {
+          const template = loadTemplate(opts.template)
+          const doc = readLedger()
+          const created = applyTemplate(doc, template)
+          writeLedger(doc)
+
+          const ids = created.map((t) => t.id)
+          const range = ids.length === 1 ? ids[0] : `${ids[0]}..${ids[ids.length - 1]}`
+          console.log(`Created ${created.length} tasks from template: ${range}`)
+          for (const t of created) {
+            console.log(`  ${t.id}  ${t.name}`)
+          }
+          return
+        }
+
+        // --json path
         let inputs: AddTaskInput[]
         try {
-          inputs = JSON.parse(opts.json) as AddTaskInput[]
+          inputs = JSON.parse(opts.json!) as AddTaskInput[]
         } catch {
           throw new Error('Invalid JSON for --json flag')
         }
@@ -642,7 +671,7 @@ export function taskCommand(): Command {
       }
     })
 
-  // tally task done <id...> --evidence "..." [--rule "..."] [--test "..."] [--commit "..."] [--review "..."] [--provider "..."]
+  // tally task done <id...> --evidence "..." [--rule "..."] [--test "..."] [--commit "..."] [--review "..."] [--provider "..."] [--no-forbidden]
   cmd.command('done')
     .description('Batch mark tasks as done')
     .argument('<id...>', 'Task IDs to mark as done')
@@ -653,7 +682,8 @@ export function taskCommand(): Command {
     .option('--review <review>', 'Review reference or reviewer')
     .option('--provider <provider>', 'Provider/model/usage evidence')
     .option('--notes <notes>', 'Additional completion notes')
-    .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string }) => {
+    .option('--no-forbidden', 'Confirm no forbidden side effects were triggered')
+    .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string; forbidden?: boolean }) => {
       try {
         const doc = readLedger()
         // Build structured evidence string from flags
@@ -664,7 +694,7 @@ export function taskCommand(): Command {
         if (opts.provider) parts.push(`[provider: ${opts.provider}]`)
         if (opts.notes) parts.push(`[notes: ${opts.notes}]`)
         const evidence = parts.join(' ')
-        const results = markTasksDone(doc, ids, evidence, opts.rule)
+        const results = markTasksDone(doc, ids, evidence, opts.rule, opts.forbidden === false)
         writeLedger(doc)
 
         console.log(`Marked ${results.length} task(s) as done:`)

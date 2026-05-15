@@ -330,3 +330,96 @@ describe('feature reference validation', () => {
     expect(result.errors.some((e) => e.code === 'FEATURE_MODULE_MISMATCH')).toBe(true)
   })
 })
+
+describe('forbidden side effects validation', () => {
+  function makeDoneTaskWithForbiddenSideEffects(doc: Record<string, unknown>) {
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    // Mark first task as done with forbidden side effects but without [no-forbidden] tag
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'implemented feature [test: all green] [commit: abc123]'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].acceptanceCriteria = {
+      requiredTests: ['unit test'],
+      forbiddenSideEffects: ['no credential leaks', 'no data corruption'],
+    }
+  }
+
+  it('should fail lintDocument when done task has forbiddenSideEffects but no [no-forbidden] in evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    makeDoneTaskWithForbiddenSideEffects(doc)
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.path.includes('evidence') && e.message.includes('no-forbidden'))).toBe(true)
+  })
+
+  it('should pass lintDocument when done task has forbiddenSideEffects and [no-forbidden] in evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    makeDoneTaskWithForbiddenSideEffects(doc)
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].evidence = 'implemented feature [test: all green] [no-forbidden: confirmed]'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should pass lintDocument when done task has null acceptanceCriteria (backward compatible)', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'old task without acceptanceCriteria'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].acceptanceCriteria = null
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should pass lintDocument when done task has empty forbiddenSideEffects array', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'task with empty forbiddenSideEffects'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].acceptanceCriteria = {
+      requiredTests: ['unit test'],
+      forbiddenSideEffects: [],
+    }
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should warn FORBIDDEN_NOT_CHECKED in validateDocument for done task with forbiddenSideEffects without [no-forbidden]', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    makeDoneTaskWithForbiddenSideEffects(doc)
+    const result = validateDocument(doc)
+    expect(result.warnings).toBeDefined()
+    expect(result.warnings.some((w) => w.code === 'FORBIDDEN_NOT_CHECKED')).toBe(true)
+  })
+
+  it('should not warn FORBIDDEN_NOT_CHECKED when evidence contains [no-forbidden]', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    makeDoneTaskWithForbiddenSideEffects(doc)
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].evidence = 'implemented feature [no-forbidden: confirmed]'
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code === 'FORBIDDEN_NOT_CHECKED')).toBe(false)
+  })
+
+  it('should not trigger on non-done tasks with forbiddenSideEffects (only done tasks are checked)', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    // pending task with forbiddenSideEffects — should not trigger lint error or warning
+    tasks[0].status = 'pending'
+    tasks[0].evidence = null
+    tasks[0].nextAction = 'do it'
+    tasks[0].acceptanceCriteria = {
+      forbiddenSideEffects: ['no credential leaks'],
+    }
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+})

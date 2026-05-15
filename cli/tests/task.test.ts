@@ -1187,3 +1187,46 @@ describe('listTasks extended', () => {
     expect(tasks[0].id).toBe('U-002')
   })
 })
+
+// ── markTasksDone with noForbidden flag ──
+
+describe('markTasksDone with noForbidden flag', () => {
+  it('appends [no-forbidden: confirmed] to evidence when noForbidden is true', () => {
+    const doc = validDoc()
+    const results = markTasksDone(doc, ['U-001'], 'implemented feature', undefined, true)
+    expect(results[0].evidence).toBe('implemented feature [no-forbidden: confirmed]')
+  })
+
+  it('does not append [no-forbidden] when flag is false', () => {
+    const doc = validDoc()
+    const results = markTasksDone(doc, ['U-001'], 'implemented feature', undefined, false)
+    expect(results[0].evidence).toBe('implemented feature')
+  })
+
+  it('does not append [no-forbidden] when flag is omitted (backward compatible)', () => {
+    const doc = validDoc()
+    // No 5th argument → noForbidden is undefined → no tag appended
+    const results = markTasksDone(doc, ['U-001'], 'implemented feature')
+    expect(results[0].evidence).toBe('implemented feature')
+  })
+
+  it('works with --rule and --no-forbidden together', () => {
+    const doc = validDoc()
+    const results = markTasksDone(doc, ['U-001'], 'verified fix', 'ci-passed', true)
+    expect(results[0].evidence).toBe('verified fix [no-forbidden: confirmed]')
+    expect(results[0].rule).toBe('ci-passed')
+  })
+
+  it('appends [no-forbidden] to evidence that already has structured flags', () => {
+    const doc = validDoc()
+    const evidence = [
+      'implemented feature',
+      '[test: all green]',
+      '[commit: abc123]',
+    ].join(' ')
+    const results = markTasksDone(doc, ['U-001'], evidence, undefined, true)
+    expect(results[0].evidence).toContain('[test: all green]')
+    expect(results[0].evidence).toContain('[commit: abc123]')
+    expect(results[0].evidence).toContain('[no-forbidden: confirmed]')
+  })
+})

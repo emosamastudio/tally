@@ -620,6 +620,40 @@ function checkAgentReferences(
   return errors
 }
 
+/**
+ * For done tasks with non-null, non-empty acceptanceCriteria.forbiddenSideEffects,
+ * verify the evidence string contains a `[no-forbidden]` tag confirming the agent
+ * checked that none of the forbidden side effects were triggered.
+ */
+function checkForbiddenSideEffects(doc: Record<string, unknown>): LintError[] {
+  const errors: LintError[] = []
+  const tasks = safeGet(doc, 'tasks')
+  if (!Array.isArray(tasks)) return errors
+
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i] as Record<string, unknown>
+    const status = t.status
+
+    if (status !== 'done') continue
+
+    const acceptanceCriteria = t.acceptanceCriteria as Record<string, unknown> | null | undefined
+    if (acceptanceCriteria == null) continue
+
+    const forbidden = acceptanceCriteria.forbiddenSideEffects as string[] | undefined
+    if (!forbidden || forbidden.length === 0) continue
+
+    const evidence = t.evidence as string | null | undefined
+    const hasNoForbidden = typeof evidence === 'string' && evidence.includes('[no-forbidden')
+    if (!hasNoForbidden) {
+      errors.push({
+        path: formatPath('tasks', i, 'evidence'),
+        message: `Done task has forbiddenSideEffects but evidence does not include [no-forbidden] confirmation`,
+      })
+    }
+  }
+  return errors
+}
+
 /** Check that task.feature references a valid _meta.features[].id. */
 function checkFeatureReferences(doc: Record<string, unknown>): LintError[] {
   const errors: LintError[] = []
@@ -692,6 +726,9 @@ export function lintDocument(doc: unknown): LintResult {
 
     // 5. Feature references
     errors.push(...checkFeatureReferences(record))
+
+    // 6. Forbidden side effects check
+    errors.push(...checkForbiddenSideEffects(record))
   }
 
   return {
@@ -882,6 +919,32 @@ export function validateDocument(doc: unknown): CheckResult {
                   code: 'STALE_TASK',
                   message: `Task "${t.id}" is pending but all dependencies are done`,
                 })
+              }
+            }
+          }
+        }
+
+        // Forbidden side effects not checked warning
+        if (Array.isArray(tasksRaw)) {
+          for (let i = 0; i < tasksRaw.length; i++) {
+            const rawTask = tasksRaw[i]
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              const status = t.status as string | undefined
+              const evidence = t.evidence as string | null | undefined
+              const ac = t.acceptanceCriteria as Record<string, unknown> | null | undefined
+              if (status === 'done' && ac != null) {
+                const forbidden = ac.forbiddenSideEffects as string[] | undefined
+                if (forbidden && forbidden.length > 0) {
+                  const hasNoForbidden = typeof evidence === 'string' && evidence.includes('[no-forbidden')
+                  if (!hasNoForbidden) {
+                    warnings.push({
+                      code: 'FORBIDDEN_NOT_CHECKED',
+                      message: `Done task "${t.id}" has forbiddenSideEffects but evidence does not confirm they were checked with [no-forbidden]`,
+                      path: formatPath('tasks', i, 'evidence'),
+                    })
+                  }
+                }
               }
             }
           }

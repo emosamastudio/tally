@@ -224,3 +224,33 @@ export interface GraphResult {
   maxDepth: number
   parallelism: { min: number; max: number }
 }
+
+// ── Template types ──
+
+export interface TemplateTaskInput {
+  name: string
+  stage?: string
+  module?: string
+  feature?: string
+  priority?: string
+  acceptance?: string
+  writeScopes?: string[]
+  deps?: string[]
+  depsRefs?: string[]
+  acceptanceCriteria?: AcceptanceCriteria
+  executionPlan?: ExecutionPlan
+  riskLevel?: string
+  executionLane?: string
+  requiresReview?: boolean
+  rollbackPlan?: string
+  resourceRequirements?: string[]
+  repos?: string[]
+  deliveryNode?: string
+}
+
+export interface TemplateFile {
+  module: string
+  feature?: string
+  tasks: TemplateTaskInput[]
+  depsRefMap?: Record<string, string>
+}

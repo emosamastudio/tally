@@ -8,6 +8,7 @@ interface DashboardLayoutProps {
   chartsCarousel?: ReactNode
   currentRound: ReactNode
   stageMatrix: ReactNode
+  featureProgress?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
 }
@@ -19,6 +20,7 @@ export default function DashboardLayout({
   chartsCarousel,
   currentRound,
   stageMatrix,
+  featureProgress,
   dependencyGraph,
   taskTable,
 }: DashboardLayoutProps) {
@@ -47,6 +49,9 @@ export default function DashboardLayout({
 
         {/* ROW 4: Stage Matrix — full width horizontal pipeline (with module breakdown) */}
         <section>{stageMatrix}</section>
+
+        {/* ROW 4.5: Feature Progress */}
+        {featureProgress && <section>{featureProgress}</section>}
 
         {/* ROW 5: DependencyGraph (tall) */}
         <section className="min-h-[400px] md:min-h-[500px]">{dependencyGraph}</section>
