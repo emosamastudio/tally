@@ -948,6 +948,58 @@ export function validateDocument(doc: unknown): CheckResult {
               }
             }
           }
+
+          // Drift detection: done tasks with insufficient evidence
+          for (let i = 0; i < tasksRaw.length; i++) {
+            const rawTask = tasksRaw[i]
+            if (rawTask != null && typeof rawTask === 'object') {
+              const t = rawTask as Record<string, unknown>
+              if (t.status !== 'done') continue
+              const evidence = (t.evidence as string) ?? ''
+              const hasTest = evidence.includes('[test:')
+              const hasCommit = evidence.includes('[commit:')
+              const hasReview = evidence.includes('[review:')
+              const hasProvider = evidence.includes('[provider:')
+
+              // Task writes code but no commit recorded
+              const writeScopes = t.writeScopes as string[] | undefined
+              if (writeScopes && writeScopes.length > 0 && !hasCommit) {
+                warnings.push({
+                  code: 'DRIFT_NO_COMMIT',
+                  message: `Done task "${t.id}" has writeScopes but no [commit:] evidence`,
+                  path: formatPath('tasks', i, 'evidence'),
+                })
+              }
+
+              // Task requires review but none recorded
+              if (t.requiresReview === true && !hasReview) {
+                warnings.push({
+                  code: 'DRIFT_NO_REVIEW',
+                  message: `Done task "${t.id}" requires review but no [review:] evidence`,
+                  path: formatPath('tasks', i, 'evidence'),
+                })
+              }
+
+              // Task has no structured evidence at all
+              if (!hasTest && !hasCommit && !hasReview && !hasProvider) {
+                warnings.push({
+                  code: 'DRIFT_NO_EVIDENCE',
+                  message: `Done task "${t.id}" has no structured evidence (no [test:], [commit:], [review:], or [provider:])`,
+                  path: formatPath('tasks', i, 'evidence'),
+                })
+              }
+
+              // Resource-using task without provider evidence
+              const resources = t.resourceRequirements as string[] | undefined
+              if (resources && resources.length > 0 && !hasProvider) {
+                warnings.push({
+                  code: 'DRIFT_NO_PROVIDER',
+                  message: `Done task "${t.id}" uses resources but no [provider:] evidence`,
+                  path: formatPath('tasks', i, 'evidence'),
+                })
+              }
+            }
+          }
         }
       }
     }

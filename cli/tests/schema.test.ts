@@ -423,3 +423,70 @@ describe('forbidden side effects validation', () => {
     expect(result.valid).toBe(true)
   })
 })
+
+describe('drift detection', () => {
+  it('warns DRIFT_NO_COMMIT for done task with writeScopes but no commit evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'implemented feature [test: passed]'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].writeScopes = ['src/auth/**']
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code === 'DRIFT_NO_COMMIT')).toBe(true)
+  })
+
+  it('warns DRIFT_NO_REVIEW for done task requiring review without review evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'done [test: ok] [commit: abc]'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].requiresReview = true
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code === 'DRIFT_NO_REVIEW')).toBe(true)
+  })
+
+  it('warns DRIFT_NO_EVIDENCE for done task with no structured evidence at all', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'just a plain string'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code === 'DRIFT_NO_EVIDENCE')).toBe(true)
+  })
+
+  it('does not warn when done task has all expected evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'done [test: all green] [commit: abc123] [review: approved]'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].writeScopes = ['src/**']
+    tasks[0].requiresReview = true
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code?.startsWith('DRIFT'))).toBe(false)
+  })
+
+  it('warns DRIFT_NO_PROVIDER for task with resources but no provider evidence', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].status = 'done'
+    tasks[0].evidence = 'done [test: ok] [commit: abc]'
+    tasks[0].completedOrder = 1
+    tasks[0].order = null
+    tasks[0].nextAction = null
+    tasks[0].resourceRequirements = ['openai/gpt-4o']
+    const result = validateDocument(doc)
+    expect(result.warnings.some((w) => w.code === 'DRIFT_NO_PROVIDER')).toBe(true)
+  })
+})
