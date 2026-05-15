@@ -2,7 +2,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
-import { startRound, closeRound, generateRoundReport } from '../src/commands/round.js'
+import { startRound, closeRound, generateRoundReport, generateRoundId, formatRoundStart } from '../src/commands/round.js'
+import type { StartRoundResult } from '../src/commands/round.js'
 import { readLedger } from '../src/ledger-reader.js'
 import { writeLedger } from '../src/ledger-writer.js'
 import type { TallyDocument } from '../src/types.js'
@@ -17,6 +18,7 @@ function testDoc(): TallyDocument {
       agents: [{ id: 'main', name: '主会话' }],
       stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
       modules: [{ id: 'core', name: 'Core Module' }],
+      features: [],
     },
     tasks: [
       makeTask('U-001', 'pending', [], 1),
@@ -37,13 +39,16 @@ function makeTask(
   deps: string[],
   order: number,
   blocks?: string,
+  module?: string,
+  feature?: string,
+  writeScopes?: string[],
 ) {
   return {
     id,
     status,
     priority: 'P1' as const,
     stage: 'S1',
-    module: 'core',
+    module: module ?? 'core',
     name: `Task ${id}`,
     acceptance: 'pass',
     deps,
@@ -51,6 +56,7 @@ function makeTask(
     nextAction: 'do it',
     evidence: null,
     rule: null,
+    feature: feature ?? null,
     tags: [],
     order,
     completedOrder: null,
@@ -58,6 +64,18 @@ function makeTask(
     claimedAt: null,
     createdAt: '2026-05-10',
     completedAt: null,
+    writeScopes: writeScopes ?? [],
+    acceptanceCriteria: null,
+    executionPlan: null,
+    riskLevel: 'medium',
+    rollbackPlan: null,
+    executionLane: null,
+    assignedAgent: null,
+    requiresReview: false,
+    resourceRequirements: [],
+    repos: [],
+    deliveryNode: null,
+    approvedBy: null,
   }
 }
 
@@ -174,6 +192,324 @@ describe('round start', () => {
     const doc = readLedger(dir)
     const u3 = doc.tasks.find((t) => t.id === 'U-003')!
     expect(u3.claimedBy).toBeNull()
+  })
+
+  it('groups auto-selected tasks by module then feature within same depth', () => {
+    // Create tasks at depth 0 with mixed modules and features.
+    // Expected sort order: module alpha → feature alpha → order asc
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['auth', 'core'] }],
+        modules: [{ id: 'auth', name: 'Auth' }, { id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        // module=core, feature=f2
+        makeTask('U-001', 'pending', [], 1, undefined, 'core', 'f2'),
+        // module=core, feature=f1 (same module, earlier feature → should come before U-001)
+        makeTask('U-002', 'pending', [], 2, undefined, 'core', 'f1'),
+        // module=auth, feature=f2
+        makeTask('U-003', 'pending', [], 3, undefined, 'auth', 'f2'),
+        // module=auth, feature=f1 (earliest module, earliest feature → should come first)
+        makeTask('U-004', 'pending', [], 4, undefined, 'auth', 'f1'),
+        // module=core, no feature (null sorts before non-null in localeCompare)
+        makeTask('U-005', 'pending', [], 5, undefined, 'core'),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-feature-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('feature-sort', { cwd: dir2, agentId: 'main' })
+      const ids = result.selected.map((s) => s.taskId)
+      // auth sorts before core; within auth: f1 before f2; within core: null before f1 before f2
+      expect(ids).toEqual(['U-004', 'U-003', 'U-005', 'U-002', 'U-001'])
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects tasks with overlapping writeScopes', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1, undefined, 'core', undefined, ['src/auth/**']),
+        makeTask('U-002', 'pending', [], 2, undefined, 'core', undefined, ['src/auth/**']),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-ws-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('ws-conflict', { cwd: dir2, agentId: 'main' }))
+        .toThrow(/write scope/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects tasks with risk above maxRisk gate', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    doc.tasks[0].riskLevel = 'critical'
+    const dir2 = mkdtempSync('/tmp/tally-round-risk-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('risk-gate', { cwd: dir2, agentId: 'main' }))
+        .toThrow(/risk level.*exceeding/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects unapproved high-risk tasks (approval gate)', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    doc.tasks[0].riskLevel = 'high'
+    const dir2 = mkdtempSync('/tmp/tally-round-approve-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('approve-gate', { cwd: dir2, agentId: 'main' }))
+        .toThrow(/not approved/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('allows approved high-risk tasks', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    doc.tasks[0].riskLevel = 'high'
+    doc.tasks[0].approvedBy = 'human-reviewer'
+    const dir2 = mkdtempSync('/tmp/tally-round-approved-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('approved-task', { cwd: dir2, agentId: 'main' })
+      expect(result.selected.length).toBe(1)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('uses feature-focused strategy', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1, undefined, 'core', 'f-b'),
+        makeTask('U-002', 'pending', [], 2, undefined, 'core', 'f-a'),
+        makeTask('U-003', 'pending', [], 3, undefined, 'core', 'f-a'),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-strat-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('feature-strat', { cwd: dir2, agentId: 'main', strategy: 'feature-focused' })
+      const ids = result.selected.map((s) => s.taskId)
+      // f-a tasks should come before f-b tasks
+      expect(ids[0]).toBe('U-002')
+      expect(ids[1]).toBe('U-003')
+      expect(ids[2]).toBe('U-001')
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('uses risk-first strategy', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+        makeTask('U-002', 'pending', [], 2),
+        makeTask('U-003', 'pending', [], 3),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    doc.tasks[0].riskLevel = 'medium'
+    doc.tasks[1].riskLevel = 'high'
+    doc.tasks[2].riskLevel = 'low'
+    // High risk must be approved to pass approval gate
+    doc.tasks[1].approvedBy = 'reviewer'
+    const dir2 = mkdtempSync('/tmp/tally-round-riskfirst-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('risk-strat', { cwd: dir2, agentId: 'main', strategy: 'risk-first' })
+      const ids = result.selected.map((s) => s.taskId)
+      // high first, then medium, then low
+      expect(ids[0]).toBe('U-002')
+      expect(ids[1]).toBe('U-001')
+      expect(ids[2]).toBe('U-003')
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('returns lane distribution warning', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+        makeTask('U-002', 'pending', [], 2),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    doc.tasks[0].executionLane = 'writer'
+    doc.tasks[1].executionLane = 'test'
+    const dir2 = mkdtempSync('/tmp/tally-round-lane-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('lane-warn', { cwd: dir2, agentId: 'main' })
+      expect(result.warnings.some((w) => w.includes('Lane distribution'))).toBe(true)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('auto-selects by depth with nested dependencies', () => {
+    // U-001: pending, no deps → depth 0
+    // U-002: done, no deps → not eligible, but satisfies U-006's dep
+    // U-003: pending, no deps → depth 0
+    // U-004: done, no deps → not eligible, but satisfies U-005's dep
+    // U-005: pending, deps=[U-004] → depth 1 (U-004 depth 0 + 1)
+    // U-006: pending, deps=[U-002] → depth 1 (U-002 depth 0 + 1)
+    // Expected sort: depth 0 first (U-001, U-003), then depth 1 (U-005, U-006)
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1),
+        makeTask('U-002', 'done', [], 2),
+        makeTask('U-003', 'pending', [], 3),
+        makeTask('U-004', 'done', [], 4),
+        makeTask('U-005', 'pending', ['U-004'], 5),
+        makeTask('U-006', 'pending', ['U-002'], 6),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-depth-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('depth-sort', { cwd: dir2, agentId: 'main' })
+      const ids = result.selected.map((s) => s.taskId)
+      // Depth 0 tasks first (U-001, U-003 by module then order),
+      // then depth 1 tasks (U-005, U-006 by module then order)
+      expect(ids).toEqual(['U-001', 'U-003', 'U-005', 'U-006'])
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('throws when no eligible tasks found (all deps unsatisfied)', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', ['U-999'], 1),
+        makeTask('U-002', 'pending', ['U-001'], 2),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-noeligible-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('no-eligible', { cwd: dir2, agentId: 'main' }))
+        .toThrow(/No eligible tasks found/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('rejects task with non-pending status when explicitly specified', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'done', [], 1),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-round-done-')
+    try {
+      writeLedger(doc, dir2)
+      expect(() => startRound('done-task', { cwd: dir2, agentId: 'main', taskIds: ['U-001'] }))
+        .toThrow(/has status "done"/)
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
   })
 })
 
@@ -298,7 +634,7 @@ describe('round close', () => {
     try {
       writeLedger(testDoc(), dir)
       expect(() => closeRound({ cwd: dir, agentId: 'main' })).toThrow(
-        /no active round/i,
+        'No active round found.',
       )
     } finally {
       rmSync(dir, { recursive: true, force: true })
@@ -323,6 +659,75 @@ describe('round close', () => {
 
       const final = readLedger(dir)
       expect(final.rounds[0].status).toBe('completed')
+      // Verify task claims are released after close
+      const u1 = final.tasks.find((t) => t.id === 'U-001')!
+      expect(u1.claimedBy).toBeNull()
+      expect(u1.claimedAt).toBeNull()
+      expect(u1.status).toBe('pending')
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('closes round with mixed done and reverted tasks', () => {
+    const dir = mkdtempSync('/tmp/tally-close-mixed-')
+    try {
+      const doc: TallyDocument = {
+        _meta: {
+          project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+          agents: [{ id: 'main', name: '主会话' }],
+          stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+          modules: [{ id: 'core', name: 'Core Module' }],
+          features: [],
+        },
+        tasks: [
+          makeTask('U-001', 'pending', [], 1),
+          makeTask('U-002', 'pending', [], 2),
+          makeTask('U-003', 'pending', [], 3),
+        ],
+        rounds: [], blocks: [], progress: [],
+      }
+      writeLedger(doc, dir)
+
+      const { roundId } = startRound('mixed', {
+        cwd: dir,
+        agentId: 'main',
+        taskIds: ['U-001', 'U-002', 'U-003'],
+      })
+
+      // Mark U-001 and U-002 as done (simulating task done command)
+      const doc2 = readLedger(dir)
+      const t1 = doc2.tasks.find((t) => t.id === 'U-001')!
+      t1.status = 'done'
+      t1.evidence = 'done 1'
+      t1.completedAt = '2026-05-10'
+      const t2 = doc2.tasks.find((t) => t.id === 'U-002')!
+      t2.status = 'done'
+      t2.evidence = 'done 2'
+      t2.completedAt = '2026-05-10'
+      writeLedger(doc2, dir)
+
+      const result = closeRound({ cwd: dir, roundId })
+      expect(result.done).toBe(2)
+      expect(result.reverted).toBe(1)
+
+      const final = readLedger(dir)
+      expect(final.rounds[0].status).toBe('completed')
+      expect(final.progress.length).toBe(1)
+
+      // Done tasks should have released claims but keep done status
+      const d1 = final.tasks.find((t) => t.id === 'U-001')!
+      expect(d1.claimedBy).toBeNull()
+      expect(d1.status).toBe('done')
+      const d2 = final.tasks.find((t) => t.id === 'U-002')!
+      expect(d2.claimedBy).toBeNull()
+      expect(d2.status).toBe('done')
+
+      // Reverted task should be released and reset to pending
+      const u3 = final.tasks.find((t) => t.id === 'U-003')!
+      expect(u3.claimedBy).toBeNull()
+      expect(u3.claimedAt).toBeNull()
+      expect(u3.status).toBe('pending')
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
@@ -351,5 +756,193 @@ describe('round close', () => {
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
+  })
+})
+
+// ── generateRoundId ──
+
+describe('generateRoundId', () => {
+  it('returns R-YYYY-MM-DD-001 when no rounds exist', () => {
+    const doc = testDoc()
+    doc.rounds = []
+    const id = generateRoundId(doc)
+    expect(id).toMatch(/^R-\d{4}-\d{2}-\d{2}-001$/)
+  })
+
+  it('increments sequence number from existing same-day rounds', () => {
+    const doc = testDoc()
+    const dateStr = new Date().toISOString().slice(0, 10)
+    doc.rounds.push({
+      id: `R-${dateStr}-001`,
+      start: dateStr,
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    doc.rounds.push({
+      id: `R-${dateStr}-002`,
+      start: dateStr,
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    const id = generateRoundId(doc)
+    expect(id).toBe(`R-${dateStr}-003`)
+  })
+
+  it('ignores rounds from other dates when computing sequence', () => {
+    const doc = testDoc()
+    const dateStr = new Date().toISOString().slice(0, 10)
+    doc.rounds.push({
+      id: 'R-2020-01-01-005',
+      start: '2020-01-01',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [],
+      completedAt: null,
+      status: 'completed',
+    })
+    const id = generateRoundId(doc)
+    expect(id).toBe(`R-${dateStr}-001`)
+  })
+})
+
+// ── formatRoundStart ──
+
+describe('formatRoundStart', () => {
+  it('includes round ID, task count, and warnings when present', () => {
+    const result: StartRoundResult = {
+      roundId: 'R-2026-05-15-001',
+      selected: [
+        { taskId: 'U-001', goal: 'Task One', criteria: 'pass' },
+        { taskId: 'U-002', goal: 'Task Two', criteria: 'pass' },
+      ],
+      warnings: ['Lane distribution: writer=1, test=1'],
+    }
+    const output = formatRoundStart(result)
+    expect(output).toContain('Round started: R-2026-05-15-001')
+    expect(output).toContain('Tasks claimed: 2')
+    expect(output).toContain('Warnings:')
+    expect(output).toContain('Lane distribution')
+    expect(output).toContain('U-001  Task One')
+    expect(output).toContain('U-002  Task Two')
+  })
+
+  it('omits warnings section when none present', () => {
+    const result: StartRoundResult = {
+      roundId: 'R-2026-05-15-001',
+      selected: [{ taskId: 'U-001', goal: 'Task One', criteria: 'pass' }],
+      warnings: [],
+    }
+    const output = formatRoundStart(result)
+    expect(output).toContain('Round started: R-2026-05-15-001')
+    expect(output).toContain('Tasks claimed: 1')
+    expect(output).not.toContain('Warnings')
+  })
+})
+
+// ── closeRound: already completed edge case ──
+
+describe('closeRound already completed', () => {
+  it('throws when round is already completed', () => {
+    const dir = mkdtempSync('/tmp/tally-close-complete-')
+    try {
+      writeLedger(testDoc(), dir)
+
+      const { roundId } = startRound('test', {
+        cwd: dir,
+        agentId: 'main',
+        taskIds: ['U-001'],
+      })
+
+      // Close it once
+      closeRound({ cwd: dir, agentId: 'main' })
+
+      // Attempt to close the same round again — should throw
+      expect(() => closeRound({ cwd: dir, roundId })).toThrow(/already completed/)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
+  it('throws when no rounds exist at all', () => {
+    const dir = mkdtempSync('/tmp/tally-close-zero-')
+    try {
+      writeLedger(testDoc(), dir)
+      // testDoc() produces rounds: [] — the ledger has tasks but zero rounds
+      expect(() => closeRound({ cwd: dir, agentId: 'main' })).toThrow(/no active round/i)
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+})
+
+// ── generateRoundReport: mixed statuses ──
+
+describe('generateRoundReport mixed statuses', () => {
+  it('reports done, pending, blocked, and hold tasks with correct counts', () => {
+    const doc = testDoc()
+    doc.rounds.push({
+      id: 'R-2026-05-15-001',
+      start: '2026-05-15',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [
+        { taskId: 'U-001', goal: 'Task U-001', criteria: 'pass' },
+        { taskId: 'U-003', goal: 'Task U-003', criteria: 'pass' },
+        { taskId: 'U-004', goal: 'Task U-004', criteria: 'pass' },
+        { taskId: 'U-005', goal: 'Task U-005', criteria: 'pass' },
+      ],
+      completedAt: null,
+      status: 'active',
+    })
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedAt = '2026-05-15'
+    // U-003 stays pending (index 2)
+    // U-004 stays blocked (index 3)
+    // U-005 stays hold (index 4)
+
+    const report = generateRoundReport(doc, 'R-2026-05-15-001')
+    expect(report.doneCount).toBe(1)
+    expect(report.totalCount).toBe(4)
+    expect(report.tasks[0].status).toBe('done')
+    expect(report.tasks[1].status).toBe('pending')
+    expect(report.tasks[2].status).toBe('blocked')
+    expect(report.tasks[3].status).toBe('hold')
+    expect(report.remaining).toEqual(['U-003', 'U-004', 'U-005'])
+  })
+
+  it('finds task by D-xxx prefix when id was rewritten after completion', () => {
+    const doc = testDoc()
+    doc.rounds.push({
+      id: 'R-2026-05-15-002',
+      start: '2026-05-15',
+      executor: 'main',
+      scope: 'test',
+      exclusions: '',
+      plannedTasks: [
+        { taskId: 'U-001', goal: 'Task U-001', criteria: 'pass' },
+      ],
+      completedAt: null,
+      status: 'active',
+    })
+    // Simulate task done → id rewritten from U-001 to D-001
+    doc.tasks[0].id = 'D-001'
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedAt = '2026-05-15'
+
+    const report = generateRoundReport(doc, 'R-2026-05-15-002')
+    expect(report.tasks[0].taskId).toBe('U-001')
+    expect(report.tasks[0].status).toBe('done')
+    expect(report.doneCount).toBe(1)
+    expect(report.remaining).toEqual([])
   })
 })

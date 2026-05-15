@@ -2,7 +2,7 @@ import { Command } from 'commander'
 import { readLedger, ledgerPath } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
 import { lintDocument } from '../schema.js'
-import type { TallyDocument } from '../types.js'
+import type { FeatureEntry, TallyDocument } from '../types.js'
 
 // ── Migration functions ──
 
@@ -18,6 +18,30 @@ type MigrationFn = (doc: TallyDocument) => TallyDocument
 const MIGRATIONS: Record<string, MigrationFn> = {}
 
 const CURRENT_VERSION = '1.0'
+
+type LegacyTallyDocument = TallyDocument & {
+  _meta: TallyDocument['_meta'] & { features?: FeatureEntry[] }
+  tasks: Array<TallyDocument['tasks'][number] | Record<string, unknown>>
+}
+
+function needsFeatureBackfill(doc: LegacyTallyDocument): boolean {
+  return !Array.isArray(doc._meta.features) || doc.tasks.some((task) => !('feature' in task))
+}
+
+function backfillFeatureSchema(doc: LegacyTallyDocument): TallyDocument {
+  if (!Array.isArray(doc._meta.features)) {
+    doc._meta.features = []
+  }
+
+  for (const task of doc.tasks) {
+    const mutableTask = task as Record<string, unknown>
+    if (!('feature' in mutableTask)) {
+      mutableTask.feature = null
+    }
+  }
+
+  return doc as TallyDocument
+}
 
 function getVersionNumber(version: string): number {
   const parts = version.split('.')
@@ -37,6 +61,10 @@ function applyMigrations(doc: TallyDocument): { doc: TallyDocument; applied: str
   const currentNum = getVersionNumber(CURRENT_VERSION)
 
   if (startNum >= currentNum) {
+    const legacyDoc = doc as LegacyTallyDocument
+    if (needsFeatureBackfill(legacyDoc)) {
+      return { doc: backfillFeatureSchema(legacyDoc), applied: ['feature-schema-backfill'] }
+    }
     return { doc, applied: [] }
   }
 
@@ -59,6 +87,12 @@ function applyMigrations(doc: TallyDocument): { doc: TallyDocument; applied: str
   // Ensure version is set to current
   current._meta.tally_version = CURRENT_VERSION
 
+  const withFeatureSchema = current as LegacyTallyDocument
+  if (needsFeatureBackfill(withFeatureSchema)) {
+    current = backfillFeatureSchema(withFeatureSchema)
+    applied.push('feature-schema-backfill')
+  }
+
   return { doc: current, applied }
 }
 
@@ -72,19 +106,23 @@ export function upgradeCommand(): Command {
         const doc = readLedger()
         const currentVersion = doc._meta.tally_version
 
-        if (currentVersion === CURRENT_VERSION) {
+        const needsBackfill = needsFeatureBackfill(doc as LegacyTallyDocument)
+        if (currentVersion === CURRENT_VERSION && !needsBackfill) {
           console.log(`tally.json is already at the latest version (${CURRENT_VERSION})`)
           process.exit(0)
         }
 
-        // Run lint first to ensure clean starting state
-        const preLint = lintDocument(doc)
-        if (!preLint.valid) {
-          console.error('tally.json has lint errors. Fix them before upgrading:')
-          for (const e of preLint.errors) {
-            console.error(`  ${e.path}: ${e.message}`)
+        // Run lint first to ensure clean starting state.  When the only issue
+        // is an older feature-less v1.0 document, allow the backfill below.
+        if (!needsBackfill) {
+          const preLint = lintDocument(doc)
+          if (!preLint.valid) {
+            console.error('tally.json has lint errors. Fix them before upgrading:')
+            for (const e of preLint.errors) {
+              console.error(`  ${e.path}: ${e.message}`)
+            }
+            process.exit(3)
           }
-          process.exit(3)
         }
 
         const { doc: upgraded, applied } = applyMigrations(doc)

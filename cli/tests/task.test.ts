@@ -13,6 +13,8 @@ import {
   blockTasks,
   unblockTasks,
   listTasks,
+  formatTaskTable,
+  formatTaskDetail,
 } from '../src/commands/task.js'
 
 function validDoc(): TallyDocument {
@@ -25,6 +27,7 @@ function validDoc(): TallyDocument {
       agents: [{ id: 'main', name: '主会话' }],
       stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
       modules: [{ id: 'core', name: 'Core Module' }],
+      features: [],
     },
     tasks: [
       {
@@ -40,6 +43,7 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        feature: null,
         tags: [],
         order: 1,
         completedOrder: null,
@@ -47,6 +51,18 @@ function validDoc(): TallyDocument {
         claimedAt: null,
         createdAt: '2026-05-10',
         completedAt: null,
+        writeScopes: [],
+        acceptanceCriteria: null,
+        executionPlan: null,
+        riskLevel: 'medium',
+        rollbackPlan: null,
+        executionLane: null,
+        assignedAgent: null,
+        requiresReview: false,
+        resourceRequirements: [],
+        repos: [],
+        deliveryNode: null,
+        approvedBy: null,
       },
       {
         id: 'U-002',
@@ -61,6 +77,7 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        feature: null,
         tags: [],
         order: 2,
         completedOrder: null,
@@ -68,6 +85,18 @@ function validDoc(): TallyDocument {
         claimedAt: null,
         createdAt: '2026-05-10',
         completedAt: null,
+        writeScopes: [],
+        acceptanceCriteria: null,
+        executionPlan: null,
+        riskLevel: 'medium',
+        rollbackPlan: null,
+        executionLane: null,
+        assignedAgent: null,
+        requiresReview: false,
+        resourceRequirements: [],
+        repos: [],
+        deliveryNode: null,
+        approvedBy: null,
       },
     ],
     rounds: [],
@@ -194,6 +223,65 @@ describe('addTasks', () => {
     expect(task.acceptance).toBe('must work')
     expect(task.deps).toEqual(['U-001'])
     expect(task.tags).toEqual(['bug', 'urgent'])
+  })
+
+  it('accepts feature field', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{
+      name: 'Feature Task',
+      stage: 'S1',
+      module: 'core',
+      feature: 'f-login',
+    }])
+    expect(task.feature).toBe('f-login')
+  })
+
+  it('defaults new scheduling fields', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{ name: 'Defaults', stage: 'S1', module: 'core' }])
+    expect(task.writeScopes).toEqual([])
+    expect(task.acceptanceCriteria).toBeNull()
+    expect(task.executionPlan).toBeNull()
+    expect(task.riskLevel).toBe('medium')
+    expect(task.rollbackPlan).toBeNull()
+    expect(task.executionLane).toBeNull()
+    expect(task.assignedAgent).toBeNull()
+    expect(task.requiresReview).toBe(false)
+    expect(task.resourceRequirements).toEqual([])
+    expect(task.repos).toEqual([])
+    expect(task.deliveryNode).toBeNull()
+    expect(task.approvedBy).toBeNull()
+  })
+
+  it('accepts scheduling fields', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{
+      name: 'Scheduled',
+      stage: 'S1',
+      module: 'core',
+      writeScopes: ['src/auth/**'],
+      riskLevel: 'high',
+      executionLane: 'writer',
+      rollbackPlan: 'git revert',
+      requiresReview: true,
+      resourceRequirements: ['openai/gpt-4o'],
+      repos: ['polaris-impl'],
+      deliveryNode: 'D6',
+    }])
+    expect(task.writeScopes).toEqual(['src/auth/**'])
+    expect(task.riskLevel).toBe('high')
+    expect(task.executionLane).toBe('writer')
+    expect(task.rollbackPlan).toBe('git revert')
+    expect(task.requiresReview).toBe(true)
+    expect(task.resourceRequirements).toEqual(['openai/gpt-4o'])
+    expect(task.repos).toEqual(['polaris-impl'])
+    expect(task.deliveryNode).toBe('D6')
+  })
+
+  it('defaults feature to null when not specified', () => {
+    const doc = validDoc()
+    const [task] = addTasks(doc, [{ name: 'No Feature', stage: 'S1', module: 'core' }])
+    expect(task.feature).toBeNull()
   })
 
   it('rejects invalid stage reference', () => {
@@ -331,6 +419,63 @@ describe('editTask', () => {
     const doc = validDoc()
     const task = editTask(doc, 'U-001', { tags: ['a', 'b'] })
     expect(task.tags).toEqual(['a', 'b'])
+  })
+
+  it('modifies feature', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { feature: 'f-auth' })
+    expect(task.feature).toBe('f-auth')
+  })
+
+  it('clears feature when set to empty string', () => {
+    const doc = validDoc()
+    doc.tasks[0].feature = 'f-old'
+    const task = editTask(doc, 'U-001', { feature: null })
+    expect(task.feature).toBeNull()
+  })
+
+  it('modifies riskLevel', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { riskLevel: 'critical' })
+    expect(task.riskLevel).toBe('critical')
+  })
+
+  it('rejects invalid riskLevel', () => {
+    const doc = validDoc()
+    expect(() => editTask(doc, 'U-001', { riskLevel: 'extreme' }))
+      .toThrow(/Invalid riskLevel/)
+  })
+
+  it('modifies executionLane', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { executionLane: 'test' })
+    expect(task.executionLane).toBe('test')
+  })
+
+  it('rejects invalid executionLane', () => {
+    const doc = validDoc()
+    expect(() => editTask(doc, 'U-001', { executionLane: 'designer' }))
+      .toThrow(/Invalid executionLane/)
+  })
+
+  it('modifies writeScopes', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { writeScopes: ['src/**', 'test/**'] })
+    expect(task.writeScopes).toEqual(['src/**', 'test/**'])
+  })
+
+  it('modifies requiresReview and rollbackPlan', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { requiresReview: true, rollbackPlan: 'revert commit' })
+    expect(task.requiresReview).toBe(true)
+    expect(task.rollbackPlan).toBe('revert commit')
+  })
+
+  it('modifies repos and deliveryNode', () => {
+    const doc = validDoc()
+    const task = editTask(doc, 'U-001', { repos: ['repo-a'], deliveryNode: 'V1' })
+    expect(task.repos).toEqual(['repo-a'])
+    expect(task.deliveryNode).toBe('V1')
   })
 
   it('refuses to edit done tasks', () => {
@@ -581,9 +726,464 @@ describe('listTasks', () => {
     expect(tasks[0].id).toBe('U-003')
   })
 
+  it('filters by feature', () => {
+    const doc = validDoc()
+    doc.tasks[0].feature = 'f-auth'
+    doc.tasks[1].feature = 'f-core'
+    const tasks = listTasks(doc, { feature: 'f-auth' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-001')
+  })
+
   it('returns empty array when no matches', () => {
     const doc = validDoc()
     const tasks = listTasks(doc, { search: 'nonexistent' })
     expect(tasks).toHaveLength(0)
+  })
+
+  it('filters with all possible filters combined', () => {
+    const doc = validDoc()
+    doc.tasks[0].tags = ['bug']
+    doc.tasks[0].feature = 'f-auth'
+    const filtered = listTasks(doc, {
+      status: 'pending',
+      module: 'core',
+      stage: 'S1',
+      priority: 'P0',
+      tag: 'bug',
+      feature: 'f-auth',
+      search: 'Task 1',
+    })
+    expect(filtered).toHaveLength(1)
+    expect(filtered[0].id).toBe('U-001')
+  })
+})
+
+// ── formatTaskTable ──
+
+describe('formatTaskTable', () => {
+  it('returns "(no tasks)" for empty list', () => {
+    expect(formatTaskTable([])).toBe('(no tasks)')
+  })
+
+  it('returns header row and formatted tasks', () => {
+    const doc = validDoc()
+    const tasks = [doc.tasks[0], doc.tasks[1]]
+    const output = formatTaskTable(tasks)
+    const lines = output.split('\n')
+    expect(lines).toHaveLength(4) // header + separator + 2 task rows
+    expect(lines[0]).toContain('ID')
+    expect(lines[0]).toContain('NAME')
+    expect(lines[0]).toContain('STAGE')
+    expect(lines[0]).toContain('STATUS')
+    expect(lines[0]).toContain('PRIORITY')
+    expect(lines[1]).toContain('------')
+    expect(lines[2]).toContain('U-001')
+    expect(lines[2]).toContain('Task 1')
+    expect(lines[2]).toContain('S1')
+    expect(lines[2]).toContain('pending')
+    expect(lines[2]).toContain('P0')
+    expect(lines[3]).toContain('U-002')
+    expect(lines[3]).toContain('P1')
+  })
+
+  it('truncates long task names with ellipsis', () => {
+    const doc = validDoc()
+    doc.tasks[0].name = 'A very long task name that exceeds twenty eight characters'
+    const output = formatTaskTable([doc.tasks[0]])
+    const lines = output.split('\n')
+    const taskLine = lines[2]
+    expect(taskLine).toContain('…')
+    expect(taskLine).not.toContain('characters')
+  })
+
+  it('handles task with done status correctly in formatting', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'done'
+    const output = formatTaskTable([doc.tasks[0]])
+    const lines = output.split('\n')
+    expect(lines[2]).toContain('done')
+  })
+
+  it('handles task with blocked status correctly in formatting', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'blocked'
+    doc.tasks[0].blocks = 'waiting on dep'
+    const output = formatTaskTable([doc.tasks[0]])
+    const lines = output.split('\n')
+    expect(lines[2]).toContain('blocked')
+  })
+})
+
+// ── formatTaskDetail ──
+
+describe('formatTaskDetail', () => {
+  function taskWithAllFields() {
+    const doc = validDoc()
+    const t = doc.tasks[0]
+    t.riskLevel = 'critical'
+    t.executionLane = 'writer'
+    t.writeScopes = ['src/auth/**', 'src/db/**']
+    t.repos = ['polaris-impl']
+    t.deliveryNode = 'V2'
+    t.requiresReview = true
+    t.assignedAgent = 'agent-7'
+    t.approvedBy = 'Alice'
+    t.rollbackPlan = 'git revert HEAD~1 && make deploy-rollback'
+    t.resourceRequirements = ['openai/gpt-4o', 'brave-search']
+    t.executionPlan = {
+      inputs: ['spec.md', 'schema.graphql'],
+      outputs: ['auth.ts', 'auth.test.ts'],
+      steps: ['read spec', 'implement auth', 'write tests'],
+    }
+    t.acceptanceCriteria = {
+      requiredTests: ['unit: auth', 'integration: login flow'],
+      passConditions: ['all tests green', 'coverage > 80%'],
+      forbiddenSideEffects: ['no credential leaks'],
+      negativeCases: ['invalid token', 'expired session'],
+    }
+    t.tags = ['security', 'critical']
+    t.order = 5
+    t.completedOrder = null
+    t.claimedBy = 'agent-7'
+    t.claimedAt = '2026-05-14'
+    t.completedAt = null
+    t.feature = 'f-auth'
+    t.rule = 'ci-passed'
+    t.evidence = 'all tests pass [test: 42 passed]'
+    t.nextAction = 'deploy'
+    t.blocks = null
+    t.deps = ['U-002']
+    doc.tasks[1].deps = [t.id] // U-002 depends on U-001
+    return { doc, task: t }
+  }
+
+  it('displays all basic fields', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('ID:          U-001')
+    expect(output).toContain('Name:        Task 1')
+    expect(output).toContain('Status:      pending')
+    expect(output).toContain('Priority:    P0')
+    expect(output).toContain('Stage:       S1')
+    expect(output).toContain('Module:      core')
+    expect(output).toContain('Acceptance:  pass')
+  })
+
+  it('displays riskLevel and executionLane', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Risk:        critical')
+    expect(output).toContain('Lane:        writer')
+  })
+
+  it('displays writeScopes and repos', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Write Scopes: src/auth/**, src/db/**')
+    expect(output).toContain('Repos:       polaris-impl')
+  })
+
+  it('displays requiresReview as Yes when true', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Review:      Yes')
+  })
+
+  it('displays requiresReview as No when false', () => {
+    const doc = validDoc()
+    doc.tasks[0].requiresReview = false
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Review:      No')
+  })
+
+  it('displays deliveryNode and assignedAgent', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Delivery:    V2')
+    expect(output).toContain('Assigned:    agent-7')
+  })
+
+  it('displays approvedBy', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Approved:    Alice')
+  })
+
+  it('displays executionPlan section when populated', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Exec Plan:')
+    expect(output).toContain('inputs=[spec.md, schema.graphql]')
+    expect(output).toContain('outputs=[auth.ts, auth.test.ts]')
+    expect(output).toContain('read spec; implement auth; write tests')
+  })
+
+  it('does not display executionPlan when null', () => {
+    const doc = validDoc()
+    doc.tasks[0].executionPlan = null
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).not.toContain('Exec Plan:')
+  })
+
+  it('displays acceptanceCriteria sections when populated', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Tests:       unit: auth, integration: login flow')
+    expect(output).toContain('Pass:        all tests green; coverage > 80%')
+    expect(output).toContain('Forbidden:   no credential leaks')
+    expect(output).toContain('Negatives:   invalid token; expired session')
+  })
+
+  it('does not display acceptanceCriteria when null', () => {
+    const doc = validDoc()
+    doc.tasks[0].acceptanceCriteria = null
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).not.toContain('Tests:')
+    expect(output).not.toContain('Pass:')
+  })
+
+  it('displays rollbackPlan when set', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Rollback:    git revert HEAD~1 && make deploy-rollback')
+  })
+
+  it('does not display rollbackPlan when null', () => {
+    const doc = validDoc()
+    doc.tasks[0].rollbackPlan = null
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).not.toContain('Rollback:')
+  })
+
+  it('displays resourceRequirements when populated', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Resources:   openai/gpt-4o, brave-search')
+  })
+
+  it('displays "(none)" for empty resourceRequirements', () => {
+    const doc = validDoc()
+    doc.tasks[0].resourceRequirements = []
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Resources:   (none)')
+  })
+
+  it('displays deps correctly', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Deps:        U-002')
+  })
+
+  it('displays "(none)" for empty deps', () => {
+    const doc = validDoc()
+    doc.tasks[0].deps = []
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Deps:        (none)')
+  })
+
+  it('displays writeScopes as "(none)" when empty', () => {
+    const doc = validDoc()
+    doc.tasks[0].writeScopes = []
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Write Scopes: (none)')
+  })
+
+  it('displays repos as "(none)" when empty', () => {
+    const doc = validDoc()
+    doc.tasks[0].repos = []
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Repos:       (none)')
+  })
+
+  it('displays tags correctly', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Tags:        security, critical')
+  })
+
+  it('displays "(none)" for null nextAction/evidence/rule/feature/blocks', () => {
+    const doc = validDoc()
+    doc.tasks[0].nextAction = null
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Next Action: (none)')
+    expect(output).toContain('Evidence:    (none)')
+    expect(output).toContain('Rule:        (none)')
+    expect(output).toContain('Feature:     (none)')
+    expect(output).toContain('Blocks:      (none)')
+    expect(output).toContain('Lane:        (none)')
+    expect(output).toContain('Delivery:    (none)')
+    expect(output).toContain('Assigned:    (none)')
+    expect(output).toContain('Approved:    (none)')
+  })
+
+  it('displays "(none)" for null order/completedOrder', () => {
+    const doc = validDoc()
+    doc.tasks[0].order = null
+    doc.tasks[0].completedOrder = null
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Order:       (none)')
+    expect(output).toContain('Comp.Order:  (none)')
+  })
+
+  it('displays ancestors section', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Ancestors (depends on):')
+    expect(output).toContain('U-002 [pending] Task 2')
+  })
+
+  it('displays descendants section', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Descendants (depends on this):')
+    expect(output).toContain('U-002 [pending] Task 2')
+  })
+
+  it('displays completedAt and createdAt', () => {
+    const { doc } = taskWithAllFields()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Created:     2026-05-10')
+    expect(output).toContain('Completed:   (none)')
+  })
+
+  it('displays completedAt when set', () => {
+    const { doc } = taskWithAllFields()
+    doc.tasks[0].completedAt = '2026-05-14'
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('Completed:   2026-05-14')
+  })
+})
+
+// ── markTasksDone with structured evidence ──
+
+describe('markTasksDone with structured evidence', () => {
+  it('stores evidence string containing structured flag content', () => {
+    const doc = validDoc()
+    // Simulate the evidence construction from the CLI handler:
+    // parts = [evidence, [test: ...], [commit: ...], [review: ...], [provider: ...], [notes: ...]]
+    const evidence = [
+      'manual verification',
+      '[test: 42 passed, 0 failed]',
+      '[commit: abc1234]',
+      '[review: approved by Bob]',
+      '[provider: openai/gpt-4o]',
+      '[notes: edge case covered]',
+    ].join(' ')
+    const results = markTasksDone(doc, ['U-001'], evidence, 'ci-verified')
+    expect(results[0].evidence).toBe(evidence)
+    expect(results[0].evidence).toContain('[test: 42 passed, 0 failed]')
+    expect(results[0].evidence).toContain('[commit: abc1234]')
+    expect(results[0].evidence).toContain('[review: approved by Bob]')
+    expect(results[0].evidence).toContain('[provider: openai/gpt-4o]')
+    expect(results[0].evidence).toContain('[notes: edge case covered]')
+    expect(results[0].rule).toBe('ci-verified')
+  })
+
+  it('stores evidence with only --test flag', () => {
+    const doc = validDoc()
+    const evidence = 'tests completed [test: all green]'
+    const results = markTasksDone(doc, ['U-001'], evidence)
+    expect(results[0].evidence).toBe('tests completed [test: all green]')
+  })
+
+  it('stores evidence with only --commit flag', () => {
+    const doc = validDoc()
+    const evidence = 'deployed [commit: def5678]'
+    const results = markTasksDone(doc, ['U-001'], evidence)
+    expect(results[0].evidence).toBe('deployed [commit: def5678]')
+  })
+
+  it('stores evidence with --test and --review flags only', () => {
+    const doc = validDoc()
+    const evidence = 'code review done [test: 10/10] [review: Alice LGTM]'
+    const results = markTasksDone(doc, ['U-001'], evidence)
+    expect(results[0].evidence).toContain('[test: 10/10]')
+    expect(results[0].evidence).toContain('[review: Alice LGTM]')
+  })
+})
+
+// ── listTasks with extended filter coverage ──
+
+describe('listTasks extended', () => {
+  it('filters by status done returns only done tasks', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedOrder = 1
+    const tasks = listTasks(doc, { status: 'done' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-001')
+    expect(tasks[0].status).toBe('done')
+  })
+
+  it('filters by status blocked returns only blocked tasks', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'blocked'
+    doc.tasks[0].blocks = 'waiting'
+    const tasks = listTasks(doc, { status: 'blocked' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-001')
+    expect(tasks[0].status).toBe('blocked')
+  })
+
+  it('filters by feature returns empty when no match', () => {
+    const doc = validDoc()
+    const tasks = listTasks(doc, { feature: 'nonexistent-feature' })
+    expect(tasks).toHaveLength(0)
+  })
+
+  it('search matches substrings of name (case insensitive)', () => {
+    const doc = validDoc()
+    const tasks = listTasks(doc, { search: 'task' })
+    expect(tasks).toHaveLength(2)
+  })
+
+  it('search matches substrings of id (case insensitive)', () => {
+    const doc = validDoc()
+    const tasks = listTasks(doc, { search: 'u-00' })
+    expect(tasks).toHaveLength(2)
+  })
+
+  it('returns all tasks when filter object is empty', () => {
+    const doc = validDoc()
+    const tasks = listTasks(doc, {})
+    expect(tasks).toHaveLength(2)
+  })
+
+  it('filters with status and module combined', () => {
+    const doc = validDoc()
+    doc._meta.modules.push({ id: 'ui', name: 'UI' })
+    doc.tasks[0].module = 'ui'
+    doc.tasks[0].status = 'blocked'
+    doc.tasks[1].status = 'blocked'
+    const tasks = listTasks(doc, { status: 'blocked', module: 'core' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-002')
   })
 })

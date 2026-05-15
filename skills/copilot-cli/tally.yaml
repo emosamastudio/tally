@@ -1,17 +1,57 @@
 name: tally
-version: "0.1.0"
-description: Agent-native task management with CLI-driven ledger, round discipline, and visualization
+version: "0.2.0"
+description: Agent-native task management with CLI-driven ledger, round discipline, multi-agent safety checks, and visualization
 commands:
   - tally status
   - tally check
-  - tally round start
-  - tally task done
-  - tally task add
-  - tally round close
   - tally lint
+  - tally round start
+  - tally round close
+  - tally round report
+  - tally task add
+  - tally task done
+  - tally task edit
+  - tally task block
+  - tally task unblock
+  - tally task list
+  - tally task show
+  - tally task approve
   - tally sync
+  - tally graph
+  - tally export
+  - tally dashboard
+  - tally init
+  - tally upgrade
+  - tally migrate
 rules:
   - Never edit tally.json directly -- always use CLI
   - Always prefer batch forms (multiple IDs in one command)
   - New tasks discovered during execution go into the ledger, not the current round
   - Before commit, run tally lint
+  - Open tasks must have a feature assigned (FEATURE_REQUIRED)
+  - High/critical risk tasks need rollback plan and review flag
+  - Round start validates write scopes, risk gates, feature freeze, and approval
+  - Use structured evidence on task done (--test, --commit, --review, --provider, --notes)
+  - Choose round strategy wisely: feature-focused for cohesion, risk-first for priority, parallel-max for throughput
+round_strategies:
+  - parallel-max: maximize parallelism, group by module then feature (default)
+  - feature-focused: complete one feature before moving to the next
+  - risk-first: highest risk tasks first
+safety_checks:
+  - write_scope_conflict: rejects overlapping writeScopes in same round
+  - risk_gating: rejects tasks above configured maxRisk
+  - feature_freeze: only contract/test tasks allowed on frozen features
+  - approval_gate: unapproved high/critical tasks rejected
+  - dependency_satisfaction: all deps must be done
+task_fields:
+  core: [id, status, priority, stage, module, name, acceptance, feature, deps, blocks, nextAction, evidence, rule, tags]
+  scheduling: [writeScopes, riskLevel, executionLane, requiresReview, rollbackPlan, assignedAgent, approvedBy]
+  planning: [acceptanceCriteria, executionPlan]
+  tracking: [resourceRequirements, repos, deliveryNode]
+feature_registry:
+  fields: [id, module, name, status, specRefs, dependsOn, owner]
+  statuses: [design, contract_frozen, implementing, stable]
+structured_evidence:
+  flags: [--evidence, --test, --commit, --review, --provider, --notes]
+export_formats: [json, csv, markdown, agent-brief]
+graph_levels: [task, feature]

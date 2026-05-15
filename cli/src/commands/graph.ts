@@ -10,6 +10,7 @@ interface GraphNode {
   status: string
   depth: number
   criticalPath: boolean
+  feature: string | null
 }
 
 interface GraphEdge {
@@ -187,6 +188,7 @@ function buildGraph(doc: TallyDocument, computeCritical: boolean): InternalGraph
     status: t.status,
     depth: depths.get(t.id) ?? 0,
     criticalPath: criticalNodes.has(t.id),
+    feature: t.feature,
   }))
 
   // Build edges: dep → dependent
@@ -222,6 +224,7 @@ function formatJson(g: InternalGraph): string {
       status: n.status,
       depth: n.depth,
       criticalPath: n.criticalPath,
+      feature: n.feature,
     })),
     edges: g.edges.map((e) => ({ from: e.from, to: e.to })),
     criticalPathLength: g.criticalPathLength,
@@ -296,9 +299,77 @@ export function graphCommand(): Command {
   cmd.description('Build and output the task dependency graph')
     .requiredOption('--format <format>', 'Output format: json, text, or dot')
     .option('--critical-path', 'Highlight the critical path')
-    .action((opts: { format: string; criticalPath?: boolean }) => {
+    .option('--level <level>', 'Graph level: task or feature', 'task')
+    .action((opts: { format: string; criticalPath?: boolean; level?: string }) => {
       try {
         const doc = readLedger()
+        const isFeatureLevel = opts.level === 'feature'
+
+        if (isFeatureLevel) {
+          // Feature-level graph: condense tasks to features
+          const featMap = new Map<string, { tasks: typeof doc.tasks; name: string; module: string }>()
+          for (const t of doc.tasks) {
+            const fid = t.feature ?? '__unassigned__'
+            if (!featMap.has(fid)) {
+              featMap.set(fid, { tasks: [], name: fid, module: t.module })
+            }
+            featMap.get(fid)!.tasks.push(t)
+          }
+
+          // Build feature-level nodes with aggregated stats
+          const nodes: GraphNode[] = []
+          const featureTaskMap = new Map<string, typeof doc.tasks>()
+          for (const [fid, f] of featMap) {
+            const done = f.tasks.filter((t) => t.status === 'done').length
+            const total = f.tasks.length
+            featureTaskMap.set(fid, f.tasks)
+            nodes.push({
+              id: fid,
+              name: fid === '__unassigned__' ? '(unassigned)' : fid,
+              status: done === total ? 'done' : done > 0 ? 'in_progress' : 'pending',
+              depth: 0,
+              criticalPath: false,
+              feature: f.module,
+            })
+          }
+
+          // Build feature-level edges (feature A → B if any task in A depends on any task in B)
+          const edges: GraphEdge[] = []
+          for (const [fid, f] of featMap) {
+            for (const t of f.tasks) {
+              for (const depId of t.deps) {
+                // Find which feature this dep belongs to
+                for (const [dfid] of featMap) {
+                  if (dfid !== fid && featMap.get(dfid)!.tasks.some((dt) => dt.id === depId)) {
+                    if (!edges.some((e) => e.from === fid && e.to === dfid)) {
+                      edges.push({ from: fid, to: dfid })
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          const result = { nodes, edges, criticalPathLength: 0, maxDepth: 0, parallelism: { min: 1, max: 1 } }
+          const fmt = opts.format.toLowerCase()
+          switch (fmt) {
+            case 'json': console.log(JSON.stringify(result, null, 2)); break
+            case 'text':
+              console.log(`Feature graph: ${nodes.length} features, ${edges.length} edges`)
+              for (const n of nodes) console.log(`  ${n.id} [${n.status}] (${n.feature})`)
+              for (const e of edges) console.log(`  ${e.from} → ${e.to}`)
+              break
+            case 'dot':
+              let dot = 'digraph Features {\n'
+              for (const n of nodes) dot += `  "${n.id}" [label="${n.name}"]\n`
+              for (const e of edges) dot += `  "${e.from}" -> "${e.to}"\n`
+              dot += '}\n'
+              console.log(dot)
+              break
+          }
+          return
+        }
+
         const g = buildGraph(doc, opts.criticalPath === true)
         const fmt = opts.format.toLowerCase()
 

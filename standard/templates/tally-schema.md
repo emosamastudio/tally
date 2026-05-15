@@ -35,6 +35,7 @@
 | `evidence` | string \| null | Verifiable evidence of completion |
 | `claimedBy` | string \| null | Agent ID that claimed this task |
 | `nextAction` | string \| null | Next action to take |
+| `feature` | string \| null | Feature this task belongs to |
 
 ## ID Prefix Convention
 

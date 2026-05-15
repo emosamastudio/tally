@@ -15,6 +15,7 @@ export interface Task {
   source: TaskSource
   stage: string
   module: string
+  feature?: string
   name: string
   priority: Priority
   status: TaskStatus
@@ -96,6 +97,15 @@ export interface ModuleMeta {
   name: string
 }
 
+export interface FeatureMeta {
+  id: string
+  module: string
+  name: string
+  total: number
+  done: number
+  blocked: number
+}
+
 export interface LedgerData {
   os: {
     tasks: Task[]
@@ -120,6 +130,7 @@ export interface LedgerData {
   }
   rounds: Round[]
   modules: ModuleMeta[]
+  features: FeatureMeta[]
   projectName: string
   updated: string | null
 }
