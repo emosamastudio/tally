@@ -1,6 +1,6 @@
 name: tally
-version: "0.2.0"
-description: Agent-native task management with CLI-driven ledger, round discipline, multi-agent safety checks, and visualization
+version: "0.3.0"
+description: Agent-native task management with CLI-driven ledger, round discipline, auto-retry, auto-next, JSON error output, and visualization
 commands:
   - tally status
   - tally check

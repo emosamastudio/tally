@@ -1,7 +1,7 @@
 {
   "name": "tally-use",
-  "skill_version": "0.2.1",
-  "aligned_release": "tally_v0.2.1",
+  "skill_version": "0.3.0",
+  "aligned_release": "tally_v0.3.0",
   "entrypoint": "tally.md",
   "compatibility": {
     "tally_v": 1,
@@ -12,12 +12,14 @@
     "project .tallyrc.yaml",
     "tally CLI --help output"
   ],
-  "expected_first_action": "Run tally status, read tally.json to understand task state, identify the task lane (round execution, task CRUD, validation, or handoff), then choose the minimal CLI command.",
+  "expected_first_action": "Run tally status, read tally.json to understand task state, identify the task lane (round execution, task CRUD, validation, or handoff), then choose the minimal CLI command. Always use --json or --json-output for machine-parseable output.",
   "positive_triggers": [
     "Manage tasks in a Tally-enabled repository",
     "Start or close an execution round",
     "Mark tasks as done, blocked, or unblocked",
     "Add newly discovered tasks to the ledger",
+    "Create tasks from a batch template file",
+    "Approve high-risk tasks for round inclusion",
     "Run tally lint, tally check, or tally status",
     "Visualize ledger data with tally dashboard",
     "Analyze dependencies with tally graph",

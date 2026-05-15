@@ -26,11 +26,12 @@ import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
-import FeatureProgress, { FeatureProgressSkeleton } from '@/components/feature-progress'
 import ChartsCarousel, { ChartsCarouselSkeleton } from '@/components/charts-carousel'
 import {
   LazyRoundAnalytics,
   LazyAgentContribution,
+  LazyFeatureProgress,
+  FeatureProgressSkeleton,
 } from '@/components/lazy-wrappers'
 
 function formatTime(date: Date): string {
@@ -327,7 +328,7 @@ export default function App() {
         featureProgress={
           <section ref={(el) => { sectionRefs.current[4] = el }}>
             <ErrorBoundary fallbackName="功能进度">
-              <FeatureProgress features={features} tasks={allTasks} />
+              <LazyFeatureProgress features={features} tasks={allTasks} />
             </ErrorBoundary>
           </section>
         }
