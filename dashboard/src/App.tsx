@@ -26,7 +26,6 @@ import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
-import DistributionPanel, { DistributionPanelSkeleton } from '@/components/distribution-panel'
 import ChartsCarousel, { ChartsCarouselSkeleton } from '@/components/charts-carousel'
 import {
   LazyRoundAnalytics,
@@ -45,7 +44,7 @@ function ShortcutHelp({ onClose }: { onClose: () => void }) {
     { key: '?', desc: '显示/隐藏快捷键帮助' },
     { key: '/', desc: '聚焦搜索框' },
     { key: 'r', desc: '手动刷新数据' },
-    { key: '1-6', desc: '跳转到对应行' },
+    { key: '1-4', desc: '跳转到对应行' },
     { key: 'Esc', desc: '关闭面板/弹窗' },
   ]
 
@@ -138,7 +137,7 @@ export default function App() {
     }
 
     const numKey = parseInt(e.key)
-    if (numKey >= 1 && numKey <= 6 && !isInput) {
+    if (numKey >= 1 && numKey <= 4 && !isInput) {
       const el = sectionRefs.current[numKey]
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -210,7 +209,6 @@ export default function App() {
         chartsCarousel={<ChartsCarouselSkeleton />}
         currentRound={<CurrentRoundSkeleton />}
         stageMatrix={<StageMatrixSkeleton />}
-        distributionPanel={<DistributionPanelSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
       />
@@ -324,15 +322,8 @@ export default function App() {
             </ErrorBoundary>
           </section>
         }
-        distributionPanel={
-          <section ref={(el) => { sectionRefs.current[4] = el }}>
-            <ErrorBoundary fallbackName="任务分布">
-              <DistributionPanel tasks={allTasks} />
-            </ErrorBoundary>
-          </section>
-        }
         dependencyGraph={
-          <section ref={(el) => { sectionRefs.current[5] = el }}>
+          <section ref={(el) => { sectionRefs.current[4] = el }}>
             <ErrorBoundary fallbackName="依赖图">
               <DependencyGraph tasks={allTasks} />
             </ErrorBoundary>

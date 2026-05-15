@@ -8,7 +8,6 @@ interface DashboardLayoutProps {
   chartsCarousel?: ReactNode
   currentRound: ReactNode
   stageMatrix: ReactNode
-  distributionPanel?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
 }
@@ -20,7 +19,6 @@ export default function DashboardLayout({
   chartsCarousel,
   currentRound,
   stageMatrix,
-  distributionPanel,
   dependencyGraph,
   taskTable,
 }: DashboardLayoutProps) {
@@ -47,16 +45,13 @@ export default function DashboardLayout({
           <div className="md:col-span-1">{currentRound}</div>
         </section>
 
-        {/* ROW 4: Stage Matrix — full width horizontal pipeline */}
+        {/* ROW 4: Stage Matrix — full width horizontal pipeline (with module breakdown) */}
         <section>{stageMatrix}</section>
 
-        {/* ROW 5: Distribution Panel — Priority + Module in a single card */}
-        {distributionPanel && <section>{distributionPanel}</section>}
-
-        {/* ROW 6: DependencyGraph (tall) */}
+        {/* ROW 5: DependencyGraph (tall) */}
         <section className="min-h-[400px] md:min-h-[500px]">{dependencyGraph}</section>
 
-        {/* ROW 7: TaskTable */}
+        {/* ROW 6: TaskTable */}
         <section>{taskTable}</section>
       </div>
     </div>
