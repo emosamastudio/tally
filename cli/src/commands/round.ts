@@ -52,12 +52,14 @@ export interface StartRoundInput {
   taskIds?: string[]
   strategy?: 'parallel-max' | 'feature-focused' | 'risk-first'
   autoRetry?: boolean
+  dryRun?: boolean
 }
 
 export interface StartRoundResult {
   roundId: string
   selected: { taskId: string; goal: string; criteria: string }[]
   warnings: string[]
+  dryRun?: boolean
 }
 
 export function startRound(scope: string, input: StartRoundInput = {}): StartRoundResult {
@@ -66,9 +68,9 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
   const agentId = input.agentId ?? config.agent.id
   const doc = readLedger(cwd)
 
-  // Check if agent already has an active round (unless parallel rounds are allowed)
+  // Check if agent already has an active round (unless parallel rounds or dry-run)
   const existingActive = getActiveRoundForAgent(doc, agentId)
-  if (existingActive && !config.round.allowParallel) {
+  if (existingActive && !config.round.allowParallel && !input.dryRun) {
     throw new Error(
       `Agent "${agentId}" already has an active round (${existingActive.id}). ` +
         `Complete it first with 'tally round close'. ` +
@@ -290,6 +292,11 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
     warnings.push(`Auto-excluded ${autoExcluded.length} task(s): ${autoExcluded.join(', ')}`)
   }
 
+  // Dry-run: return preview without claiming or persisting
+  if (input.dryRun) {
+    return { roundId: '(dry-run)', selected, warnings, dryRun: true }
+  }
+
   // Generate round ID
   const roundId = generateRoundId(doc)
 
@@ -508,8 +515,13 @@ export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
 
 export function formatRoundStart(result: StartRoundResult): string {
   const lines: string[] = []
-  lines.push(`Round started: ${result.roundId}`)
-  lines.push(`Tasks claimed: ${result.selected.length}`)
+  if (result.dryRun) {
+    lines.push(`[DRY RUN] — no tasks claimed`)
+    lines.push(`Would start round with ${result.selected.length} task(s):`)
+  } else {
+    lines.push(`Round started: ${result.roundId}`)
+    lines.push(`Tasks claimed: ${result.selected.length}`)
+  }
   if (result.warnings.length > 0) {
     lines.push(`Warnings:`)
     for (const w of result.warnings) {
@@ -565,14 +577,16 @@ export function roundCommand(): Command {
     .option('--agent <id>', 'Executor agent ID')
     .option('--strategy <strategy>', 'Round strategy: parallel-max, feature-focused, or risk-first')
     .option('--auto-retry', 'Auto-exclude conflicting tasks and retry')
+    .option('--dry-run', 'Preview task selection without claiming')
     .option('--json', 'Output errors as machine-parseable JSON')
-    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string; autoRetry?: boolean; json?: boolean }) => {
+    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string; autoRetry?: boolean; dryRun?: boolean; json?: boolean }) => {
       wrapAction(opts, () => {
         const result = startRound(scope, {
           agentId: opts.agent,
           taskIds: opts.tasks,
           strategy: opts.strategy as StartRoundInput['strategy'],
           autoRetry: opts.autoRetry,
+          dryRun: opts.dryRun,
         })
         if (opts.json) {
           console.log(JSON.stringify({ ok: true, ...result }))
