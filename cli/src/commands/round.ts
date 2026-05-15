@@ -399,12 +399,16 @@ export interface CloseRoundInput {
   cwd?: string
   agentId?: string
   roundId?: string
+  autoNext?: boolean
+  nextStrategy?: StartRoundInput['strategy']
+  nextAutoRetry?: boolean
 }
 
 export interface CloseRoundResult {
   roundId: string
   done: number
   reverted: number
+  nextRound?: StartRoundResult
 }
 
 export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
@@ -484,7 +488,20 @@ export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
   doc.progress.push(progress)
   writeLedger(doc, cwd)
 
-  return { roundId: round.id, done, reverted }
+  const result: CloseRoundResult = { roundId: round.id, done, reverted }
+
+  // Auto-next: close and immediately start a new round
+  if (input.autoNext) {
+    const nextResult = startRound(round.scope, {
+      cwd,
+      agentId,
+      strategy: input.nextStrategy ?? 'parallel-max',
+      autoRetry: input.nextAutoRetry ?? true,
+    })
+    result.nextRound = nextResult
+  }
+
+  return result
 }
 
 // ── Formatting ──
@@ -593,16 +610,28 @@ export function roundCommand(): Command {
     .command('close')
     .description('Close an active round, release claims, record progress')
     .option('--round <id>', 'Round ID to close')
-    .action((opts: { round?: string }) => {
-      try {
+    .option('--auto-next', 'Auto-start a new round after closing')
+    .option('--strategy <strategy>', 'Strategy for the next round (with --auto-next)')
+    .option('--auto-retry', 'Auto-exclude conflicting tasks in next round (with --auto-next)')
+    .option('--json', 'Output errors as JSON')
+    .action((opts: { round?: string; autoNext?: boolean; strategy?: string; autoRetry?: boolean; json?: boolean }) => {
+      wrapAction(opts, () => {
         const result = closeRound({
           roundId: opts.round,
+          autoNext: opts.autoNext,
+          nextStrategy: opts.strategy as StartRoundInput['strategy'],
+          nextAutoRetry: opts.autoRetry,
         })
-        console.log(formatRoundClose(result))
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: true, ...result }))
+        } else {
+          console.log(formatRoundClose(result))
+          if (result.nextRound) {
+            console.log('')
+            console.log(formatRoundStart(result.nextRound))
+          }
+        }
+      })
     })
 
   return cmd
