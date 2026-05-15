@@ -51,6 +51,7 @@ export interface StartRoundInput {
   agentId?: string
   taskIds?: string[]
   strategy?: 'parallel-max' | 'feature-focused' | 'risk-first'
+  autoRetry?: boolean
 }
 
 export interface StartRoundResult {
@@ -148,104 +149,146 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
   }
 
   // Validate all candidates before claiming any (atomic)
-  const errors: string[] = []
-  const selected: { taskId: string; goal: string; criteria: string }[] = []
+  // If autoRetry is enabled, exclude conflicting tasks and retry
+  const MAX_RETRIES = 10
+  const autoRetry = input.autoRetry ?? false
+  const autoExcluded: string[] = []
+  let selected: { taskId: string; goal: string; criteria: string }[] = []
+  let errors: string[] = []
 
-  for (const id of candidateIds) {
-    const task = findTaskByEitherPrefix(doc, id)
-    if (!task) {
-      errors.push(`Task "${id}" not found`)
-      continue
+  for (let retry = 0; retry <= MAX_RETRIES; retry++) {
+    const remainingIds = autoRetry && retry > 0
+      ? candidateIds.filter((id) => !autoExcluded.includes(id))
+      : candidateIds
+
+    if (remainingIds.length === 0) {
+      if (autoRetry) {
+        throw new Error(
+          'No eligible tasks after auto-retry. Excluded tasks:\n' +
+            autoExcluded.map((id) => `  - ${id}`).join('\n'),
+        )
+      }
+      throw new Error(
+        'No eligible tasks found. All pending/in-progress tasks either have unsatisfied dependencies or are claimed by active rounds.',
+      )
     }
 
-    // Must be pending or in_progress
-    if (task.status !== 'pending' && task.status !== 'in_progress') {
-      errors.push(`Task "${task.id}" has status "${task.status}" — cannot be claimed`)
-      continue
-    }
+    errors = []
+    selected = []
 
-    // Must not be claimed by another active round
-    if (isTaskClaimedByOtherActiveRound(doc, task)) {
-      errors.push(`Task "${task.id}" is already claimed by active round "${task.claimedBy}"`)
-      continue
-    }
+    for (const id of remainingIds) {
+      const task = findTaskByEitherPrefix(doc, id)
+      if (!task) {
+        errors.push(`Task "${id}" not found`)
+        continue
+      }
 
-    // All dependencies must be done
-    if (!areDepsSatisfied(doc, task)) {
-      const unsatisfied = task.deps.filter((depId) => {
-        const dep = findTaskByEitherPrefix(doc, depId)
-        return !dep || dep.status !== 'done'
-      })
-      errors.push(`Task "${task.id}" has unsatisfied dependencies: ${unsatisfied.join(', ')}`)
-      continue
-    }
+      if (task.status !== 'pending' && task.status !== 'in_progress') {
+        errors.push(`Task "${task.id}" has status "${task.status}" — cannot be claimed`)
+        continue
+      }
 
-    // Write scope conflict: reject if overlaps with any already-selected task
-    if (config.gates.detectWriteConflicts && task.writeScopes.length > 0) {
-      for (const s of selected) {
-        const other = findTaskByEitherPrefix(doc, s.taskId)
-        if (other && other.writeScopes.length > 0) {
-          const overlap = task.writeScopes.filter((ws) => other.writeScopes.includes(ws))
-          if (overlap.length > 0) {
+      if (isTaskClaimedByOtherActiveRound(doc, task)) {
+        errors.push(`Task "${task.id}" is already claimed by active round "${task.claimedBy}"`)
+        continue
+      }
+
+      if (!areDepsSatisfied(doc, task)) {
+        const unsatisfied = task.deps.filter((depId) => {
+          const dep = findTaskByEitherPrefix(doc, depId)
+          return !dep || dep.status !== 'done'
+        })
+        errors.push(`Task "${task.id}" has unsatisfied dependencies: ${unsatisfied.join(', ')}`)
+        continue
+      }
+
+      // Write scope conflict
+      if (config.gates.detectWriteConflicts && task.writeScopes.length > 0) {
+        for (const s of selected) {
+          const other = findTaskByEitherPrefix(doc, s.taskId)
+          if (other && other.writeScopes.length > 0) {
+            const overlap = task.writeScopes.filter((ws) => other.writeScopes.includes(ws))
+            if (overlap.length > 0) {
+              errors.push(
+                `Task "${task.id}" write scope conflicts with "${other.id}": ${overlap.join(', ')}`,
+              )
+              break
+            }
+          }
+        }
+        if (errors.length > 0 && errors[errors.length - 1].includes('write scope')) continue
+      }
+
+      // Risk gating
+      const riskOrder = { low: 0, medium: 1, high: 2, critical: 3 }
+      if (riskOrder[task.riskLevel] > riskOrder[config.gates.maxRisk]) {
+        errors.push(
+          `Task "${task.id}" has risk level "${task.riskLevel}" exceeding max "${config.gates.maxRisk}"`,
+        )
+        continue
+      }
+
+      // Feature freeze
+      if (task.feature && config.gates.featureFreeze.length > 0) {
+        const feat = doc._meta.features.find((f) => f.id === task.feature)
+        if (feat) {
+          const isFrozen = config.gates.featureFreeze.includes(task.feature)
+          const isFrozenInMeta = feat.status === 'contract_frozen' || feat.status === 'stable'
+          if ((isFrozen || isFrozenInMeta) && task.executionLane !== 'contract' && task.executionLane !== 'test') {
             errors.push(
-              `Task "${task.id}" write scope conflicts with "${other.id}": ${overlap.join(', ')}`,
+              `Task "${task.id}" belongs to frozen feature "${task.feature}" — only contract/test tasks allowed`,
             )
-            break
+            continue
           }
         }
       }
-      if (errors.length > 0 && errors[errors.length - 1].includes('write scope')) continue
+
+      // Approval gate
+      if ((task.riskLevel === 'high' || task.riskLevel === 'critical') && !task.approvedBy) {
+        errors.push(
+          `Task "${task.id}" is ${task.riskLevel} risk but not approved — use "tally task approve ${task.id} --by <name>"`,
+        )
+        continue
+      }
+
+      selected.push({
+        taskId: task.id,
+        goal: task.name,
+        criteria: task.acceptance,
+      })
     }
 
-    // Risk gating: reject tasks above configured max risk threshold
-    const riskOrder = { low: 0, medium: 1, high: 2, critical: 3 }
-    if (riskOrder[task.riskLevel] > riskOrder[config.gates.maxRisk]) {
-      errors.push(
-        `Task "${task.id}" has risk level "${task.riskLevel}" exceeding max "${config.gates.maxRisk}"`,
+    // If no errors, we're done
+    if (errors.length === 0) break
+
+    // If not auto-retrying, fail atomically
+    if (!autoRetry) {
+      throw new Error(
+        'Cannot start round — the following tasks have conflicts:\n' +
+          errors.map((e) => `  - ${e}`).join('\n'),
       )
-      continue
     }
 
-    // Feature freeze: only allow design/contract tasks on unfrozen features
-    if (task.feature && config.gates.featureFreeze.length > 0) {
-      const feat = doc._meta.features.find((f) => f.id === task.feature)
-      if (feat) {
-        const isFrozen = config.gates.featureFreeze.includes(task.feature)
-        const isFrozenInMeta = feat.status === 'contract_frozen' || feat.status === 'stable'
-        if ((isFrozen || isFrozenInMeta) && task.executionLane !== 'contract' && task.executionLane !== 'test') {
-          errors.push(
-            `Task "${task.id}" belongs to frozen feature "${task.feature}" — only contract/test tasks allowed`,
-          )
-          continue
-        }
+    // Auto-retry: extract failed task IDs, exclude them, and retry
+    const failedIds = new Set<string>()
+    for (const err of errors) {
+      const match = err.match(/^Task "([^"]+)"/)
+      if (match) failedIds.add(match[1])
+    }
+    for (const fid of failedIds) {
+      if (!autoExcluded.includes(fid)) {
+        autoExcluded.push(fid)
       }
     }
-
-    // Approval gate: skip unapproved high/critical risk tasks
-    if ((task.riskLevel === 'high' || task.riskLevel === 'critical') && !task.approvedBy) {
-      errors.push(
-        `Task "${task.id}" is ${task.riskLevel} risk but not approved — use "tally task approve ${task.id} --by <name>"`,
-      )
-      continue
-    }
-
-    selected.push({
-      taskId: task.id,
-      goal: task.name,
-      criteria: task.acceptance,
-    })
-  }
-
-  // Atomic: if any task was rejected, abort entirely
-  if (errors.length > 0) {
-    throw new Error(
-      'Cannot start round — the following tasks have conflicts:\n' +
-        errors.map((e) => `  - ${e}`).join('\n'),
-    )
   }
 
   // Collect warnings (non-blocking issues)
   const warnings: string[] = []
+
+  // Report auto-excluded tasks
+  if (autoRetry && autoExcluded.length > 0) {
+    warnings.push(`Auto-excluded ${autoExcluded.length} task(s): ${autoExcluded.join(', ')}`)
+  }
 
   // Generate round ID
   const roundId = generateRoundId(doc)
@@ -504,13 +547,15 @@ export function roundCommand(): Command {
     .option('--tasks <ids...>', 'Specific task IDs to claim')
     .option('--agent <id>', 'Executor agent ID')
     .option('--strategy <strategy>', 'Round strategy: parallel-max, feature-focused, or risk-first')
+    .option('--auto-retry', 'Auto-exclude conflicting tasks and retry')
     .option('--json', 'Output errors as machine-parseable JSON')
-    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string; json?: boolean }) => {
+    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string; autoRetry?: boolean; json?: boolean }) => {
       wrapAction(opts, () => {
         const result = startRound(scope, {
           agentId: opts.agent,
           taskIds: opts.tasks,
           strategy: opts.strategy as StartRoundInput['strategy'],
+          autoRetry: opts.autoRetry,
         })
         if (opts.json) {
           console.log(JSON.stringify({ ok: true, ...result }))
