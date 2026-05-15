@@ -7,6 +7,65 @@ import { loadTemplate, applyTemplate } from './template.js'
 
 // ── Helpers ──
 
+/** Structured error for agent-parseable JSON output. */
+export class TallyError extends Error {
+  constructor(
+    message: string,
+    public code: string,
+    public details?: Record<string, unknown>,
+  ) {
+    super(message)
+    this.name = 'TallyError'
+  }
+}
+
+/** Derive an error code from an error message by pattern matching. */
+function inferErrorCode(message: string): string {
+  if (message.includes('write scope')) return 'WRITE_SCOPE_CONFLICT'
+  if (message.includes('risk level') && message.includes('exceeding')) return 'RISK_GATE'
+  if (message.includes('not approved')) return 'APPROVAL_REQUIRED'
+  if (message.includes('frozen feature')) return 'FEATURE_FROZEN'
+  if (message.includes('unsatisfied dependencies')) return 'DEP_UNSATISFIED'
+  if (message.includes('not found')) return 'TASK_NOT_FOUND'
+  if (message.includes('already done')) return 'TASK_ALREADY_DONE'
+  if (message.includes('Invalid')) return 'INVALID_FIELD'
+  if (message.includes('no-forbidden') || message.includes('forbidden')) return 'FORBIDDEN_NOT_CHECKED'
+  if (message.includes('claimed')) return 'CLAIMED_BY_OTHER'
+  if (message.includes('active round')) return 'ACTIVE_ROUND_EXISTS'
+  if (message.includes('No eligible tasks')) return 'NO_ELIGIBLE_TASKS'
+  if (message.includes('empty')) return 'EMPTY_INPUT'
+  if (message.includes('not valid JSON') || message.includes('Invalid JSON')) return 'INVALID_JSON'
+  return 'UNKNOWN'
+}
+
+/** Output a JSON error to stdout and exit. Does not return. */
+export function jsonError(message: string): never {
+  const error = {
+    ok: false,
+    error: inferErrorCode(message),
+    message,
+  }
+  console.log(JSON.stringify(error))
+  process.exit(1)
+}
+
+/** Wrap a CLI action: if --json is set, errors go to stdout as JSON instead of stderr. */
+export function wrapAction(
+  opts: Record<string, unknown>,
+  fn: () => void,
+): void {
+  try {
+    fn()
+  } catch (e) {
+    if (opts.json) {
+      jsonError((e as Error).message)
+    } else {
+      console.error((e as Error).message)
+      process.exit(1)
+    }
+  }
+}
+
 export function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -512,8 +571,9 @@ export function taskCommand(): Command {
     .description('Batch create tasks from a JSON array or template file')
     .option('--json <json>', 'JSON array of task objects')
     .option('--template <file>', 'JSON template file for batch task creation')
-    .action((opts: { json?: string; template?: string }) => {
-      try {
+    .option('--json-output', 'Output errors as machine-parseable JSON')
+    .action((opts: { json?: string; template?: string; jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         if (opts.template && opts.json) {
           throw new Error('--template and --json are mutually exclusive')
         }
@@ -559,25 +619,20 @@ export function taskCommand(): Command {
         for (const t of created) {
           console.log(`  ${t.id}  ${t.name}`)
         }
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task show <id>
   cmd.command('show')
     .description('Print full task detail + dependency tree')
     .argument('<id>', 'Task ID (e.g. U-001)')
-    .action((id: string) => {
-      try {
+    .option('--json-output', 'Output errors as JSON')
+    .action((id: string, opts: { jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         const detail = getTaskDetail(doc, id)
         console.log(formatTaskDetail(detail))
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task edit <id> --field value
@@ -604,8 +659,9 @@ export function taskCommand(): Command {
     .option('--repos <repos>', 'Comma-separated repo names')
     .option('--delivery-node <node>', 'Delivery milestone node')
     .option('--resource-requirements <resources>', 'Comma-separated resource requirements')
+    .option('--json-output', 'Output errors as JSON')
     .action((id: string, opts: Record<string, string | boolean | undefined>) => {
-      try {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         const fields: Record<string, unknown> = {}
 
@@ -665,10 +721,7 @@ export function taskCommand(): Command {
         const task = editTask(doc, id, fields)
         writeLedger(doc)
         console.log(`Updated ${task.id}: ${task.name}`)
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task done <id...> --evidence "..." [--rule "..."] [--test "..."] [--commit "..."] [--review "..."] [--provider "..."] [--no-forbidden]
@@ -683,8 +736,9 @@ export function taskCommand(): Command {
     .option('--provider <provider>', 'Provider/model/usage evidence')
     .option('--notes <notes>', 'Additional completion notes')
     .option('--no-forbidden', 'Confirm no forbidden side effects were triggered')
-    .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string; forbidden?: boolean }) => {
-      try {
+    .option('--json-output', 'Output errors as JSON')
+    .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string; forbidden?: boolean; jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         // Build structured evidence string from flags
         const parts: string[] = [opts.evidence]
@@ -701,10 +755,7 @@ export function taskCommand(): Command {
         for (const t of results) {
           console.log(`  ${t.id}  ${t.name}`)
         }
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task block <id...> --reason "..."
@@ -712,8 +763,9 @@ export function taskCommand(): Command {
     .description('Batch block tasks')
     .argument('<id...>', 'Task IDs to block')
     .requiredOption('--reason <reason>', 'Reason for blocking')
-    .action((ids: string[], opts: { reason: string }) => {
-      try {
+    .option('--json-output', 'Output errors as JSON')
+    .action((ids: string[], opts: { reason: string; jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         const results = blockTasks(doc, ids, opts.reason)
         writeLedger(doc)
@@ -722,18 +774,16 @@ export function taskCommand(): Command {
         for (const t of results) {
           console.log(`  ${t.id}  ${t.name}`)
         }
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task unblock <id...>
   cmd.command('unblock')
     .description('Batch unblock tasks')
     .argument('<id...>', 'Task IDs to unblock')
-    .action((ids: string[]) => {
-      try {
+    .option('--json-output', 'Output errors as JSON')
+    .action((ids: string[], opts: { jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         const results = unblockTasks(doc, ids)
         writeLedger(doc)
@@ -742,10 +792,7 @@ export function taskCommand(): Command {
         for (const t of results) {
           console.log(`  ${t.id}  ${t.name}`)
         }
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task approve <id> --by <human>
@@ -753,8 +800,9 @@ export function taskCommand(): Command {
     .description('Approve a high-risk task for round inclusion')
     .argument('<id>', 'Task ID to approve')
     .requiredOption('--by <name>', 'Approver name')
-    .action((id: string, opts: { by: string }) => {
-      try {
+    .option('--json-output', 'Output errors as JSON')
+    .action((id: string, opts: { by: string; jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
         const task = doc.tasks.find((t) => t.id === id)
         if (!task) throw new Error(`Task "${id}" not found`)
@@ -762,10 +810,7 @@ export function taskCommand(): Command {
         task.approvedBy = opts.by
         writeLedger(doc)
         console.log(`Approved ${task.id} by ${opts.by}`)
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+      })
     })
 
   // tally task list [filters]

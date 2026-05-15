@@ -3,7 +3,7 @@ import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
 import { loadConfig } from '../config.js'
-import { today } from './task.js'
+import { today, wrapAction } from './task.js'
 import type { TallyDocument, Task, Round, ProgressPoint } from '../types.js'
 
 // ── Helpers ──
@@ -504,18 +504,20 @@ export function roundCommand(): Command {
     .option('--tasks <ids...>', 'Specific task IDs to claim')
     .option('--agent <id>', 'Executor agent ID')
     .option('--strategy <strategy>', 'Round strategy: parallel-max, feature-focused, or risk-first')
-    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string }) => {
-      try {
+    .option('--json', 'Output errors as machine-parseable JSON')
+    .action((scope: string, opts: { tasks?: string[]; agent?: string; strategy?: string; json?: boolean }) => {
+      wrapAction(opts, () => {
         const result = startRound(scope, {
           agentId: opts.agent,
           taskIds: opts.tasks,
           strategy: opts.strategy as StartRoundInput['strategy'],
         })
-        console.log(formatRoundStart(result))
-      } catch (e) {
-        console.error((e as Error).message)
-        process.exit(1)
-      }
+        if (opts.json) {
+          console.log(JSON.stringify({ ok: true, ...result }))
+        } else {
+          console.log(formatRoundStart(result))
+        }
+      })
     })
 
   // tally round report
