@@ -409,6 +409,7 @@ export interface CloseRoundInput {
   autoNext?: boolean
   nextStrategy?: StartRoundInput['strategy']
   nextAutoRetry?: boolean
+  integrate?: boolean
 }
 
 export interface CloseRoundResult {
@@ -416,6 +417,12 @@ export interface CloseRoundResult {
   done: number
   reverted: number
   nextRound?: StartRoundResult
+  integration?: IntegrationReport
+}
+
+export interface IntegrationReport {
+  passed: boolean
+  issues: string[]
 }
 
 export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
@@ -497,6 +504,74 @@ export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
 
   const result: CloseRoundResult = { roundId: round.id, done, reverted }
 
+  // Integration check: verify cross-round, cross-agent consistency
+  if (input.integrate) {
+    const issues: string[] = []
+
+    // 1. Check: all tasks in closed rounds have deps resolved
+    for (const r of doc.rounds) {
+      if (r.status !== 'completed' && r.id !== round.id) continue
+      for (const pt of r.plannedTasks) {
+        const task = findTaskByEitherPrefix(doc, pt.taskId)
+        if (!task || task.status === 'done') continue
+        const unsatisfied = task.deps.filter((depId) => {
+          const dep = findTaskByEitherPrefix(doc, depId)
+          return !dep || dep.status !== 'done'
+        })
+        if (unsatisfied.length > 0) {
+          issues.push(`Task "${task.id}" (round ${r.id}) has unsatisfied deps: ${unsatisfied.join(', ')}`)
+        }
+      }
+    }
+
+    // 2. Check: no cross-agent write scope overlaps in same feature
+    const writesByFeature = new Map<string, Map<string, string[]>>()
+    for (const r of doc.rounds) {
+      if (r.status !== 'completed' && r.id !== round.id) continue
+      for (const pt of r.plannedTasks) {
+        const task = findTaskByEitherPrefix(doc, pt.taskId)
+        if (!task || task.status !== 'done' || task.writeScopes.length === 0) continue
+        const fid = task.feature ?? '__none__'
+        if (!writesByFeature.has(fid)) writesByFeature.set(fid, new Map())
+        const agentWrites = writesByFeature.get(fid)!
+        const agent = r.executor
+        if (!agentWrites.has(agent)) agentWrites.set(agent, [])
+        agentWrites.get(agent)!.push(...task.writeScopes)
+      }
+    }
+    for (const [fid, agentWrites] of writesByFeature) {
+      const agents = [...agentWrites.keys()]
+      for (let i = 0; i < agents.length; i++) {
+        for (let j = i + 1; j < agents.length; j++) {
+          const pathsA = agentWrites.get(agents[i])!
+          const pathsB = agentWrites.get(agents[j])!
+          const overlap = pathsA.filter((p) => pathsB.includes(p))
+          if (overlap.length > 0) {
+            issues.push(
+              `Feature "${fid}": agents "${agents[i]}" and "${agents[j]}" both wrote to: ${overlap.join(', ')}`,
+            )
+          }
+        }
+      }
+    }
+
+    // 3. Check: cross-feature deps are satisfied
+    for (const feat of doc._meta.features) {
+      for (const depId of feat.dependsOn) {
+        const depFeat = doc._meta.features.find((f) => f.id === depId)
+        if (!depFeat) continue
+        if (depFeat.status === 'design') {
+          issues.push(`Feature "${feat.id}" depends on "${depId}" which is still in design`)
+        }
+      }
+    }
+
+    result.integration = {
+      passed: issues.length === 0,
+      issues,
+    }
+  }
+
   // Auto-next: close and immediately start a new round
   if (input.autoNext) {
     const nextResult = startRound(round.scope, {
@@ -551,6 +626,19 @@ function formatRoundReport(report: RoundReportResult): string {
     lines.push(`Remaining: ${report.remaining.join(', ')}`)
   }
 
+  return lines.join('\n')
+}
+
+function formatIntegration(report: IntegrationReport): string {
+  const lines: string[] = []
+  if (report.passed) {
+    lines.push('Integration check: PASSED')
+  } else {
+    lines.push(`Integration check: ${report.issues.length} issue(s)`)
+    for (const issue of report.issues) {
+      lines.push(`  ⚠ ${issue}`)
+    }
+  }
   return lines.join('\n')
 }
 
@@ -627,19 +715,25 @@ export function roundCommand(): Command {
     .option('--auto-next', 'Auto-start a new round after closing')
     .option('--strategy <strategy>', 'Strategy for the next round (with --auto-next)')
     .option('--auto-retry', 'Auto-exclude conflicting tasks in next round (with --auto-next)')
+    .option('--integrate', 'Run cross-round integration check after close')
     .option('--json', 'Output errors as JSON')
-    .action((opts: { round?: string; autoNext?: boolean; strategy?: string; autoRetry?: boolean; json?: boolean }) => {
+    .action((opts: { round?: string; autoNext?: boolean; strategy?: string; autoRetry?: boolean; integrate?: boolean; json?: boolean }) => {
       wrapAction(opts, () => {
         const result = closeRound({
           roundId: opts.round,
           autoNext: opts.autoNext,
           nextStrategy: opts.strategy as StartRoundInput['strategy'],
           nextAutoRetry: opts.autoRetry,
+          integrate: opts.integrate,
         })
         if (opts.json) {
           console.log(JSON.stringify({ ok: true, ...result }))
         } else {
           console.log(formatRoundClose(result))
+          if (result.integration) {
+            console.log('')
+            console.log(formatIntegration(result.integration))
+          }
           if (result.nextRound) {
             console.log('')
             console.log(formatRoundStart(result.nextRound))
