@@ -1,141 +1,164 @@
 ---
 name: tally-use
-description: Use when managing tasks in a Tally-enabled project — CLI-driven task ledger with round discipline, dependency tracking, safety checks, and visualization. Trigger on tally commands, task management, round operations, ledger validation, or tally.json.
+description: Use when managing tasks in a Tally-enabled project — CLI-driven task ledger with round discipline, multi-agent safety, auto-retry, JSON error output, and visualization. Trigger on tally commands, task management, round operations, ledger validation, or tally.json.
 ---
 
 # Tally Use
 
 Use this skill as a Tally workflow adapter. Tally is an agent-native task management CLI with multi-agent scheduling safety. The skill file is the canonical usage reference — the CLI is the sole write gate to tally.json.
 
+## Agent Loop (CRITICAL)
+
+The standard agent workflow is fully autonomous:
+
+```bash
+# 1. Preview available work
+tally round start --dry-run --auto-retry --json
+
+# 2. Start round (claims tasks)
+tally round start "scope" --auto-retry --json
+
+# 3. Execute tasks, mark done with structured evidence
+tally task done U-001 U-002 --evidence "completed" \
+  --test "pnpm test" --commit "abc123" --review "approved" --no-forbidden
+
+# 4. Close + auto-start next round (single command)
+tally round close --auto-next --auto-retry --integrate --json
+```
+
+Step 4: close → integration check → start next → deconflict → claim. One command.
+
 ## First Action
 
 1. Detect project state:
    - Run `tally status` to see current done/open/hold/blocked counts
-   - If `tally.json` exists, read it via Read tool to understand task details
+   - Read `tally.json` via Read tool to understand task details
 2. Identify the task lane: round execution, task CRUD, ledger validation, or handoff
-3. Choose the minimal correct command path before editing:
-   - Starting work: `tally round start "scope" [--strategy feature-focused|risk-first|parallel-max]` — locks tasks, prevents conflicts
-   - Task completion: `tally task done <id...> --evidence "..." [--test "..."] [--commit "..."] [--review "..."]` — batch form preferred
-   - New task discovered: `tally task add --json '[...]'` — do NOT insert into current round
-   - Validation: `tally lint` (fast, pre-commit) or `tally check` (deep, before round)
-   - Handoff: `tally export --format agent-brief [--task U-xxx]`
+3. **Always use `--json` or `--json-output` for machine-parseable output**
+4. Choose the minimal correct command path:
+   - Preview: `tally round start --dry-run --auto-retry --json`
+   - Start: `tally round start "scope" --auto-retry --json`
+   - Done: `tally task done <ids> --evidence "..." --test "..." --commit "..." --no-forbidden`
+   - Batch create: `tally task add --template plan.json`
+   - Close: `tally round close --auto-next --auto-retry --integrate --json`
 
 ## Write Discipline (CRITICAL)
 
 **NEVER edit `tally.json` directly.** ALL writes go through CLI commands.
-The CLI owns validation, ID generation, and field constraints.
-Agent reads `tally.json` via Read tool, writes via `tally <command>`.
 
-## Use When
+## JSON Error Output
 
-- Working in a Tally-enabled repository (tally.json exists)
-- Starting a new execution round
-- Marking tasks as done, blocked, or unblocked
-- Adding newly discovered tasks to the ledger
-- Validating ledger health before commit (`tally lint` / `tally check`)
-- Preparing a handoff or progress report
-- Visualizing task data (`tally dashboard`)
-- Analyzing dependency graph (`tally graph --level task|feature`)
-- Exporting data (`tally export --format json|csv|markdown|agent-brief`)
-- Migrating from legacy Markdown ledgers (`tally migrate`)
-- Approving high-risk tasks (`tally task approve <id> --by <name>`)
+All commands support `--json` / `--json-output` for machine-parseable errors:
+```json
+{"ok":false,"error":"WRITE_SCOPE_CONFLICT","message":"Task \"U-014\" write scope conflicts with \"U-016\""}
+```
 
-## BATCH (Always Prefer)
+15 error codes: `WRITE_SCOPE_CONFLICT`, `RISK_GATE`, `APPROVAL_REQUIRED`, `FEATURE_FROZEN`, `DEP_UNSATISFIED`, `TASK_NOT_FOUND`, `TASK_ALREADY_DONE`, `INVALID_FIELD`, `FORBIDDEN_NOT_CHECKED`, `CLAIMED_BY_OTHER`, `ACTIVE_ROUND_EXISTS`, `NO_ELIGIBLE_TASKS`, `INVALID_JSON`, `EMPTY_INPUT`, `UNKNOWN`
 
-- Multiple tasks done: `tally task done U-001 U-002 U-003 --evidence "..."`
-- Multiple tasks added: `tally task add --json '[...]'`
-- Multiple blocked: `tally task block U-001 U-002 --reason "..."`
+## Round Safety (auto-enforced)
 
-## Round Start Safety Checks
+1. Write scope conflict detection — overlapping paths rejected or auto-excluded
+2. Risk gating — rejects above `gates.maxRisk`
+3. Feature freeze gating — only contract/test on frozen features
+4. Approval gate — unapproved high/critical tasks rejected
+5. Dependency satisfaction — all deps must be done
 
-`tally round start` enforces multi-agent safety before claiming tasks:
+## Auto-Retry & Auto-Next
 
-1. **Write scope conflict detection** — two tasks touching the same paths cannot enter the same round
-2. **Risk gating** — tasks above configured `gates.maxRisk` are rejected
-3. **Feature freeze gating** — on frozen features, only contract/test tasks are allowed
-4. **Approval gate** — unapproved high/critical risk tasks are rejected
-5. **Dependency satisfaction** — all deps must be `done`
+- `--auto-retry`: On conflict, auto-excludes failing tasks and retries (max 10 iterations)
+- `--auto-next`: On close, auto-starts next round with same scope
+- `--dry-run`: Preview task selection without claiming (bypasses active-round guard)
+- `--integrate`: Cross-round, cross-agent integration check on close
 
 ## Round Strategies
-
-`tally round start --strategy <name>`:
 
 | Strategy | Behavior |
 |----------|----------|
 | `parallel-max` (default) | Shallowest depth first, grouped by module → feature |
-| `feature-focused` | Complete one feature's eligible tasks before moving to the next |
-| `risk-first` | Highest risk tasks first (critical → high → medium → low) |
+| `feature-focused` | Complete one feature before moving to the next |
+| `risk-first` | Highest risk tasks first |
 
-## Task Data Model (Key Fields)
+## Evidence Quality Scoring
 
-### Core
-- `id`, `status`, `priority`, `stage`, `module`, `name`, `acceptance`
-- `feature` — references `_meta.features[].id` (required for open tasks)
-- `deps`, `blocks`, `nextAction`, `evidence`, `rule`
+Done tasks scored 0-100:
+- `[test:]` +25 | `[commit:]` +25 | `[review:]` +25 | `[no-forbidden]` +25
 
-### Scheduling & Safety (v0.2.0)
-- `writeScopes: string[]` — paths this task is allowed to modify
-- `riskLevel: low|medium|high|critical` — risk classification
-- `executionLane: contract|writer|runtime|ui|test|review` — execution role
-- `requiresReview: boolean` — code review required before done
-- `rollbackPlan: string` — how to undo if needed
-- `assignedAgent: string` — agent assigned to this task
-- `approvedBy: string` — human approval for high-risk tasks
-- `resourceRequirements: string[]` — providers/models/ports needed
-- `repos: string[]` — repositories involved
-- `deliveryNode: string` — milestone label
-- `acceptanceCriteria: { requiredTests, passConditions, forbiddenSideEffects, negativeCases }`
-- `executionPlan: { inputs, outputs, steps }`
+Drift warnings (`tally check`):
+`DRIFT_NO_COMMIT`, `DRIFT_NO_REVIEW`, `DRIFT_NO_EVIDENCE`, `DRIFT_NO_PROVIDER`, `DRIFT_LOW_QUALITY`
 
-### Feature Registry (`_meta.features`)
-- `id`, `module`, `name`
-- `status: design|contract_frozen|implementing|stable`
-- `specRefs: string[]` — design document references
-- `dependsOn: string[]` — feature-level dependencies
-- `owner: string` — feature owner
+## Batch Template
 
-## Structured Evidence
-
-`tally task done` supports structured completion evidence:
+```bash
+tally task add --template feature-plan.json
 ```
-tally task done U-001 --evidence "Implemented" \
-  --test "pnpm test -- --filter=auth" \
-  --commit "abc1234" \
-  --review "PR #42 approved by @reviewer" \
-  --provider "openai/gpt-4o for code generation" \
-  --notes "Edge case X handled separately in U-005"
+
+Template:
+```json
+{
+  "module": "work-planning",
+  "feature": "workorder-plan-materialization",
+  "tasks": [{
+    "name": "Implement persistence",
+    "priority": "P0",
+    "writeScopes": ["src/persistence/**"],
+    "executionLane": "writer",
+    "depsRefs": ["$1"],
+    "acceptanceCriteria": {
+      "requiredTests": ["pnpm test"],
+      "forbiddenSideEffects": ["must not create RuntimeTask"]
+    }
+  }],
+  "depsRefMap": { "existing-dep": "U-005" }
+}
 ```
+
+`$N` = template-internal reference by position. `depsRefMap` = symbolic → ledger IDs.
+
+## Reverse Acceptance
+
+```bash
+tally task done U-001 --evidence "done" --no-forbidden
+```
+
+When `acceptanceCriteria.forbiddenSideEffects` is set, `--no-forbidden` must confirm none triggered.
+
+## Task Fields
+
+**Core**: `id`, `status`, `priority`, `stage`, `module`, `name`, `acceptance`, `feature`, `deps`, `blocks`, `nextAction`, `evidence`, `rule`
+**Scheduling**: `writeScopes`, `riskLevel` (low|medium|high|critical), `executionLane` (contract|writer|runtime|ui|test|review), `requiresReview`, `rollbackPlan`, `assignedAgent`, `approvedBy`
+**Planning**: `acceptanceCriteria` {requiredTests, passConditions, forbiddenSideEffects, negativeCases}, `executionPlan` {inputs, outputs, steps}
+**Tracking**: `resourceRequirements`, `repos`, `deliveryNode`
+
+## Feature Registry
+
+`_meta.features`: `id`, `module`, `name`, `status` (design|contract_frozen|implementing|stable), `specRefs`, `dependsOn`, `owner`
 
 ## Concurrency
 
-- Set agent ID: `export TALLY_AGENT_ID=<id>` (must exist in `_meta.agents`)
-- Before round start: `git pull`
-- If round start fails with claim conflict: re-read tally.json, adjust selection, retry
-- After round close: `tally sync`
-- If sync fails: `git pull --rebase` → `tally check` → `git push`
+- Agent ID: `export TALLY_AGENT_ID=<id>` (must be in `_meta.agents`)
+- Before start: `git pull`
+- Conflicts: use `--auto-retry` or preview with `--dry-run` first
+- After close: `tally sync`
 
-## Config Reference (.tallyrc.yaml)
+## Config
 
 ```yaml
-agent:
-  id: main
-round:
-  maxTasks: 10
-  allowParallel: false
+agent: { id: main }
+round: { maxTasks: 10, allowParallel: false }
 gates:
   requireFeature: true
   requireReview: false
   featureFreeze: []
   maxRisk: high
   detectWriteConflicts: true
-dashboard:
-  port: 5173
+dashboard: { port: 5173 }
 ```
 
-## Data Model Reference
+## Reference
 
 - Status: `pending` | `in_progress` | `blocked` | `hold` | `deferred` | `done`
 - Priority: `P0` | `P1` | `P2`
 - Risk: `low` | `medium` | `high` | `critical`
 - Lane: `contract` | `writer` | `runtime` | `ui` | `test` | `review`
-- Task ID: `U-xxx` = unfinished, `D-xxx` = done, `B-xxx` = block, `R-YYYY-MM-DD-NNN` = round
+- Feature status: `design` | `contract_frozen` | `implementing` | `stable`
+- Task ID: `U-xxx` unfinished, `D-xxx` done, `B-xxx` block, `R-YYYY-MM-DD-NNN` round
