@@ -66,6 +66,17 @@ export function wrapAction(
   }
 }
 
+/** Score evidence quality for a done task. Returns 0-100. */
+export function scoreEvidence(evidence: string | null, requiresReview?: boolean, hasForbidden?: boolean): number {
+  if (!evidence) return 0
+  let score = 0
+  if (evidence.includes('[test:')) score += 25
+  if (evidence.includes('[commit:')) score += 25
+  if (evidence.includes('[review:') || !requiresReview) score += 25
+  if (evidence.includes('[no-forbidden') || !hasForbidden) score += 25
+  return score
+}
+
 export function today(): string {
   return new Date().toISOString().slice(0, 10)
 }
@@ -511,6 +522,12 @@ export function formatTaskDetail(detail: TaskDetail): string {
   lines.push(`Blocks:      ${t.blocks ?? '(none)'}`)
   lines.push(`Next Action: ${t.nextAction ?? '(none)'}`)
   lines.push(`Evidence:    ${t.evidence ?? '(none)'}`)
+  if (t.status === 'done') {
+    const hasForbidden = (t.acceptanceCriteria?.forbiddenSideEffects?.length ?? 0) > 0
+    const score = scoreEvidence(t.evidence, t.requiresReview, hasForbidden)
+    const bar = t.evidence ? '█'.repeat(Math.round(score / 20)) + '░'.repeat(5 - Math.round(score / 20)) : '─────'
+    lines.push(`Quality:     ${bar} ${score}/100`)
+  }
   lines.push(`Rule:        ${t.rule ?? '(none)'}`)
   lines.push(`Feature:     ${t.feature ?? '(none)'}`)
   lines.push(`Risk:        ${t.riskLevel}`)

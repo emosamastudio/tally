@@ -960,6 +960,25 @@ export function validateDocument(doc: unknown): CheckResult {
               const hasCommit = evidence.includes('[commit:')
               const hasReview = evidence.includes('[review:')
               const hasProvider = evidence.includes('[provider:')
+              const requiresReview = t.requiresReview === true
+              const ac = t.acceptanceCriteria as Record<string, unknown> | null | undefined
+              const hasForbidden = (ac?.forbiddenSideEffects as string[] | undefined)?.length ?? 0 > 0
+
+              // Compute quality score
+              let score = 0
+              if (hasTest) score += 25
+              if (hasCommit) score += 25
+              if (hasReview || !requiresReview) score += 25
+              if (evidence.includes('[no-forbidden') || !hasForbidden) score += 25
+
+              // Low quality warning
+              if (score < 50) {
+                warnings.push({
+                  code: 'DRIFT_LOW_QUALITY',
+                  message: `Done task "${t.id}" has low evidence quality (${score}/100)`,
+                  path: formatPath('tasks', i, 'evidence'),
+                })
+              }
 
               // Task writes code but no commit recorded
               const writeScopes = t.writeScopes as string[] | undefined
