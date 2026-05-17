@@ -485,6 +485,62 @@ describe('editTask', () => {
       .toThrow(/already done/)
   })
 
+  it('allows metadata-only edits on done tasks when explicitly requested', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].evidence = 'completed evidence'
+    doc.tasks[0].completedAt = '2026-05-11'
+
+    const task = editTask(doc, 'U-001', {
+      feature: 'f-history',
+      deliveryNode: 'V1',
+      executionLane: 'contract',
+      tags: ['history'],
+    }, { allowDoneMetadata: true })
+
+    expect(task.status).toBe('done')
+    expect(task.name).toBe('Task 1')
+    expect(task.evidence).toBe('completed evidence')
+    expect(task.completedAt).toBe('2026-05-11')
+    expect(task.feature).toBe('f-history')
+    expect(task.deliveryNode).toBe('V1')
+    expect(task.executionLane).toBe('contract')
+    expect(task.tags).toEqual(['history'])
+  })
+
+  it('rejects historical fact fields on done task metadata-only edits', () => {
+    const historicalFactFields = ['name', 'priority', 'acceptance', 'deps', 'nextAction']
+
+    for (const field of historicalFactFields) {
+      const doc = validDoc()
+      doc.tasks[0].status = 'done'
+      expect(() => editTask(doc, 'U-001', { [field]: field === 'deps' ? ['U-002'] : 'changed' }, { allowDoneMetadata: true }))
+        .toThrow(/metadata-only/)
+    }
+  })
+
+  it('rejects removing existing forbidden side effects on done task metadata-only edits', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].evidence = 'completed evidence [no-forbidden: confirmed]'
+    doc.tasks[0].acceptanceCriteria = {
+      requiredTests: [],
+      passConditions: [],
+      forbiddenSideEffects: ['must not deploy'],
+      negativeCases: [],
+    }
+
+    expect(() => editTask(doc, 'U-001', {
+      acceptanceCriteria: {
+        requiredTests: [],
+        passConditions: ['metadata is queryable'],
+        forbiddenSideEffects: [],
+        negativeCases: [],
+      },
+    }, { allowDoneMetadata: true }))
+      .toThrow(/forbiddenSideEffects/)
+  })
+
   it('throws for missing task', () => {
     const doc = validDoc()
     expect(() => editTask(doc, 'U-999', { name: 'Nope' }))

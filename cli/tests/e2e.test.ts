@@ -158,6 +158,115 @@ describe('tally end-to-end', () => {
     expect(doc.tasks[0].feature).toBe('f-edit')
   })
 
+  it('task edit --allow-done-metadata updates completed task metadata without changing completion facts', () => {
+    run(['init', 'done-metadata-edit', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Completed task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'original evidence'], dir)
+
+    run([
+      'task',
+      'edit',
+      'D-001',
+      '--allow-done-metadata',
+      '--feature',
+      'f-history',
+      '--delivery-node',
+      'GOV',
+      '--execution-lane',
+      'contract',
+      '--repos',
+      'repo-a,repo-b',
+      '--tags',
+      'history,standardized',
+      '--acceptance-criteria-json',
+      JSON.stringify({
+        requiredTests: ['historical evidence retained'],
+        passConditions: ['metadata is queryable'],
+        negativeCases: ['missing historical evidence remains visible'],
+      }),
+      '--execution-plan-json',
+      JSON.stringify({
+        inputs: ['completed task'],
+        outputs: ['metadata-only update'],
+        steps: ['preserve completion facts', 'write metadata fields'],
+      }),
+    ], dir)
+
+    const doc = readDoc(dir)
+    const task = doc.tasks[0]
+    const completedAt = task.completedAt
+    expect(task.id).toBe('D-001')
+    expect(task.status).toBe('done')
+    expect(task.name).toBe('Completed task')
+    expect(task.priority).toBe('P0')
+    expect(task.acceptance).toBe('ok')
+    expect(task.deps).toEqual([])
+    expect(task.nextAction).toBeNull()
+    expect(task.evidence).toBe('original evidence')
+    expect(completedAt).toBeTruthy()
+    expect(task.feature).toBe('f-history')
+    expect(task.deliveryNode).toBe('GOV')
+    expect(task.executionLane).toBe('contract')
+    expect(task.repos).toEqual(['repo-a', 'repo-b'])
+    expect(task.tags).toEqual(['history', 'standardized'])
+    expect(task.acceptanceCriteria?.passConditions).toEqual(['metadata is queryable'])
+    expect(task.executionPlan?.outputs).toEqual(['metadata-only update'])
+  })
+
+  it('task edit --allow-done-metadata rejects historical fact changes on completed tasks', () => {
+    run(['init', 'done-metadata-edit-rejects-facts', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Immutable completed task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'original evidence'], dir)
+
+    const out = runLaxSafe([
+      'task',
+      'edit',
+      'D-001',
+      '--allow-done-metadata',
+      '--name',
+      'Changed historical name',
+      '--json-output',
+    ], dir)
+
+    const result = JSON.parse(out)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('DONE_TASK_FACT_FIELD_CHANGE')
+    expect(result.message).toContain('metadata-only')
+
+    const doc = readDoc(dir)
+    expect(doc.tasks[0].name).toBe('Immutable completed task')
+    expect(doc.tasks[0].evidence).toBe('original evidence')
+  })
+
+  it('task edit --allow-done-metadata rejects forbidden side effects without preserved confirmation', () => {
+    run(['init', 'done-metadata-edit-rejects-forbidden-side-effects', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Completed task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'original evidence'], dir)
+
+    const out = runLaxSafe([
+      'task',
+      'edit',
+      'D-001',
+      '--allow-done-metadata',
+      '--acceptance-criteria-json',
+      JSON.stringify({
+        forbiddenSideEffects: ['must not change historical evidence'],
+      }),
+      '--json-output',
+    ], dir)
+
+    const result = JSON.parse(out)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('DONE_TASK_FACT_FIELD_CHANGE')
+    expect(result.message).toContain('forbiddenSideEffects')
+  })
+
   it('task list --feature filters by feature', () => {
     run(['init', 'feature-list', '--no-hook'], dir)
     run(['task', 'add', '--json', JSON.stringify([

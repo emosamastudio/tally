@@ -29,6 +29,7 @@ function inferErrorCode(message: string): string {
   if (message.includes('not found')) return 'TASK_NOT_FOUND'
   if (message.includes('already done')) return 'TASK_ALREADY_DONE'
   if (message.includes('Invalid')) return 'INVALID_FIELD'
+  if (message.includes('metadata-only')) return 'DONE_TASK_FACT_FIELD_CHANGE'
   if (message.includes('no-forbidden') || message.includes('forbidden')) return 'FORBIDDEN_NOT_CHECKED'
   if (message.includes('claimed')) return 'CLAIMED_BY_OTHER'
   if (message.includes('active round')) return 'ACTIVE_ROUND_EXISTS'
@@ -277,13 +278,61 @@ function collectDescendants(doc: TallyDocument, id: string, visited: Set<string>
   return result
 }
 
-export function editTask(doc: TallyDocument, id: string, fields: Record<string, unknown>): Task {
+const DONE_TASK_METADATA_FIELDS = new Set([
+  'stage',
+  'module',
+  'tags',
+  'feature',
+  'writeScopes',
+  'acceptanceCriteria',
+  'executionPlan',
+  'riskLevel',
+  'rollbackPlan',
+  'executionLane',
+  'assignedAgent',
+  'requiresReview',
+  'resourceRequirements',
+  'repos',
+  'deliveryNode',
+])
+
+export function editTask(
+  doc: TallyDocument,
+  id: string,
+  fields: Record<string, unknown>,
+  options: { allowDoneMetadata?: boolean } = {},
+): Task {
   const task = doc.tasks.find((t) => t.id === id)
   if (!task) {
     throw new Error(`Task "${id}" not found`)
   }
   if (task.status === 'done') {
-    throw new Error(`Task "${id}" is already done. Use "tally task done" for status changes.`)
+    if (!options.allowDoneMetadata) {
+      throw new Error(`Task "${id}" is already done. Use "tally task done" for status changes.`)
+    }
+
+    const historicalFactFields = Object.keys(fields)
+      .filter((field) => !DONE_TASK_METADATA_FIELDS.has(field))
+    if (historicalFactFields.length > 0) {
+      throw new Error(`Completed task metadata-only edit cannot change historical fact fields: ${historicalFactFields.join(', ')}`)
+    }
+
+    const nextCriteria = fields.acceptanceCriteria as AcceptanceCriteria | undefined
+    const currentForbiddenSideEffects = task.acceptanceCriteria?.forbiddenSideEffects ?? []
+    const nextForbiddenSideEffects = nextCriteria?.forbiddenSideEffects
+    if (
+      nextCriteria !== undefined
+      && currentForbiddenSideEffects.length > 0
+      && JSON.stringify(nextForbiddenSideEffects ?? []) !== JSON.stringify(currentForbiddenSideEffects)
+    ) {
+      throw new Error('Completed task metadata-only edit cannot change existing forbiddenSideEffects')
+    }
+
+    const addsForbiddenSideEffects = (nextCriteria?.forbiddenSideEffects?.length ?? 0) > 0
+    const hasNoForbiddenEvidence = typeof task.evidence === 'string' && task.evidence.includes('[no-forbidden')
+    if (addsForbiddenSideEffects && !hasNoForbiddenEvidence) {
+      throw new Error('Completed task metadata-only edit cannot add forbiddenSideEffects unless existing evidence includes [no-forbidden] confirmation')
+    }
   }
 
   if (fields.name !== undefined) task.name = fields.name as string
@@ -676,6 +725,7 @@ export function taskCommand(): Command {
     .option('--repos <repos>', 'Comma-separated repo names')
     .option('--delivery-node <node>', 'Delivery milestone node')
     .option('--resource-requirements <resources>', 'Comma-separated resource requirements')
+    .option('--allow-done-metadata', 'Allow metadata-only edits on completed tasks')
     .option('--json-output', 'Output errors as JSON')
     .action((id: string, opts: Record<string, string | boolean | undefined>) => {
       wrapAction({ json: opts.jsonOutput }, () => {
@@ -735,7 +785,9 @@ export function taskCommand(): Command {
           throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, --tags, --feature, --risk-level, --execution-lane, --write-scopes, etc.')
         }
 
-        const task = editTask(doc, id, fields)
+        const task = editTask(doc, id, fields, {
+          allowDoneMetadata: opts.allowDoneMetadata === true,
+        })
         writeLedger(doc)
         console.log(`Updated ${task.id}: ${task.name}`)
       })
