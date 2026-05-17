@@ -129,8 +129,12 @@ export function applyTemplate(doc: TallyDocument, template: TemplateFile): Task[
     const stage = input.stage ?? inferStage(doc, module)
 
     // Validate stage
-    if (!doc._meta.stages.some((s) => s.id === stage)) {
+    const stageEntry = doc._meta.stages.find((s) => s.id === stage)
+    if (!stageEntry) {
       throw new Error(`Stage "${stage}" not found in _meta.stages`)
+    }
+    if (!stageEntry.modules.includes(module)) {
+      throw new Error(`Stage "${stage}" does not include module "${module}"`)
     }
 
     // Warn if task-level feature is missing

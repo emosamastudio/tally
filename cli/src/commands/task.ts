@@ -26,7 +26,13 @@ function inferErrorCode(message: string): string {
   if (message.includes('not approved')) return 'APPROVAL_REQUIRED'
   if (message.includes('frozen feature')) return 'FEATURE_FROZEN'
   if (message.includes('Feature dependency')) return 'FEATURE_DEP_NOT_FOUND'
+  if (message.includes('Stage module') && message.includes('not found in _meta.modules')) return 'STAGE_MODULE_NOT_FOUND'
+  if (message.includes('does not include module')) return 'STAGE_MODULE_MISMATCH'
+  if (message.includes('Stage "') && message.includes('already exists')) return 'STAGE_ALREADY_EXISTS'
+  if (message.includes('Invalid stage')) return 'STAGE_INVALID'
+  if (message.includes('Module "') && message.includes('already exists')) return 'MODULE_ALREADY_EXISTS'
   if (message.includes('Module "') && message.includes('not found in _meta.modules')) return 'FEATURE_MODULE_NOT_FOUND'
+  if (message.includes('Invalid module')) return 'MODULE_INVALID'
   if (message.includes('Feature "') && message.includes('already exists')) return 'FEATURE_ALREADY_EXISTS'
   if (message.includes('Invalid feature')) return 'FEATURE_INVALID'
   if (message.includes('unsatisfied dependencies')) return 'DEP_UNSATISFIED'
@@ -110,11 +116,15 @@ export function nextCompletedOrder(doc: TallyDocument): number {
 }
 
 function validateMetaRefs(doc: TallyDocument, stage: string, module: string): void {
-  if (!doc._meta.stages.some((s) => s.id === stage)) {
+  const stageEntry = doc._meta.stages.find((s) => s.id === stage)
+  if (!stageEntry) {
     throw new Error(`Stage "${stage}" not found in _meta.stages`)
   }
   if (!doc._meta.modules.some((m) => m.id === module)) {
     throw new Error(`Module "${module}" not found in _meta.modules`)
+  }
+  if (!stageEntry.modules.includes(module)) {
+    throw new Error(`Stage "${stage}" does not include module "${module}"`)
   }
 }
 
@@ -347,19 +357,12 @@ export function editTask(
     }
     task.priority = p as Task['priority']
   }
-  if (fields.stage !== undefined) {
-    const stage = fields.stage as string
-    if (!doc._meta.stages.some((s) => s.id === stage)) {
-      throw new Error(`Stage "${stage}" not found in _meta.stages`)
-    }
-    task.stage = stage
-  }
-  if (fields.module !== undefined) {
-    const mod = fields.module as string
-    if (!doc._meta.modules.some((m) => m.id === mod)) {
-      throw new Error(`Module "${mod}" not found in _meta.modules`)
-    }
-    task.module = mod
+  if (fields.stage !== undefined || fields.module !== undefined) {
+    const nextStage = (fields.stage as string | undefined) ?? task.stage
+    const nextModule = (fields.module as string | undefined) ?? task.module
+    validateMetaRefs(doc, nextStage, nextModule)
+    task.stage = nextStage
+    task.module = nextModule
   }
   if (fields.acceptance !== undefined) task.acceptance = fields.acceptance as string
   if (fields.deps !== undefined) task.deps = fields.deps as string[]

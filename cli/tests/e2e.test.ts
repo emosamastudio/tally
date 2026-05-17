@@ -294,6 +294,155 @@ describe('tally end-to-end', () => {
     ])
   })
 
+  it('module add registers modules for historical taxonomy migration', () => {
+    run(['init', 'module-register', '--no-hook'], dir)
+    run(['module', 'add', 'runtime-adapters', '--name', 'Runtime Adapters'], dir)
+
+    const doc = readDoc(dir)
+    expect(doc._meta.modules).toContainEqual({
+      id: 'runtime-adapters',
+      name: 'Runtime Adapters',
+    })
+  })
+
+  it('module add rejects duplicate ids and blank metadata', () => {
+    run(['init', 'module-register-rejects', '--no-hook'], dir)
+    run(['module', 'add', 'runtime-adapters', '--name', 'Runtime Adapters'], dir)
+
+    const duplicate = runLaxSafe([
+      'module',
+      'add',
+      'runtime-adapters',
+      '--name',
+      'Runtime Adapters',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(duplicate)).toMatchObject({
+      ok: false,
+      error: 'MODULE_ALREADY_EXISTS',
+    })
+
+    const blankName = runLaxSafe([
+      'module',
+      'add',
+      'blank-module',
+      '--name',
+      '   ',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(blankName)).toMatchObject({
+      ok: false,
+      error: 'MODULE_INVALID',
+    })
+  })
+
+  it('stage add registers stages and binds existing modules', () => {
+    run(['init', 'stage-register', '--no-hook'], dir)
+    run(['module', 'add', 'runtime-adapters', '--name', 'Runtime Adapters'], dir)
+    run(['module', 'add', 'resource-authority', '--name', 'Resource Authority'], dir)
+
+    run([
+      'stage',
+      'add',
+      'runtime-execution',
+      '--name',
+      'Runtime Execution',
+      '--modules',
+      'runtime-adapters,resource-authority,runtime-adapters',
+    ], dir)
+
+    const doc = readDoc(dir)
+    expect(doc._meta.stages).toContainEqual({
+      id: 'runtime-execution',
+      name: 'Runtime Execution',
+      modules: ['runtime-adapters', 'resource-authority'],
+    })
+  })
+
+  it('stage add rejects missing modules, duplicate ids, and empty module lists', () => {
+    run(['init', 'stage-register-rejects', '--no-hook'], dir)
+    run(['module', 'add', 'runtime-adapters', '--name', 'Runtime Adapters'], dir)
+    run([
+      'stage',
+      'add',
+      'runtime-execution',
+      '--name',
+      'Runtime Execution',
+      '--modules',
+      'runtime-adapters',
+    ], dir)
+
+    const duplicate = runLaxSafe([
+      'stage',
+      'add',
+      'runtime-execution',
+      '--name',
+      'Runtime Execution',
+      '--modules',
+      'runtime-adapters',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(duplicate)).toMatchObject({
+      ok: false,
+      error: 'STAGE_ALREADY_EXISTS',
+    })
+
+    const missingModule = runLaxSafe([
+      'stage',
+      'add',
+      'portfolio',
+      '--name',
+      'Portfolio',
+      '--modules',
+      'portfolio-governance',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(missingModule)).toMatchObject({
+      ok: false,
+      error: 'STAGE_MODULE_NOT_FOUND',
+    })
+
+    const emptyModules = runLaxSafe([
+      'stage',
+      'add',
+      'empty',
+      '--name',
+      'Empty Stage',
+      '--modules',
+      '  ',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(emptyModules)).toMatchObject({
+      ok: false,
+      error: 'STAGE_INVALID',
+    })
+  })
+
+  it('task add emits a specific JSON error when module is outside the selected stage', () => {
+    run(['init', 'stage-module-mismatch', '--no-hook'], dir)
+    run(['module', 'add', 'operator-console', '--name', 'Operator Console'], dir)
+
+    const mismatch = runLaxSafe([
+      'task',
+      'add',
+      '--json',
+      JSON.stringify([
+        {
+          name: 'Bad mapping',
+          stage: 'S1',
+          module: 'operator-console',
+          priority: 'P0',
+          acceptance: 'ok',
+        },
+      ]),
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(mismatch)).toMatchObject({
+      ok: false,
+      error: 'STAGE_MODULE_MISMATCH',
+    })
+  })
+
   it('task add --json accepts feature field', () => {
     run(['init', 'feature-add', '--no-hook'], dir)
     run(['task', 'add', '--json', JSON.stringify([
@@ -1010,13 +1159,13 @@ describe('tally end-to-end', () => {
     // Add a second module and stage to _meta so we can create tasks in different modules
     const doc = readDoc(dir)
     doc._meta.modules.push({ id: 'other', name: 'Other' })
-    doc._meta.stages.push({ id: 'S2', name: 'Stage 2', modules: ['other'] })
+    doc._meta.stages.push({ id: 'S4', name: 'Stage 4', modules: ['other'] })
     writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
 
     run(['task', 'add', '--json', JSON.stringify([
       { name: 'Core Pending', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
       { name: 'Core Done', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
-      { name: 'Other Pending', stage: 'S2', module: 'other', priority: 'P0', acceptance: 'ok' },
+      { name: 'Other Pending', stage: 'S4', module: 'other', priority: 'P0', acceptance: 'ok' },
     ])], dir)
 
     // Mark Core Done as done

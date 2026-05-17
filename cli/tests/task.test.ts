@@ -295,6 +295,13 @@ describe('addTasks', () => {
     expect(() => addTasks(doc, [{ name: 'Bad', stage: 'S1', module: 'BOGUS' }]))
       .toThrow(/Module "BOGUS" not found/)
   })
+
+  it('rejects module outside the selected stage', () => {
+    const doc = validDoc()
+    doc._meta.modules.push({ id: 'ui', name: 'UI Module' })
+    expect(() => addTasks(doc, [{ name: 'Bad', stage: 'S1', module: 'ui' }]))
+      .toThrow(/Stage "S1" does not include module "ui"/)
+  })
 })
 
 // ── getTaskDetail + show ──
@@ -387,6 +394,7 @@ describe('editTask', () => {
   it('modifies module with validation', () => {
     const doc = validDoc()
     doc._meta.modules.push({ id: 'ui', name: 'UI Module' })
+    doc._meta.stages[0].modules.push('ui')
     const task = editTask(doc, 'U-001', { module: 'ui' })
     expect(task.module).toBe('ui')
   })
@@ -395,6 +403,13 @@ describe('editTask', () => {
     const doc = validDoc()
     expect(() => editTask(doc, 'U-001', { module: 'BOGUS' }))
       .toThrow(/Module "BOGUS" not found/)
+  })
+
+  it('rejects edited module outside the selected stage', () => {
+    const doc = validDoc()
+    doc._meta.modules.push({ id: 'ui', name: 'UI Module' })
+    expect(() => editTask(doc, 'U-001', { module: 'ui' }))
+      .toThrow(/Stage "S1" does not include module "ui"/)
   })
 
   it('modifies acceptance', () => {

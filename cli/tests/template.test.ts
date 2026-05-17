@@ -266,6 +266,17 @@ describe('applyTemplate', () => {
     expect(created[0].module).toBe('ui')
   })
 
+  it('rejects a task-level stage/module mismatch', () => {
+    const doc = validDoc()
+    const template = {
+      module: 'core',
+      tasks: [{ name: 'Wrong stage', stage: 'S1', module: 'ui' }],
+    }
+    expect(() => applyTemplate(doc, template)).toThrow(
+      'Stage "S1" does not include module "ui"',
+    )
+  })
+
   it('allows task-level feature override', () => {
     const doc = validDoc()
     const template = {
