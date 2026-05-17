@@ -12,6 +12,7 @@ import { graphCommand } from './commands/graph.js'
 import { upgradeCommand } from './commands/upgrade.js'
 import { dashboardCommand } from './commands/dashboard.js'
 import { migrateCommand } from './commands/migrate.js'
+import { featureCommand } from './commands/feature.js'
 
 const program = new Command()
 program.name('tally').description('Agent-native task management').version('0.1.0')
@@ -21,6 +22,7 @@ program.addCommand(lintCommand())
 program.addCommand(checkCommand())
 program.addCommand(statusCommand())
 program.addCommand(taskCommand())
+program.addCommand(featureCommand())
 program.addCommand(roundCommand())
 program.addCommand(exportCommand())
 program.addCommand(syncCommand())

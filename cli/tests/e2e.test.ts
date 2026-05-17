@@ -139,6 +139,161 @@ describe('tally end-to-end', () => {
     expect(doc._meta.features).toEqual([])
   })
 
+  it('feature add registers a feature under an existing module', () => {
+    run(['init', 'feature-register', '--no-hook'], dir)
+    run(['feature', 'add', 'f-base', '--module', 'core', '--name', 'Base Feature'], dir)
+
+    run([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'core',
+      '--name',
+      'Historical Migration',
+      '--status',
+      'stable',
+      '--spec-refs',
+      'spec-a,spec-b',
+      '--depends-on',
+      'f-base',
+      '--owner',
+      'main',
+    ], dir)
+
+    const doc = readDoc(dir)
+    expect(doc._meta.features[1]).toEqual({
+      id: 'f-history',
+      module: 'core',
+      name: 'Historical Migration',
+      status: 'stable',
+      specRefs: ['spec-a', 'spec-b'],
+      dependsOn: ['f-base'],
+      owner: 'main',
+    })
+  })
+
+  it('feature add rejects missing modules and duplicate ids', () => {
+    run(['init', 'feature-register-rejects', '--no-hook'], dir)
+
+    const missingModule = runLaxSafe([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'missing',
+      '--name',
+      'Historical Migration',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(missingModule).ok).toBe(false)
+
+    run(['feature', 'add', 'f-history', '--module', 'core', '--name', 'Historical Migration'], dir)
+    const duplicate = runLaxSafe([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'core',
+      '--name',
+      'Historical Migration',
+      '--json-output',
+    ], dir)
+    const result = JSON.parse(duplicate)
+    expect(result.ok).toBe(false)
+    expect(result.message).toContain('already exists')
+  })
+
+  it('feature add normalizes list fields and rejects invalid feature metadata', () => {
+    run(['init', 'feature-register-normalizes', '--no-hook'], dir)
+    run(['feature', 'add', 'f-base', '--module', 'core', '--name', 'Base Feature'], dir)
+
+    run([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'core',
+      '--name',
+      ' Historical Migration ',
+      '--spec-refs',
+      ' spec-a, spec-a, spec-b ',
+      '--depends-on',
+      ' f-base, f-base ',
+      '--owner',
+      ' main ',
+    ], dir)
+
+    const doc = readDoc(dir)
+    expect(doc._meta.features[1]).toMatchObject({
+      name: 'Historical Migration',
+      specRefs: ['spec-a', 'spec-b'],
+      dependsOn: ['f-base'],
+      owner: 'main',
+    })
+
+    const blankName = runLaxSafe([
+      'feature',
+      'add',
+      'f-blank',
+      '--module',
+      'core',
+      '--name',
+      '   ',
+      '--json-output',
+    ], dir)
+    const result = JSON.parse(blankName)
+    expect(result.ok).toBe(false)
+    expect(result.error).toBe('FEATURE_INVALID')
+  })
+
+  it('feature add emits feature-specific JSON errors', () => {
+    run(['init', 'feature-register-json-errors', '--no-hook'], dir)
+
+    const missingModule = runLaxSafe([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'missing',
+      '--name',
+      'Historical Migration',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(missingModule).error).toBe('FEATURE_MODULE_NOT_FOUND')
+
+    const missingDependency = runLaxSafe([
+      'feature',
+      'add',
+      'f-history',
+      '--module',
+      'core',
+      '--name',
+      'Historical Migration',
+      '--depends-on',
+      'f-missing',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(missingDependency).error).toBe('FEATURE_DEP_NOT_FOUND')
+  })
+
+  it('feature list --json emits JSON errors when no ledger exists', () => {
+    const out = runLaxSafe(['feature', 'list', '--json'], dir)
+    const result = JSON.parse(out)
+    expect(result.ok).toBe(false)
+  })
+
+  it('feature list --json outputs registered features', () => {
+    run(['init', 'feature-list-command', '--no-hook'], dir)
+    run(['feature', 'add', 'f-history', '--module', 'core', '--name', 'Historical Migration'], dir)
+
+    const out = run(['feature', 'list', '--json'], dir)
+    const features = JSON.parse(out)
+    expect(features).toEqual([
+      expect.objectContaining({ id: 'f-history', module: 'core', name: 'Historical Migration' }),
+    ])
+  })
+
   it('task add --json accepts feature field', () => {
     run(['init', 'feature-add', '--no-hook'], dir)
     run(['task', 'add', '--json', JSON.stringify([
