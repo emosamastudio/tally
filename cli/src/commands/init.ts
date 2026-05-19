@@ -35,8 +35,8 @@ function installPreCommitHook(cwd: string): void {
     console.log('pre-commit hook already exists, skipping')
     return
   }
-  writeFileSync(hookPath, '#!/bin/sh\nnpx tally lint --strict\n', { mode: 0o755 })
-  console.log('pre-commit hook installed (.git/hooks/pre-commit)')
+  writeFileSync(hookPath, '#!/bin/sh\nnpx tally check --strict\n', { mode: 0o755 })
+  console.log('pre-commit hook installed (.git/hooks/pre-commit) — runs tally check --strict')
 }
 
 function registerProject(cwd: string, projectName: string): void {
