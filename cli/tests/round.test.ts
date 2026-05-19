@@ -3,7 +3,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest'
 import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'fs'
 import { join } from 'path'
 import { startRound, closeRound, generateRoundReport, generateRoundId, formatRoundStart } from '../src/commands/round.js'
-import type { StartRoundResult } from '../src/commands/round.js'
+import type { StartRoundResult, ExclusionInfo } from '../src/commands/round.js'
 import { readLedger } from '../src/ledger-reader.js'
 import { writeLedger } from '../src/ledger-writer.js'
 import type { TallyDocument } from '../src/types.js'
@@ -845,6 +845,219 @@ describe('formatRoundStart', () => {
     expect(output).toContain('Round started: R-2026-05-15-001')
     expect(output).toContain('Tasks claimed: 1')
     expect(output).not.toContain('Warnings')
+  })
+
+  it('displays exclusions in dry-run mode grouped with reason details', () => {
+    const excluded: ExclusionInfo[] = [
+      { taskId: 'U-002', goal: 'Task B', reason: 'write_scope_conflict', detail: 'write scope conflict with U-001: src/shared/**' },
+      { taskId: 'U-004', goal: 'Task D', reason: 'dependency', detail: 'unsatisfied dependencies: U-005' },
+      { taskId: 'U-005', goal: 'Task E', reason: 'approval_gate', detail: 'high risk not approved' },
+    ]
+    const result: StartRoundResult = {
+      roundId: '(dry-run)',
+      selected: [
+        { taskId: 'U-001', goal: 'Task A', criteria: 'pass' },
+        { taskId: 'U-003', goal: 'Task C', criteria: 'pass' },
+      ],
+      warnings: [],
+      dryRun: true,
+      excluded,
+    }
+    const output = formatRoundStart(result)
+    expect(output).toContain('[DRY RUN]')
+    expect(output).toContain('Would start round with 2 task(s):')
+    expect(output).toContain('U-001  Task A')
+    expect(output).toContain('U-003  Task C')
+    expect(output).toContain('Excluded 3 task(s):')
+    expect(output).toContain('U-002  Task B — write scope conflict with U-001: src/shared/**')
+    expect(output).toContain('U-004  Task D — unsatisfied dependencies: U-005')
+    expect(output).toContain('U-005  Task E — high risk not approved')
+  })
+
+  it('omits exclusion section when none present in dry-run', () => {
+    const result: StartRoundResult = {
+      roundId: '(dry-run)',
+      selected: [{ taskId: 'U-001', goal: 'Task One', criteria: 'pass' }],
+      warnings: [],
+      dryRun: true,
+    }
+    const output = formatRoundStart(result)
+    expect(output).not.toContain('Excluded')
+  })
+
+  it('omits exclusion section in non-dry-run mode even with excluded array', () => {
+    const result: StartRoundResult = {
+      roundId: 'R-2026-05-15-001',
+      selected: [{ taskId: 'U-001', goal: 'Task One', criteria: 'pass' }],
+      warnings: [],
+      excluded: [{ taskId: 'U-002', goal: 'Task B', reason: 'dependency', detail: 'unsatisfied dependencies: U-003' }],
+    }
+    const output = formatRoundStart(result)
+    expect(output).not.toContain('Excluded')
+  })
+})
+
+// ── dry-run exclusion collection ──
+
+describe('dry-run exclusions', () => {
+  let dir: string
+
+  beforeEach(() => {
+    dir = mkdtempSync('/tmp/tally-dryrun-excl-')
+    writeLedger(testDoc(), dir)
+  })
+
+  afterEach(() => rmSync(dir, { recursive: true, force: true }))
+
+  it('returns exclusions for tasks with unsatisfied dependencies', () => {
+    const result = startRound('dry deps', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-001', 'U-002'],
+      dryRun: true,
+    })
+    expect(result.dryRun).toBe(true)
+    expect(result.selected).toHaveLength(1)
+    expect(result.selected[0].taskId).toBe('U-001')
+    expect(result.excluded).toBeDefined()
+    expect(result.excluded!.length).toBe(1)
+    expect(result.excluded![0]).toMatchObject({
+      taskId: 'U-002',
+      reason: 'dependency',
+    })
+    expect(result.excluded![0].detail).toContain('unsatisfied dependencies')
+  })
+
+  it('returns exclusions for tasks with wrong status', () => {
+    const result = startRound('dry status', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-004'],
+      dryRun: true,
+    })
+    expect(result.dryRun).toBe(true)
+    expect(result.selected).toHaveLength(0)
+    expect(result.excluded).toBeDefined()
+    expect(result.excluded![0]).toMatchObject({
+      taskId: 'U-004',
+      reason: 'status',
+    })
+    expect(result.excluded![0].detail).toContain('blocked')
+  })
+
+  it('returns not_found exclusion for non-existent task IDs', () => {
+    const result = startRound('dry missing', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-001', 'U-999'],
+      dryRun: true,
+    })
+    expect(result.dryRun).toBe(true)
+    expect(result.selected).toHaveLength(1)
+    const missing = result.excluded!.find((e) => e.taskId === 'U-999')
+    expect(missing).toBeDefined()
+    expect(missing!.reason).toBe('not_found')
+  })
+
+  it('returns multiple exclusions with mixed reason codes', () => {
+    // U-002: unsatisfied deps, U-004: blocked status, U-999: not found
+    const result = startRound('dry mixed', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-001', 'U-002', 'U-004', 'U-999'],
+      dryRun: true,
+    })
+    expect(result.selected).toHaveLength(1)
+    expect(result.selected[0].taskId).toBe('U-001')
+    expect(result.excluded).toBeDefined()
+    expect(result.excluded!.length).toBe(3)
+    const reasons = result.excluded!.map((e) => e.reason)
+    expect(reasons).toContain('dependency')
+    expect(reasons).toContain('status')
+    expect(reasons).toContain('not_found')
+  })
+
+  it('dry-run does not throw on validation errors (unlike non-dry-run)', () => {
+    // Non-dry-run would throw for U-002 unsatisfied deps
+    expect(() =>
+      startRound('non-dry', {
+        cwd: dir,
+        agentId: 'main',
+        taskIds: ['U-002'],
+        dryRun: false,
+      }),
+    ).toThrow(/unsatisfied dependencies/)
+
+    // Dry-run returns exclusions instead
+    const result = startRound('dry', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-002'],
+      dryRun: true,
+    })
+    expect(result.excluded).toBeDefined()
+    expect(result.excluded![0].taskId).toBe('U-002')
+  })
+
+  it('dry-run with auto-retry accumulates exclusions across passes', () => {
+    const doc: TallyDocument = {
+      _meta: {
+        project: 'test', tally_version: '1.0', created: '2026-05-10', updated: '2026-05-10',
+        agents: [{ id: 'main', name: '主会话' }],
+        stages: [{ id: 'S1', name: 'Core', modules: ['core'] }],
+        modules: [{ id: 'core', name: 'Core' }],
+        features: [],
+      },
+      tasks: [
+        makeTask('U-001', 'pending', [], 1, undefined, 'core', undefined, ['src/shared/**']),
+        makeTask('U-002', 'pending', [], 2, undefined, 'core', undefined, ['src/shared/**']),
+        makeTask('U-003', 'pending', [], 3),
+      ],
+      rounds: [], blocks: [], progress: [],
+    }
+    const dir2 = mkdtempSync('/tmp/tally-dryrun-retry-')
+    try {
+      writeLedger(doc, dir2)
+      const result = startRound('dry retry', {
+        cwd: dir2,
+        agentId: 'main',
+        taskIds: ['U-001', 'U-002', 'U-003'],
+        dryRun: true,
+        autoRetry: true,
+      })
+      // U-001 selected, U-002 excluded (write scope conflict with U-001), U-003 selected
+      expect(result.selected).toHaveLength(2)
+      const selectedIds = result.selected.map((s) => s.taskId)
+      expect(selectedIds).toContain('U-001')
+      expect(selectedIds).toContain('U-003')
+      expect(result.excluded).toBeDefined()
+      const excludedIds = result.excluded!.map((e) => e.taskId)
+      expect(excludedIds).toContain('U-002')
+      expect(result.excluded![0].reason).toBe('write_scope_conflict')
+    } finally {
+      rmSync(dir2, { recursive: true, force: true })
+    }
+  })
+
+  it('dry-run exclusion goal matches task name', () => {
+    const result = startRound('dry goal', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-002'], // unsatisfied deps
+      dryRun: true,
+    })
+    expect(result.excluded![0].goal).toBe('Task U-002')
+  })
+
+  it('dry-run not_found exclusion uses taskId as goal', () => {
+    const result = startRound('dry missing goal', {
+      cwd: dir,
+      agentId: 'main',
+      taskIds: ['U-999'],
+      dryRun: true,
+    })
+    expect(result.excluded![0].goal).toBe('U-999')
+    expect(result.excluded![0].reason).toBe('not_found')
   })
 })
 

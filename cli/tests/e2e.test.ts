@@ -1152,6 +1152,38 @@ describe('tally end-to-end', () => {
     expect(doc.tasks[0].blocks).toBeNull()
   })
 
+  it('task list --status open returns all non-done tasks', () => {
+    run(['init', 'e2e-list-open', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Open Task 1', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Open Task 2', stage: 'S1', module: 'core', priority: 'P1', acceptance: 'ok' },
+      { name: 'Open Task 3', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+
+    // Mark one task as done
+    run(['task', 'done', 'U-001', '--evidence', 'done'], dir)
+
+    const out = run(['task', 'list', '--status', 'open'], dir)
+    expect(out).not.toContain('U-001')
+    expect(out).toContain('U-002')
+    expect(out).toContain('U-003')
+  })
+
+  it('task list --open is shorthand for --status open', () => {
+    run(['init', 'e2e-list-open-flag', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Flag Task 1', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Flag Task 2', stage: 'S1', module: 'core', priority: 'P1', acceptance: 'ok' },
+    ])], dir)
+
+    // Mark one task as done
+    run(['task', 'done', 'U-001', '--evidence', 'done'], dir)
+
+    const out = run(['task', 'list', '--open'], dir)
+    expect(out).not.toContain('U-001')
+    expect(out).toContain('U-002')
+  })
+
   // ── task list with combined filters ──
 
   it('task list --module --status filters correctly with combined criteria', () => {

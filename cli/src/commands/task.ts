@@ -44,6 +44,7 @@ function inferErrorCode(message: string): string {
   if (message.includes('claimed')) return 'CLAIMED_BY_OTHER'
   if (message.includes('active round')) return 'ACTIVE_ROUND_EXISTS'
   if (message.includes('No eligible tasks')) return 'NO_ELIGIBLE_TASKS'
+  if (message.includes('locked by another writer')) return 'WRITE_LOCK_BUSY'
   if (message.includes('empty')) return 'EMPTY_INPUT'
   if (message.includes('not valid JSON') || message.includes('Invalid JSON')) return 'INVALID_JSON'
   return 'UNKNOWN'
@@ -396,14 +397,20 @@ export function editTask(
   return task
 }
 
+export interface DoneTaskResult {
+  task: Task
+  originalId: string
+  doneAlias: string
+}
+
 export function markTasksDone(
   doc: TallyDocument,
   ids: string[],
   evidence: string,
   rule?: string,
   noForbidden?: boolean,
-): Task[] {
-  const results: Task[] = []
+): DoneTaskResult[] {
+  const results: DoneTaskResult[] = []
 
   for (const id of ids) {
     const task = doc.tasks.find((t) => t.id === id)
@@ -456,7 +463,7 @@ export function markTasksDone(
       }
     }
 
-    results.push(task)
+    results.push({ task, originalId: oldId, doneAlias: newId })
   }
 
   return results
@@ -515,7 +522,9 @@ export interface ListFilters {
 export function listTasks(doc: TallyDocument, filters: ListFilters): Task[] {
   let tasks = [...doc.tasks]
 
-  if (filters.status) {
+  if (filters.status === 'open') {
+    tasks = tasks.filter((t) => t.status !== 'done')
+  } else if (filters.status) {
     tasks = tasks.filter((t) => t.status === filters.status)
   }
   if (filters.module) {
@@ -567,7 +576,10 @@ export function formatTaskDetail(detail: TaskDetail): string {
   const t = detail.task
   const lines: string[] = []
 
-  lines.push(`ID:          ${t.id}`)
+  const idDisplay = t.id.startsWith('D-')
+    ? `${t.id} (was U-${t.id.slice(2)})`
+    : t.id
+  lines.push(`ID:          ${idDisplay}`)
   lines.push(`Name:        ${t.name}`)
   lines.push(`Status:      ${t.status}`)
   lines.push(`Priority:    ${t.priority}`)
@@ -827,9 +839,21 @@ export function taskCommand(): Command {
         const results = markTasksDone(doc, ids, evidence, opts.rule, opts.forbidden === false)
         writeLedger(doc)
 
-        console.log(`Marked ${results.length} task(s) as done:`)
-        for (const t of results) {
-          console.log(`  ${t.id}  ${t.name}`)
+        if (opts.jsonOutput) {
+          console.log(JSON.stringify({
+            ok: true,
+            done: results.map((r) => ({
+              originalId: r.originalId,
+              doneAlias: r.doneAlias,
+              name: r.task.name,
+              evidence: r.task.evidence,
+            })),
+          }))
+        } else {
+          console.log(`Marked ${results.length} task(s) as done:`)
+          for (const r of results) {
+            console.log(`  ${r.originalId} as done → ${r.doneAlias}: ${r.task.name}`)
+          }
         }
       })
     })
@@ -871,6 +895,63 @@ export function taskCommand(): Command {
       })
     })
 
+  // tally task annotate <id> --field value [--allow-done-metadata]
+  cmd.command('annotate')
+    .description('Metadata-only edit (safe for done tasks)')
+    .argument('<id>', 'Task ID to annotate')
+    .option('--module <module>', 'Module ID')
+    .option('--feature <feature>', 'Feature ID')
+    .option('--delivery-node <node>', 'Delivery milestone')
+    .option('--execution-lane <lane>', 'Execution lane')
+    .option('--repos <repos>', 'Comma-separated repos')
+    .option('--tags <tags>', 'Comma-separated tags')
+    .option('--acceptance-criteria-json <json>', 'AcceptanceCriteria JSON')
+    .option('--execution-plan-json <json>', 'ExecutionPlan JSON')
+    .option('--json-output', 'Output errors as JSON')
+    .action((id: string, opts: Record<string, string | undefined>) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
+        const METADATA_FIELDS = new Set([
+          'module', 'feature', 'deliveryNode', 'executionLane', 'repos', 'tags',
+          'acceptanceCriteria', 'executionPlan',
+        ])
+        const doc = readLedger()
+        const task = doc.tasks.find((t) => t.id === id)
+        if (!task) throw new Error(`Task "${id}" not found`)
+
+        const fields: Record<string, unknown> = {}
+        if (opts.module !== undefined && METADATA_FIELDS.has('module')) fields.module = opts.module
+        if (opts.feature !== undefined && METADATA_FIELDS.has('feature')) fields.feature = opts.feature === '' ? null : opts.feature
+        if (opts.deliveryNode !== undefined && METADATA_FIELDS.has('deliveryNode')) fields.deliveryNode = opts.deliveryNode === '' ? null : opts.deliveryNode
+        if (opts.executionLane !== undefined && METADATA_FIELDS.has('executionLane')) fields.executionLane = opts.executionLane === '' ? null : opts.executionLane
+        if (opts.repos !== undefined && METADATA_FIELDS.has('repos')) fields.repos = (opts.repos as string).split(',').map((r: string) => r.trim()).filter(Boolean)
+        if (opts.tags !== undefined && METADATA_FIELDS.has('tags')) fields.tags = (opts.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean)
+        if (opts.acceptanceCriteriaJson !== undefined) {
+          fields.acceptanceCriteria = JSON.parse(opts.acceptanceCriteriaJson)
+        }
+        if (opts.executionPlanJson !== undefined) {
+          fields.executionPlan = JSON.parse(opts.executionPlanJson)
+        }
+
+        // Only apply fields that are metadata-safe
+        const safeFields: Record<string, unknown> = {}
+        for (const [k, v] of Object.entries(fields)) {
+          if (METADATA_FIELDS.has(k) || k === 'acceptanceCriteria' || k === 'executionPlan') {
+            safeFields[k] = v
+          }
+        }
+
+        if (Object.keys(safeFields).length === 0) {
+          throw new Error('No metadata fields specified')
+        }
+
+        for (const [k, v] of Object.entries(safeFields)) {
+          (task as unknown as Record<string, unknown>)[k] = v
+        }
+        writeLedger(doc)
+        console.log(`Annotated ${task.id}: ${task.name}`)
+      })
+    })
+
   // tally task approve <id> --by <human>
   cmd.command('approve')
     .description('Approve a high-risk task for round inclusion')
@@ -892,7 +973,8 @@ export function taskCommand(): Command {
   // tally task list [filters]
   cmd.command('list')
     .description('Filterable task list')
-    .option('--status <status>', 'Filter by status')
+    .option('--status <status>', 'Filter by status: pending, in_progress, blocked, hold, deferred, done, or open (all non-done)')
+    .option('--open', 'Show only open tasks (alias for --status open)')
     .option('--module <module>', 'Filter by module ID')
     .option('--stage <stage>', 'Filter by stage ID')
     .option('--priority <priority>', 'Filter by priority (P0, P1, P2)')
@@ -900,11 +982,11 @@ export function taskCommand(): Command {
     .option('--feature <feature>', 'Filter by feature ID')
     .option('--search <text>', 'Search by name or ID')
     .option('--json', 'Output as JSON')
-    .action((opts: { status?: string; module?: string; stage?: string; priority?: string; tag?: string; feature?: string; search?: string; json?: boolean }) => {
+    .action((opts: { status?: string; open?: boolean; module?: string; stage?: string; priority?: string; tag?: string; feature?: string; search?: string; json?: boolean }) => {
       try {
         const doc = readLedger()
         const tasks = listTasks(doc, {
-          status: opts.status,
+          status: opts.open ? 'open' : opts.status,
           module: opts.module,
           stage: opts.stage,
           priority: opts.priority,

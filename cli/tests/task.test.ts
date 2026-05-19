@@ -570,12 +570,12 @@ describe('markTasksDone', () => {
     const doc = validDoc()
     const results = markTasksDone(doc, ['U-001'], 'all tests pass')
     expect(results).toHaveLength(1)
-    expect(results[0].status).toBe('done')
-    expect(results[0].evidence).toBe('all tests pass')
-    expect(results[0].completedAt).toBe(today())
-    expect(results[0].order).toBeNull()
-    expect(results[0].nextAction).toBeNull()
-    expect(results[0].blocks).toBeNull()
+    expect(results[0].task.status).toBe('done')
+    expect(results[0].task.evidence).toBe('all tests pass')
+    expect(results[0].task.completedAt).toBe(today())
+    expect(results[0].task.order).toBeNull()
+    expect(results[0].task.nextAction).toBeNull()
+    expect(results[0].task.blocks).toBeNull()
   })
 
   it('rewrites U-xxx to D-xxx', () => {
@@ -627,7 +627,7 @@ describe('markTasksDone', () => {
   it('supports --rule flag', () => {
     const doc = validDoc()
     const results = markTasksDone(doc, ['U-001'], 'evidence text', 'verified-by-rule')
-    expect(results[0].rule).toBe('verified-by-rule')
+    expect(results[0].task.rule).toBe('verified-by-rule')
   })
 
   it('refuses to mark already done task', () => {
@@ -1168,35 +1168,35 @@ describe('markTasksDone with structured evidence', () => {
       '[notes: edge case covered]',
     ].join(' ')
     const results = markTasksDone(doc, ['U-001'], evidence, 'ci-verified')
-    expect(results[0].evidence).toBe(evidence)
-    expect(results[0].evidence).toContain('[test: 42 passed, 0 failed]')
-    expect(results[0].evidence).toContain('[commit: abc1234]')
-    expect(results[0].evidence).toContain('[review: approved by Bob]')
-    expect(results[0].evidence).toContain('[provider: openai/gpt-4o]')
-    expect(results[0].evidence).toContain('[notes: edge case covered]')
-    expect(results[0].rule).toBe('ci-verified')
+    expect(results[0].task.evidence).toBe(evidence)
+    expect(results[0].task.evidence).toContain('[test: 42 passed, 0 failed]')
+    expect(results[0].task.evidence).toContain('[commit: abc1234]')
+    expect(results[0].task.evidence).toContain('[review: approved by Bob]')
+    expect(results[0].task.evidence).toContain('[provider: openai/gpt-4o]')
+    expect(results[0].task.evidence).toContain('[notes: edge case covered]')
+    expect(results[0].task.rule).toBe('ci-verified')
   })
 
   it('stores evidence with only --test flag', () => {
     const doc = validDoc()
     const evidence = 'tests completed [test: all green]'
     const results = markTasksDone(doc, ['U-001'], evidence)
-    expect(results[0].evidence).toBe('tests completed [test: all green]')
+    expect(results[0].task.evidence).toBe('tests completed [test: all green]')
   })
 
   it('stores evidence with only --commit flag', () => {
     const doc = validDoc()
     const evidence = 'deployed [commit: def5678]'
     const results = markTasksDone(doc, ['U-001'], evidence)
-    expect(results[0].evidence).toBe('deployed [commit: def5678]')
+    expect(results[0].task.evidence).toBe('deployed [commit: def5678]')
   })
 
   it('stores evidence with --test and --review flags only', () => {
     const doc = validDoc()
     const evidence = 'code review done [test: 10/10] [review: Alice LGTM]'
     const results = markTasksDone(doc, ['U-001'], evidence)
-    expect(results[0].evidence).toContain('[test: 10/10]')
-    expect(results[0].evidence).toContain('[review: Alice LGTM]')
+    expect(results[0].task.evidence).toContain('[test: 10/10]')
+    expect(results[0].task.evidence).toContain('[review: Alice LGTM]')
   })
 })
 
@@ -1257,6 +1257,37 @@ describe('listTasks extended', () => {
     expect(tasks).toHaveLength(1)
     expect(tasks[0].id).toBe('U-002')
   })
+
+  it('filters by status open returns all non-done tasks', () => {
+    const doc = validDoc()
+    doc.tasks[0].status = 'done'
+    doc.tasks[0].completedOrder = 1
+    doc.tasks[1].status = 'blocked'
+    doc.tasks[1].blocks = 'waiting'
+    const tasks = listTasks(doc, { status: 'open' })
+    expect(tasks).toHaveLength(1)
+    expect(tasks[0].id).toBe('U-002')
+    expect(tasks[0].status).toBe('blocked')
+  })
+
+  it('filters by status open returns tasks with mixed non-done statuses', () => {
+    const doc = validDoc()
+    // U-001 stays pending, U-002 becomes done
+    doc.tasks[1].status = 'done'
+    doc.tasks[1].completedOrder = 1
+    // Add a third task with a different non-done status
+    doc.tasks.push({
+      id: 'U-003', status: 'blocked', priority: 'P1', stage: 'S1', module: 'core',
+      name: 'Task 3', acceptance: 'pass', deps: [], blocks: 'waiting',
+      nextAction: null, evidence: null, rule: null, tags: [],
+      order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
+      createdAt: '2026-05-10', completedAt: null,
+    } as any)
+    const tasks = listTasks(doc, { status: 'open' })
+    expect(tasks).toHaveLength(2)
+    expect(tasks.map((t) => t.id).sort()).toEqual(['U-001', 'U-003'])
+    expect(tasks.every((t) => t.status !== 'done')).toBe(true)
+  })
 })
 
 // ── markTasksDone with noForbidden flag ──
@@ -1265,27 +1296,27 @@ describe('markTasksDone with noForbidden flag', () => {
   it('appends [no-forbidden: confirmed] to evidence when noForbidden is true', () => {
     const doc = validDoc()
     const results = markTasksDone(doc, ['U-001'], 'implemented feature', undefined, true)
-    expect(results[0].evidence).toBe('implemented feature [no-forbidden: confirmed]')
+    expect(results[0].task.evidence).toBe('implemented feature [no-forbidden: confirmed]')
   })
 
   it('does not append [no-forbidden] when flag is false', () => {
     const doc = validDoc()
     const results = markTasksDone(doc, ['U-001'], 'implemented feature', undefined, false)
-    expect(results[0].evidence).toBe('implemented feature')
+    expect(results[0].task.evidence).toBe('implemented feature')
   })
 
   it('does not append [no-forbidden] when flag is omitted (backward compatible)', () => {
     const doc = validDoc()
     // No 5th argument → noForbidden is undefined → no tag appended
     const results = markTasksDone(doc, ['U-001'], 'implemented feature')
-    expect(results[0].evidence).toBe('implemented feature')
+    expect(results[0].task.evidence).toBe('implemented feature')
   })
 
   it('works with --rule and --no-forbidden together', () => {
     const doc = validDoc()
     const results = markTasksDone(doc, ['U-001'], 'verified fix', 'ci-passed', true)
-    expect(results[0].evidence).toBe('verified fix [no-forbidden: confirmed]')
-    expect(results[0].rule).toBe('ci-passed')
+    expect(results[0].task.evidence).toBe('verified fix [no-forbidden: confirmed]')
+    expect(results[0].task.rule).toBe('ci-passed')
   })
 
   it('appends [no-forbidden] to evidence that already has structured flags', () => {
@@ -1296,8 +1327,59 @@ describe('markTasksDone with noForbidden flag', () => {
       '[commit: abc123]',
     ].join(' ')
     const results = markTasksDone(doc, ['U-001'], evidence, undefined, true)
-    expect(results[0].evidence).toContain('[test: all green]')
-    expect(results[0].evidence).toContain('[commit: abc123]')
-    expect(results[0].evidence).toContain('[no-forbidden: confirmed]')
+    expect(results[0].task.evidence).toContain('[test: all green]')
+    expect(results[0].task.evidence).toContain('[commit: abc123]')
+    expect(results[0].task.evidence).toContain('[no-forbidden: confirmed]')
+  })
+})
+
+// ── markTasksDone returns DoneTaskResult with originalId and doneAlias ──
+
+describe('markTasksDone DoneTaskResult fields', () => {
+  it('returns originalId and doneAlias alongside the task', () => {
+    const doc = validDoc()
+    const results = markTasksDone(doc, ['U-001'], 'done evidence')
+    expect(results).toHaveLength(1)
+    expect(results[0].originalId).toBe('U-001')
+    expect(results[0].doneAlias).toBe('D-001')
+    expect(results[0].task.id).toBe('D-001')
+    expect(results[0].task.name).toBe('Task 1')
+  })
+
+  it('preserves numeric part across U→D transition', () => {
+    const doc = validDoc()
+    // Create task with non-sequential initial ID to test
+    doc.tasks.push({
+      id: 'U-005', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
+      name: 'Task 5', acceptance: 'pass', deps: [], blocks: null,
+      nextAction: null, evidence: null, rule: null, tags: [],
+      order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
+      createdAt: '2026-05-10', completedAt: null,
+    } as any)
+    const results = markTasksDone(doc, ['U-005'], 'evidence')
+    expect(results[0].originalId).toBe('U-005')
+    expect(results[0].doneAlias).toBe('D-005')
+    expect(results[0].task.id).toBe('D-005')
+  })
+})
+
+// ── formatTaskDetail shows transition for D-prefixed tasks ──
+
+describe('formatTaskDetail with ID transition', () => {
+  it('shows both IDs for done tasks with D- prefix', () => {
+    const doc = validDoc()
+    // Mark a task done so it gets D- prefix
+    markTasksDone(doc, ['U-001'], 'completed')
+    const detail = getTaskDetail(doc, 'D-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('ID:          D-001 (was U-001)')
+  })
+
+  it('shows only single ID for non-done U-prefixed tasks', () => {
+    const doc = validDoc()
+    const detail = getTaskDetail(doc, 'U-001')
+    const output = formatTaskDetail(detail)
+    expect(output).toContain('ID:          U-001')
+    expect(output).not.toContain('(was')
   })
 })

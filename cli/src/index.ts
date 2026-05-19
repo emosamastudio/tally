@@ -12,6 +12,7 @@ import { graphCommand } from './commands/graph.js'
 import { upgradeCommand } from './commands/upgrade.js'
 import { dashboardCommand } from './commands/dashboard.js'
 import { migrateCommand } from './commands/migrate.js'
+import { auditCommand } from './commands/audit.js'
 import { featureCommand } from './commands/feature.js'
 import { moduleCommand } from './commands/module.js'
 import { stageCommand } from './commands/stage.js'
@@ -33,6 +34,7 @@ program.addCommand(syncCommand())
 program.addCommand(graphCommand())
 program.addCommand(upgradeCommand())
 program.addCommand(migrateCommand())
+program.addCommand(auditCommand())
 program.addCommand(dashboardCommand())
 
 program.parse()

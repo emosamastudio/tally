@@ -28,6 +28,18 @@ function areDepsSatisfied(doc: TallyDocument, task: Task): boolean {
   })
 }
 
+function addExclusion(
+  excluded: ExclusionInfo[],
+  taskId: string,
+  goal: string,
+  reason: ExclusionInfo['reason'],
+  detail: string,
+): void {
+  if (!excluded.some((e) => e.taskId === taskId)) {
+    excluded.push({ taskId, goal, reason, detail })
+  }
+}
+
 export function generateRoundId(doc: TallyDocument): string {
   const prefix = `R-${today()}-`
   const existing = doc.rounds
@@ -55,11 +67,27 @@ export interface StartRoundInput {
   dryRun?: boolean
 }
 
+export interface ExclusionInfo {
+  taskId: string
+  goal: string
+  reason:
+    | 'dependency'
+    | 'write_scope_conflict'
+    | 'risk_gate'
+    | 'feature_freeze'
+    | 'approval_gate'
+    | 'claimed'
+    | 'status'
+    | 'not_found'
+  detail: string
+}
+
 export interface StartRoundResult {
   roundId: string
   selected: { taskId: string; goal: string; criteria: string }[]
   warnings: string[]
   dryRun?: boolean
+  excluded?: ExclusionInfo[]
 }
 
 export function startRound(scope: string, input: StartRoundInput = {}): StartRoundResult {
@@ -157,13 +185,16 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
   const autoExcluded: string[] = []
   let selected: { taskId: string; goal: string; criteria: string }[] = []
   let errors: string[] = []
+  const excluded: ExclusionInfo[] = []
 
   for (let retry = 0; retry <= MAX_RETRIES; retry++) {
-    const remainingIds = autoRetry && retry > 0
-      ? candidateIds.filter((id) => !autoExcluded.includes(id))
-      : candidateIds
+    const remainingIds =
+      autoRetry && retry > 0
+        ? candidateIds.filter((id) => !autoExcluded.includes(id))
+        : candidateIds
 
     if (remainingIds.length === 0) {
+      if (input.dryRun) break
       if (autoRetry) {
         throw new Error(
           'No eligible tasks after auto-retry. Excluded tasks:\n' +
@@ -181,17 +212,23 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
     for (const id of remainingIds) {
       const task = findTaskByEitherPrefix(doc, id)
       if (!task) {
+        const detail = `not found in ledger`
         errors.push(`Task "${id}" not found`)
+        addExclusion(excluded, id, id, 'not_found', detail)
         continue
       }
 
       if (task.status !== 'pending' && task.status !== 'in_progress') {
-        errors.push(`Task "${task.id}" has status "${task.status}" — cannot be claimed`)
+        const detail = `has status "${task.status}" — cannot be claimed`
+        errors.push(`Task "${task.id}" ${detail}`)
+        addExclusion(excluded, task.id, task.name, 'status', detail)
         continue
       }
 
       if (isTaskClaimedByOtherActiveRound(doc, task)) {
-        errors.push(`Task "${task.id}" is already claimed by active round "${task.claimedBy}"`)
+        const detail = `already claimed by active round "${task.claimedBy}"`
+        errors.push(`Task "${task.id}" is ${detail}`)
+        addExclusion(excluded, task.id, task.name, 'claimed', detail)
         continue
       }
 
@@ -200,7 +237,9 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
           const dep = findTaskByEitherPrefix(doc, depId)
           return !dep || dep.status !== 'done'
         })
-        errors.push(`Task "${task.id}" has unsatisfied dependencies: ${unsatisfied.join(', ')}`)
+        const detail = `unsatisfied dependencies: ${unsatisfied.join(', ')}`
+        errors.push(`Task "${task.id}" has ${detail}`)
+        addExclusion(excluded, task.id, task.name, 'dependency', detail)
         continue
       }
 
@@ -211,9 +250,9 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
           if (other && other.writeScopes.length > 0) {
             const overlap = task.writeScopes.filter((ws) => other.writeScopes.includes(ws))
             if (overlap.length > 0) {
-              errors.push(
-                `Task "${task.id}" write scope conflicts with "${other.id}": ${overlap.join(', ')}`,
-              )
+              const detail = `write scope conflict with ${other.id}: ${overlap.join(', ')}`
+              errors.push(`Task "${task.id}" ${detail}`)
+              addExclusion(excluded, task.id, task.name, 'write_scope_conflict', detail)
               break
             }
           }
@@ -224,9 +263,11 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
       // Risk gating
       const riskOrder = { low: 0, medium: 1, high: 2, critical: 3 }
       if (riskOrder[task.riskLevel] > riskOrder[config.gates.maxRisk]) {
+        const detail = `risk level "${task.riskLevel}" exceeding max "${config.gates.maxRisk}"`
         errors.push(
           `Task "${task.id}" has risk level "${task.riskLevel}" exceeding max "${config.gates.maxRisk}"`,
         )
+        addExclusion(excluded, task.id, task.name, 'risk_gate', detail)
         continue
       }
 
@@ -235,21 +276,31 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
         const feat = doc._meta.features.find((f) => f.id === task.feature)
         if (feat) {
           const isFrozen = config.gates.featureFreeze.includes(task.feature)
-          const isFrozenInMeta = feat.status === 'contract_frozen' || feat.status === 'stable'
-          if ((isFrozen || isFrozenInMeta) && task.executionLane !== 'contract' && task.executionLane !== 'test') {
-            errors.push(
-              `Task "${task.id}" belongs to frozen feature "${task.feature}" — only contract/test tasks allowed`,
-            )
+          const isFrozenInMeta =
+            feat.status === 'contract_frozen' || feat.status === 'stable'
+          if (
+            (isFrozen || isFrozenInMeta) &&
+            task.executionLane !== 'contract' &&
+            task.executionLane !== 'test'
+          ) {
+            const detail = `belongs to frozen feature "${task.feature}" — only contract/test tasks allowed`
+            errors.push(`Task "${task.id}" ${detail}`)
+            addExclusion(excluded, task.id, task.name, 'feature_freeze', detail)
             continue
           }
         }
       }
 
       // Approval gate
-      if ((task.riskLevel === 'high' || task.riskLevel === 'critical') && !task.approvedBy) {
+      if (
+        (task.riskLevel === 'high' || task.riskLevel === 'critical') &&
+        !task.approvedBy
+      ) {
+        const detail = `${task.riskLevel} risk but not approved`
         errors.push(
-          `Task "${task.id}" is ${task.riskLevel} risk but not approved — use "tally task approve ${task.id} --by <name>"`,
+          `Task "${task.id}" is ${detail} — use "tally task approve ${task.id} --by <name>"`,
         )
+        addExclusion(excluded, task.id, task.name, 'approval_gate', detail)
         continue
       }
 
@@ -262,6 +313,9 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
 
     // If no errors, we're done
     if (errors.length === 0) break
+
+    // In dry-run mode, report exclusions without throwing
+    if (input.dryRun) break
 
     // If not auto-retrying, fail atomically
     if (!autoRetry) {
@@ -289,12 +343,20 @@ export function startRound(scope: string, input: StartRoundInput = {}): StartRou
 
   // Report auto-excluded tasks
   if (autoRetry && autoExcluded.length > 0) {
-    warnings.push(`Auto-excluded ${autoExcluded.length} task(s): ${autoExcluded.join(', ')}`)
+    warnings.push(
+      `Auto-excluded ${autoExcluded.length} task(s): ${autoExcluded.join(', ')}`,
+    )
   }
 
   // Dry-run: return preview without claiming or persisting
   if (input.dryRun) {
-    return { roundId: '(dry-run)', selected, warnings, dryRun: true }
+    return {
+      roundId: '(dry-run)',
+      selected,
+      warnings,
+      dryRun: true,
+      excluded: excluded.length > 0 ? excluded : undefined,
+    }
   }
 
   // Generate round ID
@@ -606,6 +668,13 @@ export function formatRoundStart(result: StartRoundResult): string {
   lines.push('')
   for (const s of result.selected) {
     lines.push(`  ${s.taskId}  ${s.goal}`)
+  }
+  if (result.dryRun && result.excluded && result.excluded.length > 0) {
+    lines.push('')
+    lines.push(`Excluded ${result.excluded.length} task(s):`)
+    for (const e of result.excluded) {
+      lines.push(`  ${e.taskId}  ${e.goal} — ${e.detail}`)
+    }
   }
   return lines.join('\n')
 }
