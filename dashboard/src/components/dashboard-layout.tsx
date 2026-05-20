@@ -15,7 +15,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
   const nav = useKeyboardNav({ categories })
 
   return (
-    <div className="sk-board">
+    <div className="sk-board" style={{ overflow: 'clip' }}>
       <div className="sk-grid" />
 
       {/* Sticky header: title + category tabs — always visible */}
