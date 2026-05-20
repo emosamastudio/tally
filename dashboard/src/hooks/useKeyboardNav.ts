@@ -11,6 +11,9 @@ interface UseKeyboardNavOptions {
   categories: NavCategory[]
 }
 
+/** Estimated height of the sticky header (title + tabs + hint) */
+const HEADER_HEIGHT = 110
+
 export function useKeyboardNav({ categories }: UseKeyboardNavOptions) {
   const [activeCategory, setActiveCategory] = useState(0)
   const [activeSection, setActiveSection] = useState(0)
@@ -18,7 +21,6 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions) {
   const totalCategories = categories.length
   const currentSections = categories[activeCategory]?.sections.length ?? 0
 
-  // Clamp section index when category changes
   useEffect(() => {
     if (activeSection >= currentSections) {
       setActiveSection(Math.max(0, currentSections - 1))
@@ -49,7 +51,6 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions) {
   // Global keyboard handler
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
-      // Don't capture when typing in inputs
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
 
@@ -85,15 +86,22 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions) {
     return () => window.removeEventListener('keydown', handler)
   }, [goNextCategory, goPrevCategory, goNextSection, goPrevSection, totalCategories])
 
-  // Scroll active section into view
+  // Scroll active section to top of viewport (below sticky header)
   useEffect(() => {
     const cat = categories[activeCategory]
     if (!cat) return
     const sectionId = cat.sections[activeSection]
     if (!sectionId) return
     const el = document.getElementById(`nav-${sectionId}`)
-    if (el) {
-      el.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    if (!el) return
+
+    const rect = el.getBoundingClientRect()
+    const isVisible = rect.top >= HEADER_HEIGHT && rect.bottom <= window.innerHeight
+
+    // Only scroll if the section isn't already fully visible
+    if (!isVisible) {
+      const targetY = window.scrollY + rect.top - HEADER_HEIGHT - 8
+      window.scrollTo({ top: targetY, behavior: 'smooth' })
     }
   }, [activeCategory, activeSection, categories])
 
