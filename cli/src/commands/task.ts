@@ -1006,5 +1006,78 @@ export function taskCommand(): Command {
       }
     })
 
+  // tally task next [--strategy <strategy>] [--lane <lane>]
+  cmd.command('next')
+    .description('Recommend the single best next task to work on')
+    .option('--strategy <strategy>', 'Selection strategy: parallel-max, feature-focused, or risk-first', 'parallel-max')
+    .option('--lane <lane>', 'Filter by execution lane')
+    .option('--json', 'Output as JSON')
+    .action((opts: { strategy?: string; lane?: string; json?: boolean }) => {
+      try {
+        const doc = readLedger()
+        // Eligible: pending/in_progress, deps satisfied, not claimed by active rounds
+        const eligible = doc.tasks
+          .filter((t) => t.status === 'pending' || t.status === 'in_progress')
+          .filter((t) => {
+            if (!t.claimedBy) return true
+            return !doc.rounds.some((r) => r.id === t.claimedBy && r.status === 'active')
+          })
+          .filter((t) => t.deps.every((depId) => {
+            const dep = doc.tasks.find((d) => d.id === depId || d.id === depId.replace(/^[UD]-/, 'U-') || d.id === depId.replace(/^[UD]-/, 'D-'))
+            return dep?.status === 'done'
+          }))
+          .filter((t) => opts.lane ? t.executionLane === opts.lane : true)
+
+        if (eligible.length === 0) {
+          const msg = opts.lane
+            ? `No eligible tasks found for lane "${opts.lane}".`
+            : 'No eligible tasks found. All pending tasks either have unsatisfied dependencies or are claimed.'
+          if (opts.json) console.log(JSON.stringify({ ok: true, task: null, reason: msg }))
+          else console.log(msg)
+          return
+        }
+
+        // Sort by strategy
+        const riskOrder: Record<string, number> = { low: 0, medium: 1, high: 2, critical: 3 }
+        const strategy = opts.strategy ?? 'parallel-max'
+
+        if (strategy === 'risk-first') {
+          eligible.sort((a, b) => (riskOrder[b.riskLevel] ?? 1) - (riskOrder[a.riskLevel] ?? 1))
+        } else if (strategy === 'feature-focused') {
+          eligible.sort((a, b) => (a.feature ?? '').localeCompare(b.feature ?? '') || (a.order ?? 999) - (b.order ?? 999))
+        } else {
+          // parallel-max: prefer no deps first, then by order
+          eligible.sort((a, b) => a.deps.length - b.deps.length || (a.order ?? 999) - (b.order ?? 999))
+        }
+
+        const best = eligible[0]
+        const reasons: string[] = []
+        if (best.deps.length === 0) reasons.push('no dependencies')
+        else reasons.push(`dependencies satisfied (${best.deps.length})`)
+        if (best.feature) reasons.push(`feature: ${best.feature}`)
+        if (best.executionLane) reasons.push(`lane: ${best.executionLane}`)
+        if (best.riskLevel !== 'medium') reasons.push(`risk: ${best.riskLevel}`)
+
+        if (opts.json) {
+          console.log(JSON.stringify({
+            ok: true,
+            task: { id: best.id, name: best.name, module: best.module, feature: best.feature, priority: best.priority, riskLevel: best.riskLevel, executionLane: best.executionLane, writeScopes: best.writeScopes },
+            reasons,
+            eligibleCount: eligible.length,
+          }))
+        } else {
+          console.log(`Next: ${best.id} — ${best.name}`)
+          console.log(`  Module: ${best.module}  Feature: ${best.feature ?? '(none)'}  Priority: ${best.priority}  Risk: ${best.riskLevel}`)
+          console.log(`  Why: ${reasons.join(', ')}`)
+          console.log(`  ${eligible.length} eligible task(s) total`)
+          if (best.writeScopes.length > 0) console.log(`  Write scopes: ${best.writeScopes.join(', ')}`)
+          if (best.nextAction) console.log(`  Next action: ${best.nextAction}`)
+        }
+      } catch (e) {
+        console.error((e as Error).message)
+        process.exit(1)
+      }
+    })
+
   return cmd
 }
