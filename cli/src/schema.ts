@@ -1022,6 +1022,55 @@ export function validateDocument(doc: unknown): CheckResult {
         }
       }
     }
+
+    // Cross-feature undeclared dependency check
+    if (Array.isArray(tasksRaw)) {
+      const meta = safeGet(record, '_meta')
+      const featuresRaw = meta != null && typeof meta === 'object'
+        ? (meta as Record<string, unknown>).features
+        : undefined
+      const taskFeature = new Map<string, string>()
+      for (const rawTask of tasksRaw) {
+        if (rawTask != null && typeof rawTask === 'object') {
+          const t = rawTask as Record<string, unknown>
+          const fid = (t.feature as string) ?? '__none__'
+          taskFeature.set(t.id as string, fid)
+        }
+      }
+      const featureDeps = new Map<string, Set<string>>()
+      if (Array.isArray(featuresRaw)) {
+        for (const f of featuresRaw) {
+          if (f != null && typeof f === 'object') {
+            const fr = f as Record<string, unknown>
+            const deps = fr.dependsOn as string[] | undefined
+            if (deps && deps.length > 0) {
+              featureDeps.set(fr.id as string, new Set(deps))
+            }
+          }
+        }
+      }
+      for (const rawTask of tasksRaw) {
+        if (rawTask != null && typeof rawTask === 'object') {
+          const t = rawTask as Record<string, unknown>
+          const taskFid = taskFeature.get(t.id as string) ?? '__none__'
+          if (taskFid === '__none__') continue
+          const deps = t.deps as string[] | undefined
+          if (!deps || deps.length === 0) continue
+          for (const depId of deps) {
+            const depFid = taskFeature.get(depId) ?? '__none__'
+            if (depFid === '__none__' || depFid === taskFid) continue
+            const declared = featureDeps.get(taskFid)
+            if (!declared || !declared.has(depFid)) {
+              warnings.push({
+                code: 'CROSS_FEATURE_DEP_UNDECLARED',
+                message: `Task "${t.id}" (feature "${taskFid}") depends on "${depId}" (feature "${depFid}") but feature "${taskFid}" does not declare dependsOn "${depFid}"`,
+                path: formatPath('tasks', tasksRaw.indexOf(rawTask), 'deps'),
+              })
+            }
+          }
+        }
+      }
+    }
   }
 
   return {
