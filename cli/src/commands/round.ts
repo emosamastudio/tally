@@ -811,5 +811,79 @@ export function roundCommand(): Command {
       })
     })
 
+  // tally agent context [--agent <id>]
+  cmd
+    .command('context')
+    .description('Show agent state for session restoration')
+    .option('--agent <id>', 'Agent ID')
+    .option('--json', 'Output as JSON')
+    .action((opts: { agent?: string; json?: boolean }) => {
+      try {
+        const config = loadConfig()
+        const agentId = opts.agent ?? config.agent.id
+        const doc = readLedger()
+
+        const activeRound = doc.rounds.find((r) => r.status === 'active' && r.executor === agentId)
+        const claimedTasks = doc.tasks.filter((t) => t.claimedBy && doc.rounds.some((r) => r.id === t.claimedBy && r.status === 'active' && r.executor === agentId))
+        const doneCount = claimedTasks.filter((t) => t.status === 'done').length
+        const pendingCount = claimedTasks.filter((t) => t.status !== 'done').length
+        const recentDone = doc.tasks.filter((t) => t.status === 'done' && t.completedAt).sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? '')).slice(0, 5)
+        const needsApproval = doc.tasks.filter((t) => (t.riskLevel === 'high' || t.riskLevel === 'critical') && !t.approvedBy && t.status !== 'done')
+
+        const ctx = {
+          agent: agentId,
+          hasActiveRound: !!activeRound,
+          activeRound: activeRound ? {
+            id: activeRound.id,
+            scope: activeRound.scope,
+            startedAt: activeRound.start,
+            tasks: claimedTasks.map((t) => ({ id: t.id, name: t.name, status: t.status, feature: t.feature })),
+            progress: `${doneCount}/${claimedTasks.length} done`,
+          } : null,
+          resumeCommand: activeRound
+            ? (pendingCount > 0
+              ? `tally round close --auto-next --auto-retry --json`
+              : `tally round close --auto-next --auto-retry --json`)
+            : `tally round start --dry-run --auto-retry --json  # preview first, then start`,
+          recentCompletions: recentDone.map((t) => ({ id: t.id, name: t.name, completedAt: t.completedAt })),
+          pendingApprovals: needsApproval.map((t) => ({ id: t.id, name: t.name, riskLevel: t.riskLevel })),
+        }
+
+        if (opts.json) {
+          console.log(JSON.stringify(ctx, null, 2))
+        } else {
+          console.log(`Agent: ${agentId}`)
+          if (activeRound) {
+            console.log(`Active round: ${activeRound.id} — ${activeRound.scope}`)
+            console.log(`Progress: ${doneCount}/${claimedTasks.length} done, ${pendingCount} remaining`)
+            console.log('Claimed tasks:')
+            for (const t of claimedTasks) {
+              const icon = t.status === 'done' ? '✓' : t.status === 'in_progress' ? '●' : '○'
+              console.log(`  ${icon} ${t.id} [${t.status}] ${t.name}`)
+            }
+            console.log(`\nResume: ${ctx.resumeCommand}`)
+          } else {
+            console.log('No active round.')
+            console.log(`\nResume: ${ctx.resumeCommand}`)
+          }
+          if (ctx.recentCompletions.length > 0) {
+            console.log('\nRecent completions:')
+            for (const t of ctx.recentCompletions) {
+              console.log(`  ✓ ${t.id} ${t.name} (${t.completedAt})`)
+            }
+          }
+          if (ctx.pendingApprovals.length > 0) {
+            console.log('\nPending approvals:')
+            for (const t of ctx.pendingApprovals) {
+              console.log(`  ! ${t.id} [${t.riskLevel}] ${t.name} — needs: tally task approve ${t.id} --by <name>`)
+            }
+          }
+        }
+      } catch (e) {
+        console.error((e as Error).message)
+        process.exit(1)
+      }
+    })
+
   return cmd
 }
