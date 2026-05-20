@@ -12,7 +12,7 @@ interface DashboardLayoutProps {
   children: Record<string, ReactNode>
 }
 
-const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类', 1: '↑↓ 选择板块 · Enter 进入', 2: '↑↓ 选择项目 · Esc 返回 · Enter 确认' }
+const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入', 2: '↑↓ 项目 · Esc 返回' }
 
 export default function DashboardLayout({ header, categories, children }: DashboardLayoutProps) {
   const nav = useKeyboardNav({ categories })

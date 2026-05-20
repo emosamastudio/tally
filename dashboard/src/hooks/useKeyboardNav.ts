@@ -92,8 +92,8 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
       const tag = (e.target as HTMLElement)?.tagName
       if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
       switch (e.key) {
-        case 'ArrowRight': e.preventDefault(); if (focusLevel === 0) goNextCategory(); break
-        case 'ArrowLeft': e.preventDefault(); if (focusLevel === 0) goPrevCategory(); break
+        case 'ArrowRight': e.preventDefault(); if (focusLevel <= 1) goNextCategory(); break
+        case 'ArrowLeft': e.preventDefault(); if (focusLevel <= 1) goPrevCategory(); break
         case 'ArrowDown':
           e.preventDefault()
           if (focusLevel === 1) goNextSection()
@@ -110,7 +110,7 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
         case '6': case '7': case '8': case '9':
           e.preventDefault()
           const idx = parseInt(e.key) - 1
-          if (idx < totalCategories) { setActiveCategory(idx); setActiveSection(0); setFocusLevel(1); setFocusedItemIndex(0) }
+          if (idx < totalCategories) { setActiveCategory(idx); setActiveSection(0); setFocusedItemIndex(0) }
           break
       }
     }
