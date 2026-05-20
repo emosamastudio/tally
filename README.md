@@ -1,6 +1,6 @@
 # Tally
 
-Agent-native task management — a CLI-driven task ledger with round discipline, multi-agent safety checks, and visualization. Tally is designed for AI agents and human developers to collaboratively manage work through a structured round-based workflow with write-scope conflict detection, risk gating, and feature-level organization.
+Agent-native task management — a CLI-driven task ledger with round discipline, multi-agent safety, auto-retry, and visualization. Tally is designed for AI agents to autonomously manage work through a structured round-based workflow. The dashboard is the sole human interface.
 
 ## Installation
 
@@ -56,21 +56,23 @@ tally round close
 | `tally lint` | Fast structural validation (pre-commit) |
 | `tally task add` | Add one or more new tasks (JSON) |
 | `tally task edit <id>` | Modify task fields (14+ fields supported) |
-| `tally task done <ids...>` | Mark tasks as done with structured evidence |
+| `tally task done <ids...>` | Mark tasks as done with structured evidence (--test, --commit, --review, --no-forbidden) |
 | `tally task block <ids...>` | Block tasks with a reason |
 | `tally task unblock <ids...>` | Unblock tasks |
-| `tally task show <id>` | Show full task detail with dependency tree |
-| `tally task list` | Filterable task list (--status, --module, --feature, --priority, --tag, --search) |
-| `tally task approve <id> --by <name>` | Human approval for high-risk tasks |
-| `tally round start <scope>` | Start a round with safety checks (--strategy feature-focused\|risk-first\|parallel-max) |
-| `tally round report` | Show mid-round progress report |
-| `tally round close` | Close the current round |
-| `tally export` | Export ledger data (json, csv, markdown, agent-brief) |
-| `tally sync` | Sync tally.json via git pull/push |
-| `tally graph` | Visualize dependency graph (--level task\|feature) |
-| `tally upgrade` | Upgrade tally.json schema version |
-| `tally migrate` | Migrate legacy task data into tally format |
+| `tally task show <id>` | Show full task detail with quality score |
+| `tally task list` | Filterable (--status open, --module, --feature, --priority, --open) |
+| `tally task next` | Recommend the single best next task (--strategy, --lane) |
+| `tally task annotate <id>` | Metadata-only edit, safe for done tasks |
+| `tally task approve <id>` | Human approval for high-risk tasks |
+| `tally round start <scope>` | Start round (--auto-retry, --dry-run, --strategy, --json) |
+| `tally round report` | Mid-round progress report |
+| `tally round close` | Close round (--auto-next, --integrate, --json) |
+| `tally round context` | Agent state for session restoration |
+| `tally audit backlog` | Find tasks missing specified fields |
+| `tally export` | Export (json, csv, markdown, agent-brief) |
+| `tally graph` | Dependency graph (--level task\|feature) |
 | `tally dashboard` | Start the dashboard HTTP server |
+| `tally sync` / `tally upgrade` / `tally migrate` | Sync, schema upgrade, legacy import |
 
 ## Config (.tallyrc.yaml)
 
@@ -184,7 +186,7 @@ npm install
 # Build both CLI and dashboard
 npm run build
 
-# Run tests (236 tests, 77.3% coverage)
+# Run tests (329 tests)
 npm test
 
 # Coverage report
