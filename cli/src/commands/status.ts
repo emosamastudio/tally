@@ -1,14 +1,53 @@
 import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
-import type { StatusResult, Task, TallyDocument } from '../types.js'
+import type { StatusResult, FeatureBreakdown, ActiveRoundInfo, TallyDocument } from '../types.js'
 
 function computeStatus(doc: TallyDocument): StatusResult {
   const tasks = doc.tasks
-  const done = tasks.filter((t: Task) => t.status === 'done').length
-  const hold = tasks.filter((t: Task) => t.status === 'hold').length
-  const blocked = tasks.filter((t: Task) => t.status === 'blocked').length
-  const open = tasks.filter((t: Task) => !['done', 'hold'].includes(t.status)).length
+  const done = tasks.filter((t) => t.status === 'done').length
+  const hold = tasks.filter((t) => t.status === 'hold').length
+  const blocked = tasks.filter((t) => t.status === 'blocked').length
+  const open = tasks.filter((t) => !['done', 'hold'].includes(t.status)).length
   const activeRound = doc.rounds.find((r) => r.status === 'active')
+
+  // Feature breakdown
+  const featMap = new Map<string, FeatureBreakdown>()
+  for (const t of tasks) {
+    const fid = t.feature ?? '__none__'
+    if (!featMap.has(fid)) {
+      const feat = doc._meta.features.find((f) => f.id === fid)
+      featMap.set(fid, {
+        feature: fid,
+        module: feat?.module ?? t.module,
+        name: feat?.name ?? fid,
+        total: 0, done: 0, blocked: 0, inProgress: 0,
+      })
+    }
+    const fb = featMap.get(fid)!
+    fb.total++
+    if (t.status === 'done') fb.done++
+    else if (t.status === 'blocked') fb.blocked++
+    else if (t.status === 'in_progress') fb.inProgress++
+  }
+  const features = [...featMap.values()].sort((a, b) => b.total - a.total)
+
+  // Active rounds
+  const activeRounds: ActiveRoundInfo[] = doc.rounds
+    .filter((r) => r.status === 'active')
+    .map((r) => {
+      const taskDetails = r.plannedTasks.map((pt) => {
+        const task = tasks.find((t) => t.id === pt.taskId || t.id === pt.taskId.replace(/^[UD]-/, 'U-') || t.id === pt.taskId.replace(/^[UD]-/, 'D-'))
+        return task?.status ?? 'unknown'
+      })
+      return {
+        roundId: r.id,
+        executor: r.executor,
+        scope: r.scope,
+        taskCount: r.plannedTasks.length,
+        doneCount: taskDetails.filter((s) => s === 'done').length,
+      }
+    })
+
   return {
     totalDone: done,
     totalOpen: open,
@@ -16,12 +55,14 @@ function computeStatus(doc: TallyDocument): StatusResult {
     totalBlocked: blocked,
     activeRoundId: activeRound?.id ?? null,
     activeBlocks: doc.blocks.filter((b) => b.resolvedAt === null).length,
+    features,
+    activeRounds,
   }
 }
 
 export function statusCommand(): Command {
   const cmd = new Command('status')
-  cmd.description('Show one-line ledger summary')
+  cmd.description('Show ledger summary with feature breakdown and active rounds')
     .option('--json', 'Output JSON')
     .action((opts: { json: boolean }) => {
       try {
@@ -35,6 +76,26 @@ export function statusCommand(): Command {
             `BLOCKED ${s.totalBlocked} / ROUND ${s.activeRoundId ?? 'none'} / ` +
             `BLOCKS ${s.activeBlocks}`,
           )
+          if (s.activeRounds.length > 0) {
+            console.log('')
+            console.log('Active rounds:')
+            for (const ar of s.activeRounds) {
+              console.log(`  ${ar.roundId} [${ar.executor}] ${ar.scope} — ${ar.doneCount}/${ar.taskCount} done`)
+            }
+          }
+          if (s.features.length > 0) {
+            console.log('')
+            console.log('Features:')
+            for (const f of s.features.slice(0, 10)) {
+              const pct = f.total > 0 ? Math.round((f.done / f.total) * 100) : 0
+              const bar = '█'.repeat(Math.round(pct / 10)) + '░'.repeat(10 - Math.round(pct / 10))
+              const label = f.feature === '__none__' ? '(no feature)' : f.feature
+              console.log(`  ${bar} ${pct}% ${label} [${f.module}] ${f.done}/${f.total}${f.blocked > 0 ? ` BLOCKED:${f.blocked}` : ''}`)
+            }
+            if (s.features.length > 10) {
+              console.log(`  ... and ${s.features.length - 10} more features`)
+            }
+          }
         }
       } catch (e) {
         console.error((e as Error).message)

@@ -208,6 +208,24 @@ export interface CheckError {
   path?: string
 }
 
+export interface FeatureBreakdown {
+  feature: string
+  module: string
+  name: string
+  total: number
+  done: number
+  blocked: number
+  inProgress: number
+}
+
+export interface ActiveRoundInfo {
+  roundId: string
+  executor: string
+  scope: string
+  taskCount: number
+  doneCount: number
+}
+
 export interface StatusResult {
   totalDone: number
   totalOpen: number
@@ -215,6 +233,8 @@ export interface StatusResult {
   totalBlocked: number
   activeRoundId: string | null
   activeBlocks: number
+  features: FeatureBreakdown[]
+  activeRounds: ActiveRoundInfo[]
 }
 
 export interface GraphResult {
