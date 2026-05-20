@@ -1,85 +1,58 @@
 // src/components/feature-progress.tsx
 import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronDown, ChevronRight } from 'lucide-react'
 import type { FeatureMeta, Task } from '@/lib/types'
 
-// ── Status inference ──
+// ── Color scale ──
 
-type FeatureStatus = 'design' | 'contract_frozen' | 'implementing' | 'stable'
-
-const STATUS_LABEL: Record<FeatureStatus, string> = {
-  design: '设计中',
-  contract_frozen: '契约冻结',
-  implementing: '实现中',
-  stable: '稳定',
+function cellColor(pct: number, blocked: number): string {
+  if (blocked > 0) return 'var(--danger)'
+  if (pct >= 100) return 'var(--accent-3)'
+  if (pct >= 70) return '#5b9bd5'
+  if (pct >= 40) return 'var(--accent-2)'
+  if (pct > 0) return 'var(--accent)'
+  return 'var(--ink-4)'
 }
 
-const STATUS_COLOR: Record<FeatureStatus, string> = {
-  design: 'var(--ink-4)',
-  contract_frozen: '#5b9bd5',
-  implementing: 'var(--accent-2)',
-  stable: 'var(--accent-3)',
+function cellBg(pct: number): string {
+  if (pct >= 100) return 'rgba(107,200,177,0.15)'
+  if (pct >= 70) return 'rgba(91,155,213,0.10)'
+  if (pct >= 40) return 'rgba(255,126,107,0.08)'
+  if (pct > 0) return 'rgba(245,180,60,0.06)'
+  return 'rgba(120,120,120,0.03)'
 }
 
-const STATUS_BG: Record<FeatureStatus, string> = {
-  design: 'rgba(170,163,163,0.12)',
-  contract_frozen: 'rgba(91,155,213,0.12)',
-  implementing: 'rgba(255,126,107,0.12)',
-  stable: 'rgba(107,200,177,0.12)',
+// ── Mini bar ──
+
+function MiniBar({ pct, blocked }: { pct: number; blocked: number }) {
+  return (
+    <div className="sk-progress-track" style={{ height: 3, minWidth: 40 }}>
+      <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct, blocked) }} />
+    </div>
+  )
 }
 
-// ── Enriched feature ──
+// ── Legend ──
 
-interface EnrichedFeature extends FeatureMeta {
-  status: FeatureStatus
-  inProgress: number
-  pendingTasks: Task[]
-}
-
-function inferStatus(feature: FeatureMeta, inProgress: number): FeatureStatus {
-  const notDone = feature.total - feature.done
-  if (notDone === 0 && feature.total > 0) return 'stable'
-  if (inProgress > 0) return 'implementing'
-  if (feature.done > 0) return 'contract_frozen'
-  return 'design'
-}
-
-function enrichFeatures(features: FeatureMeta[], tasks: Task[]): EnrichedFeature[] {
-  return features.map((f) => {
-    const featureTasks = tasks.filter((t) => t.feature === f.id)
-    const inProgress = featureTasks.filter((t) => t.status === 'in_progress').length
-    const pendingTasks = featureTasks
-      .filter((t) => t.status === 'pending' || t.status === 'in_progress')
-      .sort((a, b) => a.order - b.order)
-      .slice(0, 3)
-
-    return {
-      ...f,
-      status: inferStatus(f, inProgress),
-      inProgress,
-      pendingTasks,
-    }
-  })
-}
-
-// ── Group by module ──
-
-interface ModuleGroup {
-  module: string
-  features: EnrichedFeature[]
-}
-
-function groupByModule(features: EnrichedFeature[]): ModuleGroup[] {
-  const map = new Map<string, EnrichedFeature[]>()
-  for (const f of features) {
-    const list = map.get(f.module) ?? []
-    list.push(f)
-    map.set(f.module, list)
-  }
-  return [...map.entries()]
-    .map(([module, features]) => ({ module, features }))
-    .sort((a, b) => a.module.localeCompare(b.module, 'zh-Hans-CN'))
+function Legend() {
+  const items: [string, string][] = [
+    ['100%', 'var(--accent-3)'],
+    ['≥70%', '#5b9bd5'],
+    ['≥40%', 'var(--accent-2)'],
+    ['>0%', 'var(--accent)'],
+    ['0%', 'var(--ink-4)'],
+    ['阻塞', 'var(--danger)'],
+  ]
+  return (
+    <div className="flex items-center gap-3 flex-wrap" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+      {items.map(([label, color]) => (
+        <span key={label} className="flex items-center gap-1">
+          <span style={{ display: 'inline-block', width: 8, height: 8, borderRadius: 2, background: color }} />
+          {label}
+        </span>
+      ))}
+    </div>
+  )
 }
 
 // ── Main component ──
@@ -90,25 +63,31 @@ interface FeatureProgressProps {
 }
 
 export default function FeatureProgress({ features, tasks }: FeatureProgressProps) {
-  const enriched = enrichFeatures(features, tasks)
-  const groups = groupByModule(enriched)
+  const [expanded, setExpanded] = useState<string | null>(null)
 
-  // All modules start expanded
-  const [collapsed, setCollapsed] = useState<Set<string>>(new Set())
-
-  const toggleModule = (moduleId: string) => {
-    setCollapsed((prev) => {
-      const next = new Set(prev)
-      if (next.has(moduleId)) next.delete(moduleId)
-      else next.add(moduleId)
-      return next
-    })
+  // Group features by module, compute task-level stats
+  const byModule = new Map<string, { features: FeatureMeta[]; taskMap: Map<string, Task[]> }>()
+  for (const f of features) {
+    if (!byModule.has(f.module)) {
+      byModule.set(f.module, { features: [], taskMap: new Map() })
+    }
+    byModule.get(f.module)!.features.push(f)
+  }
+  for (const t of tasks) {
+    if (!t.feature) continue
+    for (const [, mod] of byModule) {
+      if (mod.features.some((f) => f.id === t.feature)) {
+        if (!mod.taskMap.has(t.feature)) mod.taskMap.set(t.feature, [])
+        mod.taskMap.get(t.feature)!.push(t)
+        break
+      }
+    }
   }
 
   if (features.length === 0) {
     return (
       <Card>
-        <CardHeader><CardTitle>功能进度</CardTitle></CardHeader>
+        <CardHeader><CardTitle>功能矩阵</CardTitle></CardHeader>
         <CardContent>
           <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无功能数据</p>
         </CardContent>
@@ -116,151 +95,105 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
     )
   }
 
-  const totalFeatures = features.length
-  const stableFeatures = enriched.filter((f) => f.status === 'stable').length
+  // Flatten all features for the heatmap, sorted by module
+  const modules = [...byModule.keys()].sort()
+  const allFeatures = modules.flatMap((m) => byModule.get(m)!.features)
 
   return (
-    <Card style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-      <div className="flex justify-between items-baseline gap-3 flex-wrap">
-        <h3 className="sk-h3">功能进度</h3>
-        <div className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
-          {totalFeatures} 功能 · {stableFeatures} 稳定 · 跨 {groups.length} 模块
-        </div>
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+      <div className="flex items-baseline justify-between gap-3 flex-wrap">
+        <h3 className="sk-h3">功能矩阵 · {allFeatures.length} 功能</h3>
+        <Legend />
       </div>
 
       <CardContent className="p-0">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
-          {groups.map((group) => {
-            const isCollapsed = collapsed.has(group.module)
+        <div className="overflow-x-auto" style={{ scrollbarWidth: 'thin' }}>
+          {/* Column headers: modules */}
+          <div className="flex" style={{ minWidth: modules.length * 140 + 140 }}>
+            <div style={{ width: 140, flexShrink: 0, padding: '0 8px' }}>
+              <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)' }}>功能</span>
+            </div>
+            {modules.map((m) => (
+              <div key={m} style={{ width: 140, flexShrink: 0, padding: '0 8px', textAlign: 'center' }}>
+                <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-2)', fontWeight: 600 }}>{m}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Heatmap rows */}
+          {allFeatures.map((f) => {
+            const pct = f.total > 0 ? Math.round((f.done / f.total) * 100) : 0
+            const isModuleFirst = allFeatures.indexOf(f) === allFeatures.findIndex((x) => x.module === f.module)
+
             return (
-              <div key={group.module}>
-                {/* Module header — accordion toggle */}
-                <button
-                  onClick={() => toggleModule(group.module)}
-                  style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    gap: 6,
-                    padding: '8px 14px',
-                    cursor: 'pointer',
-                    width: '100%',
-                    border: 'none',
-                    borderBottom: isCollapsed ? 'none' : '1.2px dashed var(--ink-4)',
-                    background: 'rgba(0,0,0,0.03)',
-                    textAlign: 'left',
-                  }}
-                >
-                  {isCollapsed ? <ChevronRight size={16} /> : <ChevronDown size={16} />}
-                  <span className="sk-h3" style={{ fontSize: 17 }}>{group.module}</span>
-                  <span className="sk-chip" style={{ fontSize: 10, marginLeft: 8 }}>
-                    {group.features.length} 功能
-                  </span>
-                </button>
-
-                {/* Feature cards */}
-                {!isCollapsed && (
-                  <div
+              <div key={f.id}>
+                {isModuleFirst && (
+                  <div className="sk-body" style={{ fontSize: 9, color: 'var(--ink-4)', padding: '2px 8px', marginTop: 2 }}>
+                    {f.module}
+                  </div>
+                )}
+                <div className="flex" style={{ minWidth: modules.length * 140 + 140 }}>
+                  {/* Feature name column */}
+                  <button
+                    className="text-left"
                     style={{
-                      display: 'grid',
-                      gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                      gap: 8,
-                      padding: '8px 14px 12px',
+                      width: 140, flexShrink: 0, padding: '4px 8px',
+                      borderBottom: '1px solid var(--ink-4)',
+                      cursor: 'pointer', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                      display: 'flex', flexDirection: 'column', gap: 2,
                     }}
+                    onClick={() => setExpanded(expanded === f.id ? null : f.id)}
                   >
-                    {group.features.map((f) => {
-                      const pct = f.total > 0 ? Math.round((f.done / f.total) * 100) : 0
-                      const statusColor = STATUS_COLOR[f.status]
-                      const statusBg = STATUS_BG[f.status]
-                      return (
-                        <div
-                          key={f.id}
-                          style={{
-                            border: '1.6px solid var(--ink)',
-                            borderLeft: `4px solid ${statusColor}`,
-                            borderRadius: 'var(--sk-radius)',
-                            background: statusBg,
-                            padding: '10px 12px',
-                            display: 'flex',
-                            flexDirection: 'column',
-                            gap: 6,
-                          }}
-                        >
-                          {/* Header row: name + status badge */}
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="sk-body" style={{ fontWeight: 700, fontSize: 13 }}>
-                              {f.name}
-                            </span>
-                            <span
-                              className="sk-chip"
-                              style={{
-                                fontSize: 10,
-                                padding: '1px 7px',
-                                background: statusColor,
-                                color: 'var(--paper)',
-                                borderColor: 'var(--ink)',
-                              }}
-                            >
-                              {STATUS_LABEL[f.status]}
-                            </span>
-                          </div>
+                    <span className="sk-mono truncate" style={{ fontSize: 10 }} title={f.name}>{f.id}</span>
+                    <div className="flex items-center gap-2">
+                      <MiniBar pct={pct} blocked={f.blocked} />
+                      <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-3)' }}>{f.done}/{f.total}</span>
+                    </div>
+                  </button>
 
-                          {/* Progress bar + done/total */}
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                            <div className="sk-progress-track" style={{ flex: 1, height: 8 }}>
-                              <div
-                                className="sk-progress-fill"
-                                style={{
-                                  width: `${pct}%`,
-                                  background: statusColor,
-                                }}
-                              />
-                            </div>
-                            <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', whiteSpace: 'nowrap' }}>
-                              {f.done}/{f.total}
-                            </span>
-                          </div>
+                  {/* Module cells — only the cell for this feature's module is active */}
+                  {modules.map((m) => {
+                    const isOwn = m === f.module
+                    const bg = isOwn ? cellBg(pct) : 'transparent'
 
-                          {/* Blocked count */}
-                          {f.blocked > 0 && (
-                            <div className="sk-mono" style={{ fontSize: 10, color: 'var(--danger)' }}>
-                              阻塞: {f.blocked}
+                    return (
+                      <div
+                        key={m}
+                        style={{
+                          width: 140, flexShrink: 0, padding: '4px 8px',
+                          borderBottom: '1px solid var(--ink-4)',
+                          background: bg,
+                          display: 'flex', flexDirection: 'column', gap: 2, justifyContent: 'center',
+                        }}
+                      >
+                        {isOwn && (
+                          <>
+                            <div className="sk-progress-track" style={{ height: 4 }}>
+                              <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct, f.blocked) }} />
                             </div>
-                          )}
+                            <div className="flex items-baseline justify-between" style={{ fontSize: 9 }}>
+                              <span style={{ color: 'var(--ink-2)' }}>{pct}%</span>
+                              {f.blocked > 0 && <span style={{ color: 'var(--danger)' }}>⊘{f.blocked}</span>}
+                            </div>
+                          </>
+                        )}
+                        {!isOwn && <span style={{ fontSize: 9, color: 'var(--ink-4)', textAlign: 'center' }}>—</span>}
+                      </div>
+                    )
+                  })}
+                </div>
 
-                          {/* Mini task list — 3 most recent pending/in_progress */}
-                          {f.pendingTasks.length > 0 && (
-                            <div
-                              style={{
-                                marginTop: 4,
-                                display: 'flex',
-                                flexDirection: 'column',
-                                gap: 2,
-                              }}
-                            >
-                              {f.pendingTasks.map((t) => (
-                                <div
-                                  key={t.id}
-                                  className="sk-mono"
-                                  style={{
-                                    fontSize: 10,
-                                    color: 'var(--ink-3)',
-                                    paddingLeft: 6,
-                                    borderLeft: '2px solid var(--ink-4)',
-                                    overflow: 'hidden',
-                                    textOverflow: 'ellipsis',
-                                    whiteSpace: 'nowrap',
-                                  }}
-                                  title={t.name}
-                                >
-                                  {t.status === 'in_progress' ? '▶ ' : '○ '}
-                                  {t.name}
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      )
-                    })}
+                {/* Expanded task list */}
+                {expanded === f.id && (
+                  <div style={{ padding: '6px 12px', background: 'var(--paper-2)', borderBottom: '1px solid var(--ink-4)' }}>
+                    <div className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)', marginBottom: 4 }}>{f.name}</div>
+                    {tasks.filter((t) => t.feature === f.id).slice(0, 10).map((t) => (
+                      <div key={t.id} className="flex items-baseline gap-2" style={{ fontSize: 11, padding: '1px 0' }}>
+                        <span className="sk-mono" style={{ color: 'var(--ink-3)' }}>{t.id}</span>
+                        <span className="sk-body truncate" style={{ color: t.status === 'completed' ? 'var(--ink-4)' : 'var(--ink-1)', textDecoration: t.status === 'completed' ? 'line-through' : 'none' }}>{t.name}</span>
+                        <span className="sk-chip" style={{ fontSize: 8, background: t.status === 'completed' ? 'var(--accent-3)' : 'var(--paper)', color: t.status === 'completed' ? 'var(--paper)' : 'var(--ink-3)' }}>{t.status}</span>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -272,46 +205,24 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
   )
 }
 
-// ── Skeleton ──
-
 export function FeatureProgressSkeleton() {
   return (
     <Card>
-      <CardHeader><CardTitle>功能进度</CardTitle></CardHeader>
+      <CardHeader><CardTitle>功能矩阵</CardTitle></CardHeader>
       <CardContent>
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-          {Array.from({ length: 2 }).map((_, gi) => (
-            <div key={gi}>
-              <div style={{ marginBottom: 8 }}>
-                <span className="sk-bar med" style={{ height: 20 }} />
+        <div className="overflow-x-auto">
+          <div style={{ minWidth: 400 }}>
+            {[1, 2, 3, 4].map((i) => (
+              <div key={i} className="flex" style={{ gap: 0 }}>
+                <div style={{ width: 140, padding: '4px 8px' }}>
+                  <span className="sk-bar long" style={{ height: 8 }} />
+                </div>
+                <div style={{ width: 140, padding: '4px 8px' }}>
+                  <div className="sk-progress-track" style={{ height: 4 }} />
+                </div>
               </div>
-              <div
-                style={{
-                  display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-                  gap: 8,
-                }}
-              >
-                {Array.from({ length: 3 }).map((_, fi) => (
-                  <div
-                    key={fi}
-                    style={{
-                      border: '1.6px solid var(--ink)',
-                      borderRadius: 'var(--sk-radius)',
-                      padding: '10px 12px',
-                      display: 'flex',
-                      flexDirection: 'column',
-                      gap: 8,
-                    }}
-                  >
-                    <span className="sk-bar long" style={{ height: 7 }} />
-                    <div className="sk-progress-track" style={{ height: 8 }} />
-                    <span className="sk-bar" style={{ width: 60, height: 5 }} />
-                  </div>
-                ))}
-              </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       </CardContent>
     </Card>
