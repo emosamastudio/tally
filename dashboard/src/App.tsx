@@ -20,11 +20,10 @@ import DashboardLayout from '@/components/dashboard-layout'
 import type { NavCategory } from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
-import OverviewBar, { OverviewBarSkeleton } from '@/components/overview-bar'
-import ProgressTrend from '@/components/progress-trend'
+import HealthHeader, { HealthHeaderSkeleton } from '@/components/health-header'
+import AttentionPanel, { AttentionPanelSkeleton } from '@/components/attention-panel'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
-import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
 import AgentActivity, { AgentActivitySkeleton } from '@/components/agent-activity'
@@ -88,7 +87,7 @@ export default function App() {
 
   if (state.status === 'loading' || state.status === 'idle') {
     const loadingCategories: NavCategory[] = [
-      { id: 'overview', label: '概览', sections: ['overview-bar', 'progress-trend', 'block-list'] },
+      { id: 'overview', label: '概览', sections: ['health-header', 'attention-panel'] },
       { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress'] },
       { id: 'execution', label: '执行', sections: ['current-round', 'agent-activity'] },
       { id: 'tasks', label: '任务', sections: ['task-table'] },
@@ -117,8 +116,8 @@ export default function App() {
         }
         categories={loadingCategories}
         children={{
-          'overview-bar': <OverviewBarSkeleton />,
-          'block-list': <BlockListSkeleton />,
+          'health-header': <HealthHeaderSkeleton />,
+          'attention-panel': <AttentionPanelSkeleton />,
           'stage-matrix': <StageMatrixSkeleton />,
           'feature-progress': <FeatureProgressSkeleton />,
           'current-round': <CurrentRoundSkeleton />,
@@ -144,7 +143,7 @@ export default function App() {
     )
   }
 
-  const { merged, os, rounds, modules, features } = state.data
+  const { merged, os, rounds, features } = state.data
   const allTasks = os.tasks
 
   return (
@@ -175,7 +174,7 @@ export default function App() {
           {
             id: 'overview',
             label: '概览',
-            sections: ['overview-bar', 'progress-trend', 'block-list'],
+            sections: ['health-header', 'attention-panel'],
           },
           {
             id: 'planning',
@@ -200,19 +199,14 @@ export default function App() {
         ]}
         children={{
           // 概览
-          'overview-bar': (
-            <ErrorBoundary fallbackName="概览">
-              <OverviewBar data={merged} tasks={allTasks} modules={modules} />
+          'health-header': (
+            <ErrorBoundary fallbackName="项目健康">
+              <HealthHeader tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} />
             </ErrorBoundary>
           ),
-          'progress-trend': (
-            <ErrorBoundary fallbackName="进度趋势">
-              <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
-            </ErrorBoundary>
-          ),
-          'block-list': (
-            <ErrorBoundary fallbackName="阻塞列表">
-              <BlockList blocks={merged.activeBlocks} />
+          'attention-panel': (
+            <ErrorBoundary fallbackName="需关注">
+              <AttentionPanel tasks={allTasks} blocks={merged.activeBlocks} />
             </ErrorBoundary>
           ),
           // 规划

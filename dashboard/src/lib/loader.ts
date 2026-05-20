@@ -38,6 +38,14 @@ interface TallyTaskRaw {
   claimedAt: string | null
   createdAt: string
   completedAt: string | null
+  writeScopes?: string[]
+  riskLevel?: string
+  requiresReview?: boolean
+  approvedBy?: string | null
+  deliveryNode?: string | null
+  executionLane?: string | null
+  repos?: string[]
+  resourceRequirements?: string[]
 }
 
 interface TallyPlannedTaskRaw {
@@ -236,6 +244,14 @@ function adaptTask(raw: TallyTaskRaw, source: TaskSource, order: number): Task {
     completedAt: raw.completedAt,
     completedOrder: raw.completedOrder ?? undefined,
     order: raw.order ?? order,
+    writeScopes: raw.writeScopes,
+    riskLevel: raw.riskLevel,
+    requiresReview: raw.requiresReview,
+    approvedBy: raw.approvedBy ?? null,
+    deliveryNode: raw.deliveryNode ?? null,
+    executionLane: raw.executionLane ?? null,
+    repos: raw.repos,
+    resourceRequirements: raw.resourceRequirements,
   }
 }
 

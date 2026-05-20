@@ -31,8 +31,16 @@ export interface Task {
   createdAt: string
   completedAt: string | null
   completedOrder?: number
-  /** Original row position in source ledger (for default sort) */
   order: number
+  // v0.4.0 scheduling & safety fields
+  writeScopes?: string[]
+  riskLevel?: string
+  requiresReview?: boolean
+  approvedBy?: string | null
+  deliveryNode?: string | null
+  executionLane?: string | null
+  repos?: string[]
+  resourceRequirements?: string[]
 }
 
 export interface RoundTask {
