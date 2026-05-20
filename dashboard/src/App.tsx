@@ -49,7 +49,7 @@ function ShortcutHelp({ onClose }: { onClose: () => void }) {
     { key: '?', desc: '显示/隐藏快捷键帮助' },
     { key: '/', desc: '聚焦搜索框' },
     { key: 'r', desc: '手动刷新数据' },
-    { key: '1-5', desc: '跳转到对应行' },
+    { key: '1-8', desc: '跳转到对应行' },
     { key: 'Esc', desc: '关闭面板/弹窗' },
   ]
 
@@ -142,7 +142,7 @@ export default function App() {
     }
 
     const numKey = parseInt(e.key)
-    if (numKey >= 1 && numKey <= 5 && !isInput) {
+    if (numKey >= 1 && numKey <= 8 && !isInput) {
       const el = sectionRefs.current[numKey]
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'start' })
@@ -339,21 +339,21 @@ export default function App() {
           </section>
         }
         agentActivity={
-          <section>
+          <section ref={(el) => { sectionRefs.current[6] = el }}>
             <ErrorBoundary fallbackName="活跃Agent">
               <AgentActivity rounds={rounds} tasks={allTasks} />
             </ErrorBoundary>
           </section>
         }
         roundTimeline={
-          <section>
+          <section ref={(el) => { sectionRefs.current[7] = el }}>
             <ErrorBoundary fallbackName="回合时间线">
               <RoundTimeline rounds={rounds} tasks={allTasks} />
             </ErrorBoundary>
           </section>
         }
         featureDeps={
-          <section>
+          <section ref={(el) => { sectionRefs.current[8] = el }}>
             <ErrorBoundary fallbackName="功能依赖">
               <FeatureDeps features={features} tasks={allTasks} />
             </ErrorBoundary>

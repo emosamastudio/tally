@@ -16,6 +16,8 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
   const [showHistory, setShowHistory] = useState(false)
 
   if (!round) {
+    // Show most recent completed round if available
+    const lastCompleted = allRounds?.filter((r) => r.status === 'completed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))[0]
     return (
       <Card tilt={1}>
         <CardHeader>
@@ -23,6 +25,16 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
         </CardHeader>
         <CardContent>
           <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无活跃回合</p>
+          {lastCompleted && (
+            <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--paper-2)', borderRadius: 'var(--sk-radius)' }}>
+              <div className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>最近完成</div>
+              <div className="sk-mono" style={{ fontSize: 12, marginTop: 2 }}>{lastCompleted.id}</div>
+              <div className="sk-body" style={{ fontSize: 11, color: 'var(--ink-2)', marginTop: 2 }}>{lastCompleted.scope}</div>
+              <div className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 4 }}>
+                完成于 {lastCompleted.completedAt} · {lastCompleted.tasks.length} 任务
+              </div>
+            </div>
+          )}
         </CardContent>
       </Card>
     )
