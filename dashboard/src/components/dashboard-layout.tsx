@@ -10,6 +10,7 @@ interface DashboardLayoutProps {
   stageMatrix: ReactNode
   featureProgress?: ReactNode
   agentActivity?: ReactNode
+  roundTimeline?: ReactNode
   dependencyGraph: ReactNode
   taskTable: ReactNode
 }
@@ -23,6 +24,7 @@ export default function DashboardLayout({
   stageMatrix,
   featureProgress,
   agentActivity,
+  roundTimeline,
   dependencyGraph,
   taskTable,
 }: DashboardLayoutProps) {
@@ -57,6 +59,9 @@ export default function DashboardLayout({
 
         {/* ROW 4.6: Agent Activity */}
         {agentActivity && <section>{agentActivity}</section>}
+
+        {/* ROW 4.7: Round Timeline */}
+        {roundTimeline && <section>{roundTimeline}</section>}
 
         {/* ROW 5: DependencyGraph (tall) */}
         <section className="min-h-[400px] md:min-h-[500px]">{dependencyGraph}</section>
