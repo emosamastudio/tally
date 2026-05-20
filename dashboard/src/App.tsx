@@ -20,8 +20,8 @@ import DashboardLayout from '@/components/dashboard-layout'
 import type { NavCategory } from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
-import HealthHeader, { HealthHeaderSkeleton } from '@/components/health-header'
-import AttentionPanel, { AttentionPanelSkeleton } from '@/components/attention-panel'
+import OverviewPanel from '@/components/overview-panel'
+import { HealthHeaderSkeleton } from '@/components/health-header'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
@@ -87,7 +87,7 @@ export default function App() {
 
   if (state.status === 'loading' || state.status === 'idle') {
     const loadingCategories: NavCategory[] = [
-      { id: 'overview', label: '概览', sections: ['health-header', 'attention-panel'] },
+      { id: 'overview', label: '概览', sections: ['overview-panel'] },
       { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress'] },
       { id: 'execution', label: '执行', sections: ['current-round', 'agent-activity'] },
       { id: 'tasks', label: '任务', sections: ['task-table'] },
@@ -116,8 +116,7 @@ export default function App() {
         }
         categories={loadingCategories}
         children={{
-          'health-header': <HealthHeaderSkeleton />,
-          'attention-panel': <AttentionPanelSkeleton />,
+          'overview-panel': <HealthHeaderSkeleton />,
           'stage-matrix': <StageMatrixSkeleton />,
           'feature-progress': <FeatureProgressSkeleton />,
           'current-round': <CurrentRoundSkeleton />,
@@ -174,7 +173,7 @@ export default function App() {
           {
             id: 'overview',
             label: '概览',
-            sections: ['health-header', 'attention-panel'],
+            sections: ['overview-panel'],
           },
           {
             id: 'planning',
@@ -199,14 +198,9 @@ export default function App() {
         ]}
         children={{
           // 概览
-          'health-header': (
-            <ErrorBoundary fallbackName="项目健康">
-              <HealthHeader tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} />
-            </ErrorBoundary>
-          ),
-          'attention-panel': (
-            <ErrorBoundary fallbackName="需关注">
-              <AttentionPanel tasks={allTasks} blocks={merged.activeBlocks} />
+          'overview-panel': (
+            <ErrorBoundary fallbackName="概览">
+              <OverviewPanel tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} />
             </ErrorBoundary>
           ),
           // 规划
