@@ -3,4 +3,5 @@ dist/
 *.tsbuildinfo
 tally.json
 .tallyrc.yaml
+.tally.json.bak
 coverage/

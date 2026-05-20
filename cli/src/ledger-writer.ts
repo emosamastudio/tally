@@ -1,5 +1,5 @@
 // cli/src/ledger-writer.ts
-import { writeFileSync, renameSync, existsSync, readFileSync, unlinkSync, openSync, fsyncSync, closeSync } from 'fs'
+import { writeFileSync, renameSync, existsSync, readFileSync, unlinkSync, openSync, fsyncSync, closeSync, copyFileSync } from 'fs'
 import { join } from 'path'
 import type { TallyDocument } from './types.js'
 
@@ -104,6 +104,12 @@ export function writeLedger(
     const fullPath = join(cwd, filename)
     const tmpPath = join(cwd, `.${filename}.tmp`)
     const json = JSON.stringify(doc, null, 2) + '\n'
+
+    // Backup: save current ledger before overwriting
+    const bakPath = join(cwd, `.${filename}.bak`)
+    if (existsSync(fullPath)) {
+      try { copyFileSync(fullPath, bakPath) } catch { /* best-effort */ }
+    }
 
     // Atomic write: temp file → fsync → rename
     writeFileSync(tmpPath, json, 'utf-8')
