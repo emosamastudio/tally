@@ -1,6 +1,6 @@
 import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
-import type { StatusResult, FeatureBreakdown, ActiveRoundInfo, TallyDocument } from '../types.js'
+import type { StatusResult, FeatureBreakdown, ActiveRoundInfo, DeliveryNodeInfo, TallyDocument } from '../types.js'
 
 function computeStatus(doc: TallyDocument): StatusResult {
   const tasks = doc.tasks
@@ -48,6 +48,20 @@ function computeStatus(doc: TallyDocument): StatusResult {
       }
     })
 
+  // Delivery node breakdown
+  const nodeMap = new Map<string, { total: number; done: number; blocked: number }>()
+  for (const t of tasks) {
+    const node = t.deliveryNode || '__none__'
+    if (!nodeMap.has(node)) nodeMap.set(node, { total: 0, done: 0, blocked: 0 })
+    const nd = nodeMap.get(node)!
+    nd.total++
+    if (t.status === 'done') nd.done++
+    else if (t.status === 'blocked') nd.blocked++
+  }
+  const deliveryNodes: DeliveryNodeInfo[] = [...nodeMap.entries()]
+    .map(([node, nd]) => ({ node, ...nd }))
+    .sort((a, b) => a.node.localeCompare(b.node))
+
   return {
     totalDone: done,
     totalOpen: open,
@@ -57,6 +71,7 @@ function computeStatus(doc: TallyDocument): StatusResult {
     activeBlocks: doc.blocks.filter((b) => b.resolvedAt === null).length,
     features,
     activeRounds,
+    deliveryNodes,
   }
 }
 
@@ -94,6 +109,15 @@ export function statusCommand(): Command {
             }
             if (s.features.length > 10) {
               console.log(`  ... and ${s.features.length - 10} more features`)
+            }
+          }
+          if (s.deliveryNodes.length > 0 && s.deliveryNodes.some((d) => d.node !== '__none__')) {
+            console.log('')
+            console.log('Delivery nodes:')
+            for (const d of s.deliveryNodes) {
+              const label = d.node === '__none__' ? '(no milestone)' : d.node
+              const pct = d.total > 0 ? Math.round((d.done / d.total) * 100) : 0
+              console.log(`  ${label}: ${d.done}/${d.total} done${d.blocked > 0 ? ` (${d.blocked} blocked)` : ''} — ${pct}%`)
             }
           }
         }

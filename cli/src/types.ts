@@ -226,6 +226,13 @@ export interface ActiveRoundInfo {
   doneCount: number
 }
 
+export interface DeliveryNodeInfo {
+  node: string
+  total: number
+  done: number
+  blocked: number
+}
+
 export interface StatusResult {
   totalDone: number
   totalOpen: number
@@ -235,6 +242,7 @@ export interface StatusResult {
   activeBlocks: number
   features: FeatureBreakdown[]
   activeRounds: ActiveRoundInfo[]
+  deliveryNodes: DeliveryNodeInfo[]
 }
 
 export interface GraphResult {
