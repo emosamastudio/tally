@@ -66,11 +66,14 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
             ))}
           </nav>
 
-          {/* Category hint */}
+          {/* Category hint + breadcrumb */}
           <div className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', display: 'flex', gap: 12, marginTop: 2 }}>
-            <span>←→ 切换分类</span>
-            <span>↑↓ 导航板块</span>
-            <span>1-{categories.length} 快速跳转</span>
+            <span>←→ 分类</span>
+            <span>↑↓ 选择</span>
+            <span>1-{categories.length} 跳转</span>
+            <span style={{ marginLeft: 'auto', color: 'var(--ink-2)' }}>
+              {categories[nav.activeCategory]?.label} › {categories[nav.activeCategory]?.sections[nav.activeSection]}
+            </span>
           </div>
         </div>
       </div>
@@ -94,12 +97,27 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                     key={sectionId}
                     id={`nav-${sectionId}`}
                     style={{
-                      outline: isFocused ? '2px solid var(--accent)' : 'none',
-                      outlineOffset: 2,
-                      borderRadius: 'var(--sk-radius)',
-                      transition: 'outline 0.15s',
+                      borderLeft: isFocused ? '3px solid var(--accent)' : '3px solid transparent',
+                      background: isFocused ? 'rgba(245,180,60,0.06)' : 'transparent',
+                      borderRadius: '0 var(--sk-radius) var(--sk-radius) 0',
+                      paddingLeft: isFocused ? 12 : 0,
+                      transition: 'border-color 0.2s, background 0.2s, padding 0.2s',
+                      position: 'relative',
                     }}
                   >
+                    {isFocused && (
+                      <div style={{
+                        position: 'absolute', left: -16, top: 8,
+                        width: 24, height: 20,
+                        background: 'var(--accent)',
+                        borderRadius: '0 3px 3px 0',
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>
+                        <span style={{ fontSize: 9, color: 'var(--paper)', fontWeight: 700 }}>
+                          {si + 1}
+                        </span>
+                      </div>
+                    )}
                     {content}
                   </section>
                 )
