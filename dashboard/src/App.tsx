@@ -13,10 +13,11 @@
  * - CurrentRound: SVG progress ring + collapsible round timeline
  * - TaskTable: inline dependency chain in expanded rows
  */
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect } from 'react'
 import { Sun, Moon } from 'lucide-react'
 import { useLedgerData } from '@/hooks/useLedgerData'
 import DashboardLayout from '@/components/dashboard-layout'
+import type { NavCategory } from '@/components/dashboard-layout'
 import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
 import OverviewBar, { OverviewBarSkeleton } from '@/components/overview-bar'
@@ -26,10 +27,9 @@ import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import BlockList, { BlockListSkeleton } from '@/components/block-list'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
 import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
-import ChartsCarousel, { ChartsCarouselSkeleton } from '@/components/charts-carousel'
 import AgentActivity, { AgentActivitySkeleton } from '@/components/agent-activity'
 import RoundTimeline from '@/components/round-timeline'
-import FeatureDeps, { FeatureDepsSkeleton } from '@/components/feature-deps'
+import FeatureDeps from '@/components/feature-deps'
 import {
   LazyRoundAnalytics,
   LazyAgentContribution,
@@ -44,54 +44,10 @@ function formatTime(date: Date): string {
   return `${hh}:${mm}:${ss}`
 }
 
-function ShortcutHelp({ onClose }: { onClose: () => void }) {
-  const shortcuts = [
-    { key: '?', desc: '显示/隐藏快捷键帮助' },
-    { key: '/', desc: '聚焦搜索框' },
-    { key: 'r', desc: '手动刷新数据' },
-    { key: '1-8', desc: '跳转到对应行' },
-    { key: 'Esc', desc: '关闭面板/弹窗' },
-  ]
-
-  return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center"
-      style={{ background: 'rgba(0,0,0,0.35)' }}
-      onClick={onClose}
-    >
-      <div
-        className="sk-box"
-        style={{ minWidth: 300, maxWidth: 400, padding: '24px 28px' }}
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center justify-between mb-3">
-          <h2 className="sk-h2">快捷键</h2>
-          <button
-            onClick={onClose}
-            className="sk-chip"
-            style={{ cursor: 'pointer' }}
-          >
-            Esc
-          </button>
-        </div>
-        <div className="space-y-2">
-          {shortcuts.map((s) => (
-            <div key={s.key} className="flex items-center justify-between">
-              <span className="sk-body" style={{ fontSize: 13 }}>{s.desc}</span>
-              <span className="sk-chip solid" style={{ fontFamily: 'JetBrains Mono, monospace', fontSize: 11 }}>
-                {s.key}
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
-    </div>
-  )
-}
 
 export default function App() {
   const [selectedProject, setSelectedProject] = useState<string | null>(null)
-  const [refreshKey, setRefreshKey] = useState(0)
+  const [refreshKey, _setRefreshKey] = useState(0)
   const { state, projects, lastRefreshed } = useLedgerData(selectedProject, refreshKey)
 
   // Theme state
@@ -103,57 +59,6 @@ export default function App() {
     document.documentElement.setAttribute('data-theme', theme)
     localStorage.setItem('tally-theme', theme)
   }, [theme])
-
-  // Shortcut help modal
-  const [showShortcuts, setShowShortcuts] = useState(false)
-
-  // Keyboard shortcuts
-  const sectionRefs = useRef<(HTMLElement | null)[]>([])
-
-  const handleKeyDown = useCallback((e: KeyboardEvent) => {
-    // Ignore if user is typing in an input
-    const tag = (e.target as HTMLElement).tagName
-    const isInput = tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT'
-
-    if (e.key === '?' && !isInput) {
-      e.preventDefault()
-      setShowShortcuts((prev) => !prev)
-      return
-    }
-
-    if (e.key === 'Escape') {
-      setShowShortcuts(false)
-      return
-    }
-
-    if (showShortcuts) return // when shortcut panel is open, only Esc works
-
-    if (e.key === '/' && !isInput) {
-      e.preventDefault()
-      const searchInput = document.querySelector<HTMLInputElement>('input[placeholder="搜索任务..."]')
-      searchInput?.focus()
-      return
-    }
-
-    if (e.key === 'r' && !isInput) {
-      e.preventDefault()
-      setRefreshKey((k) => k + 1)
-      return
-    }
-
-    const numKey = parseInt(e.key)
-    if (numKey >= 1 && numKey <= 8 && !isInput) {
-      const el = sectionRefs.current[numKey]
-      if (el) {
-        el.scrollIntoView({ behavior: 'smooth', block: 'start' })
-      }
-    }
-  }, [showShortcuts])
-
-  useEffect(() => {
-    window.addEventListener('keydown', handleKeyDown)
-    return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [handleKeyDown])
 
   // Auto-select first project when multi-project mode is detected
   useEffect(() => {
@@ -182,6 +87,13 @@ export default function App() {
   ) : null
 
   if (state.status === 'loading' || state.status === 'idle') {
+    const loadingCategories: NavCategory[] = [
+      { id: 'overview', label: '概览', sections: ['overview-bar', 'progress-trend', 'block-list'] },
+      { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress'] },
+      { id: 'execution', label: '执行', sections: ['current-round', 'agent-activity'] },
+      { id: 'tasks', label: '任务', sections: ['task-table'] },
+      { id: 'graphs', label: '图谱', sections: ['dependency-graph'] },
+    ]
     return (
       <DashboardLayout
         header={
@@ -192,14 +104,8 @@ export default function App() {
             </div>
             <div className="flex gap-2 items-center flex-wrap">
               {projects.length > 0 ? (
-                <select
-                  className="sk-select"
-                  value={selectedProject ?? ''}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
-                  ))}
+                <select className="sk-select" value={selectedProject ?? ''} onChange={(e) => setSelectedProject(e.target.value)}>
+                  {projects.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
                 </select>
               ) : (
                 <span className="sk-chip shrink-0">Tally</span>
@@ -209,17 +115,17 @@ export default function App() {
             </div>
           </div>
         }
-        overview={<OverviewBarSkeleton />}
-        blockList={<BlockListSkeleton />}
-        chartsCarousel={<ChartsCarouselSkeleton />}
-        currentRound={<CurrentRoundSkeleton />}
-        stageMatrix={<StageMatrixSkeleton />}
-        featureProgress={<FeatureProgressSkeleton />}
-        agentActivity={<AgentActivitySkeleton />}
-        roundTimeline={<AgentActivitySkeleton />}
-        featureDeps={<FeatureDepsSkeleton />}
-        dependencyGraph={<DependencyGraphSkeleton />}
-        taskTable={<TaskTableSkeleton />}
+        categories={loadingCategories}
+        children={{
+          'overview-bar': <OverviewBarSkeleton />,
+          'block-list': <BlockListSkeleton />,
+          'stage-matrix': <StageMatrixSkeleton />,
+          'feature-progress': <FeatureProgressSkeleton />,
+          'current-round': <CurrentRoundSkeleton />,
+          'agent-activity': <AgentActivitySkeleton />,
+          'task-table': <TaskTableSkeleton />,
+          'dependency-graph': <DependencyGraphSkeleton />,
+        }}
       />
     )
   }
@@ -243,27 +149,18 @@ export default function App() {
 
   return (
     <>
-      {showShortcuts && <ShortcutHelp onClose={() => setShowShortcuts(false)} />}
-
       <DashboardLayout
         header={
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
             <div className="flex items-baseline gap-4 min-w-0 flex-wrap">
               <h1 className="sk-h1 shrink-0" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
               {projects.length > 0 ? (
-                <select
-                  className="sk-select"
-                  value={selectedProject ?? ''}
-                  onChange={(e) => setSelectedProject(e.target.value)}
-                >
-                  {projects.map((p) => (
-                    <option key={p.name} value={p.name}>{p.name}</option>
-                  ))}
+                <select className="sk-select" value={selectedProject ?? ''} onChange={(e) => setSelectedProject(e.target.value)}>
+                  {projects.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
                 </select>
               ) : (
                 <span className="sk-chip shrink-0">{state.status === 'ready' ? state.data.projectName : 'Tally'}</span>
               )}
-              {refreshIndicator}
             </div>
             <div className="flex gap-2 shrink-0 items-center flex-wrap">
               {themeToggle}
@@ -274,103 +171,105 @@ export default function App() {
             </div>
           </div>
         }
-        overview={
-          <section ref={(el) => { sectionRefs.current[1] = el }}>
+        categories={[
+          {
+            id: 'overview',
+            label: '概览',
+            sections: ['overview-bar', 'progress-trend', 'block-list'],
+          },
+          {
+            id: 'planning',
+            label: '规划',
+            sections: ['stage-matrix', 'feature-progress', 'feature-deps'],
+          },
+          {
+            id: 'execution',
+            label: '执行',
+            sections: ['current-round', 'agent-activity', 'round-timeline', 'round-analytics'],
+          },
+          {
+            id: 'tasks',
+            label: '任务',
+            sections: ['task-table', 'agent-contribution'],
+          },
+          {
+            id: 'graphs',
+            label: '图谱',
+            sections: ['dependency-graph'],
+          },
+        ]}
+        children={{
+          // 概览
+          'overview-bar': (
             <ErrorBoundary fallbackName="概览">
               <OverviewBar data={merged} tasks={allTasks} modules={modules} />
             </ErrorBoundary>
-          </section>
-        }
-        blockList={
-          <ErrorBoundary fallbackName="阻塞列表">
-            <BlockList blocks={merged.activeBlocks} />
-          </ErrorBoundary>
-        }
-        chartsCarousel={
-          <section ref={(el) => { sectionRefs.current[2] = el }}>
-            <ChartsCarousel tabs={[
-              {
-                key: 'trend',
-                label: '进度趋势',
-                content: (
-                  <ErrorBoundary fallbackName="进度趋势">
-                    <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
-                  </ErrorBoundary>
-                ),
-              },
-              {
-                key: 'rounds',
-                label: '回合分析',
-                content: (
-                  <ErrorBoundary fallbackName="回合分析">
-                    <LazyRoundAnalytics rounds={rounds} tasks={allTasks} />
-                  </ErrorBoundary>
-                ),
-              },
-              {
-                key: 'agents',
-                label: 'Agent 贡献',
-                content: (
-                  <ErrorBoundary fallbackName="代理贡献">
-                    <LazyAgentContribution rounds={rounds} tasks={allTasks} />
-                  </ErrorBoundary>
-                ),
-              },
-            ]} />
-          </section>
-        }
-        currentRound={
-          <ErrorBoundary fallbackName="当前回合">
-            <CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />
-          </ErrorBoundary>
-        }
-        stageMatrix={
-          <section ref={(el) => { sectionRefs.current[3] = el }}>
+          ),
+          'progress-trend': (
+            <ErrorBoundary fallbackName="进度趋势">
+              <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
+            </ErrorBoundary>
+          ),
+          'block-list': (
+            <ErrorBoundary fallbackName="阻塞列表">
+              <BlockList blocks={merged.activeBlocks} />
+            </ErrorBoundary>
+          ),
+          // 规划
+          'stage-matrix': (
             <ErrorBoundary fallbackName="阶段矩阵">
               <StageMatrix stages={merged.allStages} />
             </ErrorBoundary>
-          </section>
-        }
-        featureProgress={
-          <section ref={(el) => { sectionRefs.current[4] = el }}>
+          ),
+          'feature-progress': (
             <ErrorBoundary fallbackName="功能进度">
               <LazyFeatureProgress features={features} tasks={allTasks} />
             </ErrorBoundary>
-          </section>
-        }
-        agentActivity={
-          <section ref={(el) => { sectionRefs.current[6] = el }}>
-            <ErrorBoundary fallbackName="活跃Agent">
-              <AgentActivity rounds={rounds} tasks={allTasks} />
-            </ErrorBoundary>
-          </section>
-        }
-        roundTimeline={
-          <section ref={(el) => { sectionRefs.current[7] = el }}>
-            <ErrorBoundary fallbackName="回合时间线">
-              <RoundTimeline rounds={rounds} tasks={allTasks} />
-            </ErrorBoundary>
-          </section>
-        }
-        featureDeps={
-          <section ref={(el) => { sectionRefs.current[8] = el }}>
+          ),
+          'feature-deps': (
             <ErrorBoundary fallbackName="功能依赖">
               <FeatureDeps features={features} tasks={allTasks} />
             </ErrorBoundary>
-          </section>
-        }
-        dependencyGraph={
-          <section ref={(el) => { sectionRefs.current[5] = el }}>
+          ),
+          // 执行
+          'current-round': (
+            <ErrorBoundary fallbackName="当前回合">
+              <CurrentRound round={merged.activeRound} allRounds={rounds} allTasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          'agent-activity': (
+            <ErrorBoundary fallbackName="活跃Agent">
+              <AgentActivity rounds={rounds} tasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          'round-timeline': (
+            <ErrorBoundary fallbackName="回合时间线">
+              <RoundTimeline rounds={rounds} tasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          'round-analytics': (
+            <ErrorBoundary fallbackName="回合分析">
+              <LazyRoundAnalytics rounds={rounds} tasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          // 任务
+          'task-table': (
+            <ErrorBoundary fallbackName="任务列表">
+              <TaskTable tasks={allTasks} allTasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          'agent-contribution': (
+            <ErrorBoundary fallbackName="Agent贡献">
+              <LazyAgentContribution rounds={rounds} tasks={allTasks} />
+            </ErrorBoundary>
+          ),
+          // 图谱
+          'dependency-graph': (
             <ErrorBoundary fallbackName="依赖图">
               <DependencyGraph tasks={allTasks} />
             </ErrorBoundary>
-          </section>
-        }
-        taskTable={
-          <ErrorBoundary fallbackName="任务列表">
-            <TaskTable tasks={allTasks} allTasks={allTasks} />
-          </ErrorBoundary>
-        }
+          ),
+        }}
       />
     </>
   )
