@@ -168,7 +168,7 @@ If a round start fails due to a claim conflict, re-read `tally.json`, adjust tas
 
 See `standard/templates/tally-schema.md` for the full data model reference.
 
-Key task fields (v0.2.0):
+Key task fields (v0.4.0):
 
 | Category | Fields |
 |----------|--------|

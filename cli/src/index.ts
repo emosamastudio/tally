@@ -18,7 +18,7 @@ import { moduleCommand } from './commands/module.js'
 import { stageCommand } from './commands/stage.js'
 
 const program = new Command()
-program.name('tally').description('Agent-native task management').version('0.1.0')
+program.name('tally').description('Agent-native task management').version('0.4.0')
 
 program.addCommand(initCommand())
 program.addCommand(lintCommand())
