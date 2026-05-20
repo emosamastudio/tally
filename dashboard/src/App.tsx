@@ -29,6 +29,7 @@ import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependenc
 import ChartsCarousel, { ChartsCarouselSkeleton } from '@/components/charts-carousel'
 import AgentActivity, { AgentActivitySkeleton } from '@/components/agent-activity'
 import RoundTimeline from '@/components/round-timeline'
+import FeatureDeps, { FeatureDepsSkeleton } from '@/components/feature-deps'
 import {
   LazyRoundAnalytics,
   LazyAgentContribution,
@@ -216,6 +217,7 @@ export default function App() {
         featureProgress={<FeatureProgressSkeleton />}
         agentActivity={<AgentActivitySkeleton />}
         roundTimeline={<AgentActivitySkeleton />}
+        featureDeps={<FeatureDepsSkeleton />}
         dependencyGraph={<DependencyGraphSkeleton />}
         taskTable={<TaskTableSkeleton />}
       />
@@ -347,6 +349,13 @@ export default function App() {
           <section>
             <ErrorBoundary fallbackName="回合时间线">
               <RoundTimeline rounds={rounds} tasks={allTasks} />
+            </ErrorBoundary>
+          </section>
+        }
+        featureDeps={
+          <section>
+            <ErrorBoundary fallbackName="功能依赖">
+              <FeatureDeps features={features} tasks={allTasks} />
             </ErrorBoundary>
           </section>
         }

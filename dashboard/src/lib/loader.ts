@@ -89,6 +89,8 @@ interface TallyFeatureRaw {
   id: string
   module: string
   name: string
+  status?: string
+  dependsOn?: string[]
 }
 
 interface TallyMetaRaw {
@@ -291,11 +293,11 @@ function adaptModules(meta: TallyMetaRaw | undefined): ModuleMeta[] {
 }
 
 function adaptFeatures(meta: TallyMetaRaw | undefined, tasks: Task[]): FeatureMeta[] {
-  const featMap = new Map<string, { name: string; module: string; total: number; done: number; blocked: number }>()
+  const featMap = new Map<string, { name: string; module: string; total: number; done: number; blocked: number; status?: string; dependsOn?: string[] }>()
   // First, register features from meta
   if (meta?.features) {
     for (const f of meta.features) {
-      featMap.set(f.id, { name: f.name, module: f.module, total: 0, done: 0, blocked: 0 })
+      featMap.set(f.id, { name: f.name, module: f.module, total: 0, done: 0, blocked: 0, status: f.status, dependsOn: f.dependsOn })
     }
   }
   // Then count tasks

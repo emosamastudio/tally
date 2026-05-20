@@ -104,6 +104,8 @@ export interface FeatureMeta {
   total: number
   done: number
   blocked: number
+  status?: string
+  dependsOn?: string[]
 }
 
 export interface LedgerData {
