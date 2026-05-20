@@ -45,7 +45,8 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                     color: nav.activeCategory === ci ? 'var(--paper)' : 'var(--ink-2)',
                     borderColor: nav.activeCategory === ci ? 'var(--accent)' : 'var(--ink-4)',
                     fontWeight: nav.activeCategory === ci ? 600 : 400,
-                    outline: nav.focusLevel === 0 && nav.activeCategory === ci ? '2px solid var(--accent)' : 'none',
+                    outline: nav.focusLevel === 0 && nav.activeCategory === ci ? '2px solid var(--ink)' : 'none',
+                    outlineOffset: nav.focusLevel === 0 && nav.activeCategory === ci ? 2 : 0,
                   }}
                   onClick={() => nav.focusSection(ci, 0)}
                 >

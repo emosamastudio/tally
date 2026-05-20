@@ -8,19 +8,20 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "clsx": "^2.1.1",
+    "dagre": "^0.8.5",
+    "lucide-react": "^0.460.0",
+    "playwright": "^1.60.0",
     "react": "^19.0.0",
     "react-dom": "^19.0.0",
     "recharts": "^2.15.0",
-    "dagre": "^0.8.5",
-    "lucide-react": "^0.460.0",
-    "clsx": "^2.1.1",
     "tailwind-merge": "^2.6.0"
   },
   "devDependencies": {
+    "@tailwindcss/vite": "^4.0.0",
+    "@types/dagre": "^0.7.52",
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
-    "@types/dagre": "^0.7.52",
-    "@tailwindcss/vite": "^4.0.0",
     "@vitejs/plugin-react": "^4.3.4",
     "tailwindcss": "^4.0.0",
     "typescript": "~5.7.0",

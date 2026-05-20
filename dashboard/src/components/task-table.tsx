@@ -1,5 +1,7 @@
 // src/components/task-table.tsx
 import { useState, useMemo, useEffect, useCallback } from 'react'
+import { NavContext } from '@/components/dashboard-layout'
+import { useContext } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Progress } from '@/components/ui/progress'
@@ -229,6 +231,7 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
     <>
       <TableRow
         id={`task-row-${task.id}`}
+        data-nav-item={task.id}
         className="cursor-pointer"
         onClick={() => setExpanded(!expanded)}
       >
@@ -391,6 +394,9 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
   const [currentPage, setCurrentPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
 
+  // L2 keyboard nav: register task rows as focusable items
+  const nav = useContext(NavContext)
+
   // Build lookup maps from allTasks (or tasks if allTasks not provided)
   const lookupTasks = allTasks ?? tasks
   const taskMap = useMemo(() => {
@@ -484,6 +490,14 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
     () => filtered.slice((currentPage - 1) * pageSize, currentPage * pageSize),
     [filtered, currentPage, pageSize],
   )
+
+  // Register current page task IDs for L2 keyboard navigation
+  useEffect(() => {
+    if (nav) {
+      const ids = paginatedData.map((t) => t.id)
+      nav.registerItems('task-table', ids)
+    }
+  }, [nav, paginatedData])
 
   return (
     <Card thin style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>

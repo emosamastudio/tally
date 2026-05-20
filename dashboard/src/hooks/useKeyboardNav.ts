@@ -28,7 +28,7 @@ export function useNav() { return useContext(NavContext) }
 export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState {
   const [activeCategory, setActiveCategory] = useState(0)
   const [activeSection, setActiveSection] = useState(0)
-  const [focusLevel, setFocusLevel] = useState<0 | 1 | 2>(1)
+  const [focusLevel, setFocusLevel] = useState<0 | 1 | 2>(0)
   const [focusedItemIndex, setFocusedItemIndex] = useState(0)
 
   const itemRegistry = useRef<Map<string, string[]>>(new Map())
@@ -123,7 +123,7 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
     if (focusLevel !== 2) return
     const itemId = items[focusedItemIndex]
     if (!itemId) return
-    const el = document.getElementById(`focus-${itemId}`)
+    const el = document.querySelector(`[data-nav-item="${itemId}"]`)
     el?.scrollIntoView({ block: 'nearest', behavior: 'smooth' })
   }, [focusLevel, focusedItemIndex, items])
 
