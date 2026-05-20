@@ -1,8 +1,9 @@
 // src/components/round-timeline.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { Round, Task } from '@/lib/types'
 import { CheckCircle2, Play, ChevronDown, ChevronRight } from 'lucide-react'
+import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 
 interface RoundTimelineProps {
   rounds: Round[]
@@ -36,6 +37,31 @@ export default function RoundTimeline({ rounds, tasks }: RoundTimelineProps) {
   const visible = showAll ? sorted : sorted.slice(0, MAX_VISIBLE)
   const hidden = sorted.length - MAX_VISIBLE
 
+  // L2 keyboard navigation
+  const itemIds = visible.map(r => r.id)
+  const { isL2, focusedIndex } = useL2Navigation('round-timeline', itemIds)
+
+  // L2 Enter: auto-expand focused round
+  useEffect(() => {
+    if (!isL2) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        const id = itemIds[focusedIndex]
+        if (id) {
+          setExpanded(prev => {
+            const next = new Set(prev)
+            if (next.has(id)) next.delete(id)
+            else next.add(id)
+            return next
+          })
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isL2, focusedIndex, itemIds])
+
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="flex justify-between items-baseline">
@@ -50,7 +76,7 @@ export default function RoundTimeline({ rounds, tasks }: RoundTimelineProps) {
           <div className="absolute left-[19px] top-2 bottom-2" style={{ width: 2, background: 'var(--ink-4)', borderRadius: 1 }} />
 
           <div className="space-y-3">
-            {visible.map((round) => {
+            {visible.map((round, i) => {
               const isActive = round.status === 'active'
               const plannedIds = new Set(round.tasks.map((rt) => rt.taskId))
               const doneCount = tasks.filter((t) => plannedIds.has(t.id) && t.status === 'completed').length
@@ -73,7 +99,14 @@ export default function RoundTimeline({ rounds, tasks }: RoundTimelineProps) {
 
                   <div
                     className="sk-box fill flex-1"
-                    style={{ padding: '8px 12px', borderStyle: isActive ? 'solid' : 'dashed', borderWidth: isActive ? 'var(--sk-border)' : '1.6px', cursor: isActive ? 'default' : 'pointer' }}
+                    data-nav-item={round.id}
+                    style={{
+                      padding: '8px 12px',
+                      borderStyle: isActive ? 'solid' : 'dashed',
+                      borderWidth: isActive ? 'var(--sk-border)' : '1.6px',
+                      cursor: isActive ? 'default' : 'pointer',
+                      ...l2FocusStyle(isL2 && focusedIndex === i),
+                    }}
                     onClick={() => !isActive && toggleExpand(round.id)}
                   >
                     {/* Compact header row — always visible */}

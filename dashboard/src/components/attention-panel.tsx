@@ -1,10 +1,12 @@
 // src/components/attention-panel.tsx
 import { Card } from '@/components/ui/card'
 import type { Task, BlockItem } from '@/lib/types'
+import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 
 interface AttentionPanelProps {
   tasks: Task[]
   blocks: BlockItem[]
+  sectionId?: string
 }
 
 interface AttentionItem {
@@ -15,7 +17,7 @@ interface AttentionItem {
   action: string
 }
 
-export default function AttentionPanel({ tasks }: AttentionPanelProps) {
+export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps) {
   const items: AttentionItem[] = []
 
   // Blocked tasks
@@ -70,6 +72,9 @@ export default function AttentionPanel({ tasks }: AttentionPanelProps) {
     })
   }
 
+  const itemIds = items.map((_, i) => `attention-${i}`)
+  const { isL2, focusedIndex } = useL2Navigation(sectionId ?? '__none__', itemIds)
+
   if (items.length === 0) {
     return (
       <Card style={{ padding: '10px 16px' }}>
@@ -94,7 +99,7 @@ export default function AttentionPanel({ tasks }: AttentionPanelProps) {
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 4 }}>
         {items.map((item, i) => (
-          <div key={i} className="flex items-baseline gap-2" style={{ padding: '3px 0', borderBottom: i < items.length - 1 ? '1px solid var(--ink-4)' : 'none' }}>
+          <div key={i} data-nav-item={`attention-${i}`} className="flex items-baseline gap-2" style={{ padding: '3px 0', borderBottom: i < items.length - 1 ? '1px solid var(--ink-4)' : 'none', ...l2FocusStyle(isL2 && focusedIndex === i) }}>
             <span className="sk-mono" style={{ fontSize: 14, color: typeColor[item.type], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon[item.type]}</span>
             <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{item.taskId}</span>
             <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{item.taskName}</span>

@@ -1,5 +1,6 @@
 // src/components/agent-activity.tsx
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 import type { Round, Task } from '@/lib/types'
 
 interface AgentActivityProps {
@@ -37,6 +38,9 @@ export default function AgentActivity({ rounds, tasks }: AgentActivityProps) {
     }
   })
 
+  const itemIds: string[] = agents.flatMap((a) => [a.agentId, ...a.taskDetails.map((t) => t.taskId)])
+  const { isL2, focusedIndex } = useL2Navigation('agent-activity', itemIds)
+
   if (agents.length === 0) {
     return (
       <Card>
@@ -70,7 +74,11 @@ export default function AgentActivity({ rounds, tasks }: AgentActivityProps) {
                 }}
               >
                 {/* Agent header */}
-                <div className="flex items-baseline justify-between gap-3">
+                <div
+                  className="flex items-baseline justify-between gap-3"
+                  data-nav-item={a.agentId}
+                  style={l2FocusStyle(isL2 && focusedIndex === itemIds.indexOf(a.agentId))}
+                >
                   <div className="flex items-center gap-3">
                     <span className="sk-h3" style={{ fontSize: 14 }}>{a.agentId}</span>
                     <span className="sk-chip" style={{ fontSize: 10, background: a.done === a.total ? 'var(--accent-3)' : 'var(--accent-2)', color: 'var(--paper)' }}>
@@ -96,7 +104,12 @@ export default function AgentActivity({ rounds, tasks }: AgentActivityProps) {
                 {/* Task list */}
                 <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
                   {a.taskDetails.map((t) => (
-                    <div key={t.taskId} className="flex items-baseline justify-between gap-3">
+                    <div
+                      key={t.taskId}
+                      className="flex items-baseline justify-between gap-3"
+                      data-nav-item={t.taskId}
+                      style={l2FocusStyle(isL2 && focusedIndex === itemIds.indexOf(t.taskId))}
+                    >
                       <span
                         className="sk-mono"
                         style={{ fontSize: 11, color: t.status === 'completed' ? 'var(--ink-4)' : 'var(--ink-2)' }}

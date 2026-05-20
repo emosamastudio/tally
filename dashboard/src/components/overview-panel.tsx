@@ -8,13 +8,14 @@ interface OverviewPanelProps {
   activeRound: Round | null
   blocks: BlockItem[]
   features: FeatureMeta[]
+  sectionId?: string
 }
 
-export default function OverviewPanel({ tasks, activeRound, blocks, features }: OverviewPanelProps) {
+export default function OverviewPanel({ tasks, activeRound, blocks, features, sectionId }: OverviewPanelProps) {
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12, height: '100%', overflow: 'auto' }}>
       <HealthHeader tasks={tasks} activeRound={activeRound} blocks={blocks} features={features} />
-      <AttentionPanel tasks={tasks} blocks={blocks} />
+      <AttentionPanel tasks={tasks} blocks={blocks} sectionId={sectionId} />
     </div>
   )
 }

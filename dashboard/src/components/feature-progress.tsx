@@ -1,7 +1,8 @@
 // src/components/feature-progress.tsx
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { FeatureMeta, Task } from '@/lib/types'
+import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 
 // ── Color scale ──
 
@@ -99,6 +100,26 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
   const modules = [...byModule.keys()].sort()
   const allFeatures = modules.flatMap((m) => byModule.get(m)!.features)
 
+  // L2 keyboard navigation
+  const itemIds = allFeatures.map(f => f.id)
+  const { isL2, focusedIndex } = useL2Navigation('feature-progress', itemIds)
+
+  // Auto-expand focused row on Enter when L2 is active
+  useEffect(() => {
+    if (!isL2) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        const id = itemIds[focusedIndex]
+        if (id) {
+          setExpanded(prev => prev === id ? null : id)
+        }
+      }
+    }
+    window.addEventListener('keydown', handler)
+    return () => window.removeEventListener('keydown', handler)
+  }, [isL2, focusedIndex, itemIds])
+
   return (
     <Card style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="flex items-baseline justify-between gap-3 flex-wrap">
@@ -121,7 +142,7 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
           </div>
 
           {/* Heatmap rows */}
-          {allFeatures.map((f) => {
+          {allFeatures.map((f, i) => {
             const pct = f.total > 0 ? Math.round((f.done / f.total) * 100) : 0
             const isModuleFirst = allFeatures.indexOf(f) === allFeatures.findIndex((x) => x.module === f.module)
 
@@ -136,11 +157,13 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
                   {/* Feature name column */}
                   <button
                     className="text-left"
+                    data-nav-item={f.id}
                     style={{
                       width: 140, flexShrink: 0, padding: '4px 8px',
                       borderBottom: '1px solid var(--ink-4)',
                       cursor: 'pointer', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
                       display: 'flex', flexDirection: 'column', gap: 2,
+                      ...l2FocusStyle(isL2 && focusedIndex === i),
                     }}
                     onClick={() => setExpanded(expanded === f.id ? null : f.id)}
                   >

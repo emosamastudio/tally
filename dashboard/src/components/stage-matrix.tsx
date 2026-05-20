@@ -1,6 +1,8 @@
 // src/components/stage-matrix.tsx
+import { useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import type { StageStatus } from '@/lib/types'
+import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 
 interface StageMatrixProps {
   stages: StageStatus[]
@@ -43,6 +45,24 @@ const PROGRESS_COLOR = STATE_COLOR.in_progress
 export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) {
   // Loader already sorts by _meta.stages order; preserve as-is.
   const sorted = stages
+
+  const itemIds = sorted.map(s => s.stageId)
+  const { isL2, focusedIndex, nav } = useL2Navigation('stage-matrix', itemIds)
+
+  // L2 Enter triggers onStageClick for the focused card
+  useEffect(() => {
+    if (!isL2 || !nav) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') {
+        e.preventDefault()
+        e.stopPropagation()
+        const itemId = itemIds[focusedIndex]
+        if (itemId) onStageClick?.(itemId)
+      }
+    }
+    window.addEventListener('keydown', handler, { capture: true })
+    return () => window.removeEventListener('keydown', handler, { capture: true })
+  }, [isL2, focusedIndex, itemIds, onStageClick, nav])
 
   if (sorted.length === 0) {
     return (
@@ -98,6 +118,7 @@ export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) 
               return (
                 <button
                   key={s.stageId}
+                  data-nav-item={s.stageId}
                   onClick={() => onStageClick?.(s.stageId)}
                   className="text-left shrink-0"
                   style={{
@@ -110,6 +131,7 @@ export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) 
                     display: 'flex',
                     flexDirection: 'column',
                     gap: 4,
+                    ...l2FocusStyle(isL2 && focusedIndex === i),
                   }}
                 >
                   {/* Title row: ID + state chip */}
