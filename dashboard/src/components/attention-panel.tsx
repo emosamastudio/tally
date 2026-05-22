@@ -87,27 +87,6 @@ const MAX_VISIBLE = 5
 const typeIcon: Record<string, string> = { blocked: '⊘', drift: '⚠', unapproved: '!' }
 const typeColor: Record<string, string> = { blocked: 'var(--danger)', drift: 'var(--accent)', unapproved: 'var(--accent-2)' }
 
-function renderItemRow(item: AttentionItem, idx: number, totalVisible: number, isL2: boolean, focusedIndex: number, navItemId: string) {
-  return (
-    <div
-      key={navItemId}
-      data-nav-item={navItemId}
-      className="flex items-baseline gap-2"
-      style={{
-        padding: '3px 0',
-        borderBottom: idx < totalVisible - 1 ? '1px solid var(--ink-4)' : 'none',
-        ...l2FocusStyle(isL2 && focusedIndex === idx),
-      }}
-    >
-      <span className="sk-mono" style={{ fontSize: 14, color: typeColor[item.type], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon[item.type]}</span>
-      <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{item.taskId}</span>
-      <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{item.taskName}</span>
-      <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)', maxWidth: 200, textAlign: 'right' }}>{item.detail}</span>
-      <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={item.action}>{'📋'}</span>
-    </div>
-  )
-}
-
 export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps) {
   const items = useMemo(() => buildItems(tasks), [tasks])
 
@@ -126,7 +105,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
     else driftGroups.set(item.detail, [item])
   }
 
-  // Build the flat list of visible rows (for rendering and L2 nav)
+  // Build the flat list of top-level rows
   const panelRows = useMemo((): PanelRow[] => {
     const rows: PanelRow[] = []
 
@@ -150,23 +129,20 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
 
   const needsFold = panelRows.length > MAX_VISIBLE
   const visibleRows = needsFold && !showAllOverflow ? panelRows.slice(0, MAX_VISIBLE) : panelRows
-  const hiddenCount = panelRows.length - MAX_VISIBLE
+  const hiddenCount = Math.max(0, panelRows.length - MAX_VISIBLE)
 
   // Build flat nav item IDs from visible rows
   const navItemIds = useMemo((): string[] => {
     const ids: string[] = []
-    let idx = 0
 
     for (const row of visibleRows) {
       if (row.kind === 'item') {
-        ids.push(`attn-${idx}`)
-        idx++
+        ids.push(`attn-item-${row.item.taskId}`)
       } else if (row.kind === 'drift-summary') {
-        ids.push(`attn-${idx}`)
-        idx++
+        ids.push(`attn-drift-summary-${row.detail}`)
         if (expandedDrifts[row.detail]) {
-          for (let j = 0; j < row.childItems.length; j++) {
-            ids.push(`attn-drift-${row.detail}-${j}`)
+          for (const child of row.childItems) {
+            ids.push(`attn-drift-child-${child.taskId}`)
           }
         }
       }
@@ -192,40 +168,53 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
     )
   }
 
-  // --- Render helpers ---
+  // --- Render ---
 
-  let globalRowIdx = 0
   const rendered: React.ReactNode[] = []
+  let slotIdx = 0
 
-  function pushRow(node: React.ReactNode) {
-    rendered.push(node)
-    globalRowIdx++
-  }
+  for (let rowIdx = 0; rowIdx < visibleRows.length; rowIdx++) {
+    const row = visibleRows[rowIdx]
+    const isLastTopRow = rowIdx === visibleRows.length - 1 && !(needsFold && !showAllOverflow)
 
-  const totalExpandedRows =
-    visibleRows.filter((r) => r.kind === 'item').length +
-    visibleRows.filter((r) => r.kind === 'drift-summary').length +
-    visibleRows
-      .filter((r) => r.kind === 'drift-summary')
-      .reduce((sum, r) => sum + (expandedDrifts[(r as Extract<PanelRow, { kind: 'drift-summary' }>).detail] ? (r as Extract<PanelRow, { kind: 'drift-summary' }>).childItems.length : 0), 0)
-
-  for (const row of visibleRows) {
     if (row.kind === 'item') {
-      pushRow(renderItemRow(row.item, globalRowIdx, totalExpandedRows, isL2, focusedIndex, `attn-${globalRowIdx}`))
-    } else if (row.kind === 'drift-summary') {
-      const isExpanded = expandedDrifts[row.detail] ?? false
-
-      // The summary row itself
+      const item = row.item
+      const isLastSlot = isLastTopRow
       rendered.push(
         <div
-          key={`attn-${globalRowIdx}`}
-          data-nav-item={`attn-${globalRowIdx}`}
+          key={`attn-item-${item.taskId}`}
+          data-nav-item={`attn-item-${item.taskId}`}
           className="flex items-baseline gap-2"
           style={{
             padding: '3px 0',
-            borderBottom: globalRowIdx < totalExpandedRows - 1 ? '1px solid var(--ink-4)' : 'none',
+            borderBottom: isLastSlot ? 'none' : '1px solid var(--ink-4)',
+            ...l2FocusStyle(isL2 && focusedIndex === slotIdx),
+          }}
+        >
+          <span className="sk-mono" style={{ fontSize: 14, color: typeColor[item.type], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon[item.type]}</span>
+          <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{item.taskId}</span>
+          <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{item.taskName}</span>
+          <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)', maxWidth: 200, textAlign: 'right' }}>{item.detail}</span>
+          <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={item.action}>{'📋'}</span>
+        </div>,
+      )
+      slotIdx++
+    } else if (row.kind === 'drift-summary') {
+      const isExpanded = expandedDrifts[row.detail] ?? false
+      const hasChildrenAfter = isExpanded && row.childItems.length > 0
+      const isLastSlot = isLastTopRow && !hasChildrenAfter
+
+      // The summary row
+      rendered.push(
+        <div
+          key={`attn-drift-summary-${row.detail}`}
+          data-nav-item={`attn-drift-summary-${row.detail}`}
+          className="flex items-baseline gap-2"
+          style={{
+            padding: '3px 0',
+            borderBottom: isLastSlot ? 'none' : '1px solid var(--ink-4)',
             cursor: 'pointer',
-            ...l2FocusStyle(isL2 && focusedIndex === globalRowIdx),
+            ...l2FocusStyle(isL2 && focusedIndex === slotIdx),
           }}
           onClick={() => setExpandedDrifts((prev) => ({ ...prev, [row.detail]: !isExpanded }))}
         >
@@ -238,22 +227,23 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
           </span>
         </div>,
       )
-      globalRowIdx++
+      slotIdx++
 
       // Expanded child items
       if (isExpanded) {
         for (let j = 0; j < row.childItems.length; j++) {
           const child = row.childItems[j]
+          const isLastChild = j === row.childItems.length - 1 && isLastTopRow
           rendered.push(
             <div
-              key={`attn-drift-${row.detail}-${j}`}
-              data-nav-item={`attn-drift-${row.detail}-${j}`}
+              key={`attn-drift-child-${child.taskId}`}
+              data-nav-item={`attn-drift-child-${child.taskId}`}
               className="flex items-baseline gap-2"
               style={{
                 padding: '3px 0',
                 paddingLeft: 28,
-                borderBottom: j < row.childItems.length - 1 ? '1px solid var(--ink-4)' : 'none',
-                ...l2FocusStyle(isL2 && focusedIndex === navItemIds.indexOf(`attn-drift-${row.detail}-${j}`)),
+                borderBottom: isLastChild ? 'none' : '1px solid var(--ink-4)',
+                ...l2FocusStyle(isL2 && focusedIndex === slotIdx),
               }}
             >
               <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{child.taskId}</span>
@@ -261,6 +251,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
               <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={child.action}>{'📋'}</span>
             </div>,
           )
+          slotIdx++
         }
       }
     }
@@ -278,7 +269,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
           borderTop: '1px solid var(--ink-4)',
           cursor: 'pointer',
           color: 'var(--accent)',
-          ...l2FocusStyle(isL2 && focusedIndex === navItemIds.indexOf('attn-overflow-fold')),
+          ...l2FocusStyle(isL2 && focusedIndex === slotIdx),
         }}
         onClick={() => setShowAllOverflow(true)}
       >
@@ -286,6 +277,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
         <span className="sk-body" style={{ fontSize: 11 }}>还有 {hiddenCount} 项...</span>
       </div>,
     )
+    // slotIdx++ not needed here, fold is last element
   }
 
   // Collapse button when all rows are shown
