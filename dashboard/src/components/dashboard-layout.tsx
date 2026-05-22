@@ -125,9 +125,19 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
 
           {/* Main content */}
           <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
-            {categories.map((cat, ci) => (
-              <div key={cat.id} style={{ display:nav.activeCategory===ci?'flex':'none', flexDirection:'column', height:'100%' }}
-                role="tabpanel" id={`panel-${cat.id}`}>
+            {categories.map((cat, ci) => {
+              const isActiveCat = nav.activeCategory === ci
+              return (
+              <div key={cat.id}
+                role="tabpanel" id={`panel-${cat.id}`}
+                style={{
+                  position:'absolute', inset:0,
+                  display:'flex', flexDirection:'column',
+                  opacity: isActiveCat ? 1 : 0,
+                  pointerEvents: isActiveCat ? 'auto' : 'none',
+                  transition: 'opacity 0.15s',
+                  zIndex: isActiveCat ? 1 : 0,
+                }}>
                 <div className="px-2 md:px-4 py-4" style={{ width:'100%', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column' }}>
                   {cat.sections.map((sectionId, si) => {
                     const content = children[sectionId]
@@ -145,7 +155,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                   })}
                 </div>
               </div>
-            ))}
+            )})}
           </div>
         </div>
       </div>
