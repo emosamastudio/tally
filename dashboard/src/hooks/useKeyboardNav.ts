@@ -47,15 +47,30 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   const items = itemRegistry.current.get(sectionId) ?? []
   const currentItems = items.length
 
+  // Per-category section position memory
+  const sectionMemory = useRef<Map<number, number>>(new Map())
+
   const goNextCategory = useCallback(() => {
-    setActiveCategory((prev) => (prev + 1) % totalCategories)
-    setActiveSection(0); setFocusLevel(1); setFocusedItemIndex(0)
-  }, [totalCategories])
+    sectionMemory.current.set(activeCategory, activeSection)
+    setActiveCategory((prev) => {
+      const next = (prev + 1) % totalCategories
+      const saved = sectionMemory.current.get(next) ?? 0
+      setActiveSection(saved)
+      return next
+    })
+    setFocusLevel(1); setFocusedItemIndex(0)
+  }, [activeCategory, activeSection, totalCategories])
 
   const goPrevCategory = useCallback(() => {
-    setActiveCategory((prev) => (prev - 1 + totalCategories) % totalCategories)
-    setActiveSection(0); setFocusLevel(1); setFocusedItemIndex(0)
-  }, [totalCategories])
+    sectionMemory.current.set(activeCategory, activeSection)
+    setActiveCategory((prev) => {
+      const next = (prev - 1 + totalCategories) % totalCategories
+      const saved = sectionMemory.current.get(next) ?? 0
+      setActiveSection(saved)
+      return next
+    })
+    setFocusLevel(1); setFocusedItemIndex(0)
+  }, [activeCategory, activeSection, totalCategories])
 
   const goNextSection = useCallback(() => {
     setActiveSection((prev) => Math.min(prev + 1, currentSections - 1))
@@ -88,9 +103,12 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   }, [focusLevel])
 
   const focusSection = useCallback((catIdx: number, secIdx: number) => {
-    setActiveCategory(catIdx); setActiveSection(secIdx)
+    sectionMemory.current.set(activeCategory, activeSection)
+    // Use saved position if this is a tab click (secIdx=0)
+    const saved = secIdx === 0 ? sectionMemory.current.get(catIdx) : undefined
+    setActiveCategory(catIdx); setActiveSection(saved ?? secIdx)
     setFocusLevel(1); setFocusedItemIndex(0)
-  }, [])
+  }, [activeCategory, activeSection])
 
   useEffect(() => {
     const handler = (e: KeyboardEvent) => {
