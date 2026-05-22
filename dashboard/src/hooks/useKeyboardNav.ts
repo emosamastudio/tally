@@ -103,11 +103,13 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
           e.preventDefault()
           if (focusLevel === 1) goNextSection()
           else if (focusLevel === 2) goNextItem()
+          else setFeedbackTrigger((v) => v + 1) // flash hint bar: wrong key at L0
           break
         case 'ArrowUp':
           e.preventDefault()
           if (focusLevel === 1) goPrevSection()
           else if (focusLevel === 2) goPrevItem()
+          else setFeedbackTrigger((v) => v + 1)
           break
         case 'Enter': e.preventDefault(); drillDown(); break
         case 'Escape': e.preventDefault(); goBack(); break

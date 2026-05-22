@@ -112,6 +112,11 @@ html, body {
   font-size: 12px;
   line-height: 1.3;
   color: var(--ink);
+  transition: background 0.15s, color 0.15s, border-color 0.15s;
+  cursor: pointer;
+}
+.sk-chip:hover {
+  background: rgba(255,255,255,0.9);
 }
 
 .sk-chip.solid { background: var(--ink); color: var(--paper); }
@@ -210,6 +215,10 @@ html, body {
 
 .sk-table-row {
   border-bottom: 1.2px dashed rgba(0,0,0,0.25);
+  transition: background 0.12s;
+}
+.sk-table-row:hover {
+  background: rgba(0,0,0,0.03);
 }
 
 /* ── Dark theme ─────────────────────────────────────── */
@@ -255,6 +264,9 @@ html, body {
 [data-theme="dark"] .sk-chip {
   background: rgba(40,40,40,0.8);
 }
+[data-theme="dark"] .sk-chip:hover {
+  background: rgba(50,50,50,0.9);
+}
 
 [data-theme="dark"] .sk-chip.solid {
   background: var(--ink);
@@ -272,6 +284,9 @@ html, body {
 
 [data-theme="dark"] .sk-table-row {
   border-bottom-color: rgba(255,255,255,0.12);
+}
+[data-theme="dark"] .sk-table-row:hover {
+  background: rgba(255,255,255,0.04);
 }
 
 [data-theme="dark"] .sk-table-header {
