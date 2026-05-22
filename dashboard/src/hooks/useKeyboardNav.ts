@@ -131,6 +131,13 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
           break
         case 'Enter': e.preventDefault(); drillDown(); break
         case 'Escape': e.preventDefault(); goBack(); break
+        case '/':
+          if (focusLevel >= 1) {
+            e.preventDefault()
+            const searchInput = document.querySelector<HTMLInputElement>('input[placeholder*="搜索"]')
+            searchInput?.focus()
+          }
+          break
         case '1': case '2': case '3': case '4': case '5':
         case '6': case '7': case '8': case '9':
           e.preventDefault()

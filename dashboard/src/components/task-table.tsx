@@ -235,6 +235,16 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
     nav.sectionId === 'task-table' &&
     nav.items[nav.focusedItemIndex] === task.id
 
+  // L2 Enter: toggle row expansion
+  useEffect(() => {
+    if (!isFocused) return
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Enter') { e.preventDefault(); e.stopPropagation(); setExpanded((p) => !p) }
+    }
+    window.addEventListener('keydown', handler, true)
+    return () => window.removeEventListener('keydown', handler, true)
+  }, [isFocused])
+
   return (
     <>
       <TableRow
