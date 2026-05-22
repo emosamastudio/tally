@@ -9,7 +9,7 @@ interface FeatureDepsProps {
 
 const STATUS_COLOR: Record<string, string> = {
   design: 'var(--ink-4)',
-  contract_frozen: '#5b9bd5',
+  contract_frozen: 'var(--contract-frozen)',
   implementing: 'var(--accent-2)',
   stable: 'var(--accent-3)',
 }

@@ -82,7 +82,7 @@ export default function RoundAnalytics({ rounds, tasks }: RoundAnalyticsProps) {
       <CardContent>
         <ResponsiveContainer width="100%" height={260}>
           <ComposedChart data={data} margin={{ top: 4, right: 4, left: -8, bottom: 0 }}>
-            <CartesianGrid strokeDasharray="3 4" stroke="rgba(0,0,0,0.08)" />
+            <CartesianGrid strokeDasharray="3 4" stroke="rgba(var(--grid-line), 0.08)" />
             <XAxis
               dataKey="round"
               tick={{ fontSize: 10, fill: 'var(--ink-3)', fontFamily: 'JetBrains Mono, ui-monospace, monospace' }}
@@ -110,7 +110,7 @@ export default function RoundAnalytics({ rounds, tasks }: RoundAnalyticsProps) {
             />
             <Tooltip
               contentStyle={{
-                background: 'rgba(255,255,255,0.95)',
+                background: 'rgba(var(--surface-rgb), 0.95)',
                 border: '2px solid var(--ink)',
                 borderRadius: '6px',
                 fontSize: '12px',

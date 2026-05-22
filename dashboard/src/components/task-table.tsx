@@ -678,7 +678,7 @@ export function TaskTableSkeleton() {
         </div>
         <div className="space-y-2">
           {Array.from({ length: 6 }).map((_, i) => (
-            <div key={i} style={{ padding: '8px 4px', borderBottom: '1.2px dashed rgba(0,0,0,0.25)' }}>
+            <div key={i} style={{ padding: '8px 4px', borderBottom: '1.2px dashed rgba(var(--grid-line), 0.25)' }}>
               <span className="sk-bar" style={{ width: `${60 + (i % 3) * 20}%`, height: 7 }} />
             </div>
           ))}

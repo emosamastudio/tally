@@ -1,4 +1,4 @@
-@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=Kalam:wght@300;400;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Caveat:wght@600;700&family=JetBrains+Mono:wght@400&family=Kalam:wght@400;700&display=swap');
 @import "tailwindcss";
 
 :root {
@@ -6,14 +6,18 @@
   --paper-2: #efe8d6;
   --ink: #1a1a1a;
   --ink-2: #3d3d3d;
-  --ink-3: #6b6b6b;
-  --ink-4: #aaa3a3;
+  --ink-3: #595959;
+  --ink-4: #7a7a7a;
   --accent: #ffd23f;
   --accent-2: #ff7e6b;
   --accent-3: #6bc8b1;
   --danger: #e85a4f;
   --sk-radius: 6px;
   --sk-border: 2.2px;
+  /* RGB triplets that invert between light and dark themes */
+  --grid-line: 0,0,0;
+  --surface-rgb: 255,255,255;
+  --contract-frozen: #5b9bd5;
 }
 
 html, body {
@@ -215,12 +219,15 @@ html, body {
   --paper-2: #252525;
   --ink: #e5e5e5;
   --ink-2: #b0b0b0;
-  --ink-3: #888888;
-  --ink-4: #666666;
+  --ink-3: #9e9e9e;
+  --ink-4: #8a8a8a;
   --accent: #cc9900;
   --accent-2: #cc5544;
   --accent-3: #44aa88;
   --danger: #e85a4f;
+  --grid-line: 255,255,255;
+  --surface-rgb: 30,30,30;
+  --contract-frozen: #5b9bd5;
 }
 
 [data-theme="dark"] .sk-board {
@@ -237,6 +244,12 @@ html, body {
 
 [data-theme="dark"] .sk-box {
   background: rgba(30,30,30,0.7);
+}
+
+[data-theme="dark"] .sk-box.hatch {
+  background:
+    repeating-linear-gradient(45deg, rgba(255,255,255,0.06) 0 1.5px, transparent 1.5px 8px),
+    rgba(30,30,30,0.4);
 }
 
 [data-theme="dark"] .sk-chip {

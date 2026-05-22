@@ -652,7 +652,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
                     y={bandTop}
                     width={band.width}
                     height={bandHeight}
-                    fill="rgba(0,0,0,0.03)"
+                    fill="rgba(var(--grid-line), 0.03)"
                     rx={6}
                     ry={6}
                   />
@@ -775,12 +775,12 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
             style={{
               left: tooltip.x + 12,
               top: tooltip.y - 8,
-              background: 'rgba(255,255,255,0.97)',
+              background: 'rgba(var(--surface-rgb), 0.97)',
               border: '2px solid var(--ink)',
               borderRadius: 'var(--sk-radius)',
               padding: '8px 12px',
               maxWidth: '280px',
-              boxShadow: '2px 2px 0 rgba(0,0,0,0.08)',
+              boxShadow: '2px 2px 0 rgba(var(--grid-line), 0.08)',
             }}
           >
             <p className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{tooltip.task.id}</p>
@@ -800,7 +800,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
         )}
 
         {/* Legend */}
-        <div className="flex flex-wrap items-center gap-3 pt-2" style={{ borderTop: '1.6px dashed rgba(0,0,0,0.25)' }}>
+        <div className="flex flex-wrap items-center gap-3 pt-2" style={{ borderTop: '1.6px dashed rgba(var(--grid-line), 0.25)' }}>
           <span className="sk-label" style={{ fontSize: 10 }}>状态图例:</span>
           {(Object.entries(STATUS_COLORS) as [TaskStatus, typeof STATUS_COLORS['completed']][]).map(([status, colors]) => (
             <span key={status} className="flex items-center gap-1">

@@ -1,6 +1,6 @@
 // src/components/dashboard-layout.tsx
 import type { ReactNode } from 'react'
-import { useEffect, useRef } from 'react'
+import { useEffect, useMemo, useRef } from 'react'
 import { useKeyboardNav, NavContext } from '@/hooks/useKeyboardNav'
 import type { NavCategory } from '@/hooks/useKeyboardNav'
 
@@ -13,6 +13,20 @@ interface DashboardLayoutProps {
   children: Record<string, ReactNode>
 }
 
+const SECTION_LABELS: Record<string, string> = {
+  'overview-panel': '概览面板',
+  'stage-matrix': '阶段矩阵',
+  'feature-progress': '功能进度',
+  'feature-deps': '功能依赖',
+  'current-round': '当前回合',
+  'agent-activity': '活跃Agent',
+  'round-timeline': '回合时间线',
+  'round-analytics': '回合分析',
+  'task-table': '任务列表',
+  'agent-contribution': 'Agent贡献',
+  'dependency-graph': '依赖图',
+}
+
 const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入', 2: '↑↓ 项目 · Esc 返回' }
 
 export default function DashboardLayout({ header, categories, children }: DashboardLayoutProps) {
@@ -20,6 +34,11 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
   const cat = categories[nav.activeCategory]
   const sectionId = cat?.sections[nav.activeSection]
   const hintRef = useRef<HTMLDivElement>(null)
+  const currentSections = cat?.sections.length ?? 0
+  const hintText = useMemo(() => {
+    if (nav.focusLevel === 1 && currentSections === 1) return '←→ 分类 · 仅 1 个板块 · Enter 进入'
+    return LEVEL_HINT[nav.focusLevel]
+  }, [nav.focusLevel, currentSections])
 
   // Flash the hint bar when Enter/Esc are no-ops (e.g. Enter at L1 with no L2 items, Esc at L0)
   useEffect(() => {
@@ -34,6 +53,54 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
   return (
     <NavContext.Provider value={nav}>
       <div className="sk-board" style={{ overflow: 'clip', height: '100vh', display: 'flex', flexDirection: 'column' }}>
+        <a
+          href="#main-content"
+          className="sr-only"
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            padding: 0,
+            margin: -1,
+            overflow: 'hidden',
+            clip: 'rect(0,0,0,0)',
+            whiteSpace: 'nowrap',
+            border: 0,
+          }}
+          onFocus={(e) => {
+            const el = e.currentTarget
+            el.style.width = 'auto'
+            el.style.height = 'auto'
+            el.style.padding = '8px 16px'
+            el.style.margin = '0'
+            el.style.clip = 'auto'
+            el.style.clipPath = 'none'
+            el.style.whiteSpace = 'normal'
+            el.style.position = 'absolute'
+            el.style.top = '4px'
+            el.style.left = '4px'
+            el.style.zIndex = '50'
+            el.style.background = 'var(--paper)'
+            el.style.border = '2px solid var(--ink)'
+            el.style.borderRadius = 'var(--sk-radius)'
+          }}
+          onBlur={(e) => {
+            const el = e.currentTarget
+            el.style.width = '1px'
+            el.style.height = '1px'
+            el.style.padding = '0'
+            el.style.margin = '-1px'
+            el.style.clip = 'rect(0,0,0,0)'
+            el.style.clipPath = ''
+            el.style.whiteSpace = 'nowrap'
+            el.style.position = 'absolute'
+            el.style.top = ''
+            el.style.left = ''
+            el.style.zIndex = ''
+          }}
+        >
+          跳到内容
+        </a>
         <div className="sk-grid" />
 
         {/* Sticky header */}
@@ -44,12 +111,13 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
             </header>
 
             {/* L1 Category Tabs */}
-            <nav className="flex gap-1 overflow-x-auto pb-1 mt-2" style={{ scrollbarWidth: 'thin' }} role="tablist">
+            <nav className="flex gap-1 overflow-x-auto pb-1 mt-2" style={{ scrollbarWidth: 'thin' }} role="tablist" aria-label="分类导航">
               {categories.map((cat, ci) => (
                 <button
                   key={cat.id}
                   role="tab"
                   aria-selected={nav.activeCategory === ci}
+                  aria-controls={`panel-${cat.id}`}
                   className="sk-chip shrink-0"
                   style={{
                     fontSize: 12, padding: '6px 14px', cursor: 'pointer',
@@ -70,10 +138,10 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
             </nav>
 
             {/* Hint bar */}
-            <div ref={hintRef} className="flex items-center justify-between" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
-              <span>{LEVEL_HINT[nav.focusLevel]}</span>
+            <div ref={hintRef} className="flex items-center justify-between" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 2 }}>
+              <span>{hintText}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                <span style={{ color: 'var(--ink-2)' }}>{cat?.label} › {sectionId}</span>
+                <span style={{ color: 'var(--ink-2)' }}>{cat?.label} › {SECTION_LABELS[sectionId] ?? sectionId}</span>
                 <span style={{ display: 'flex', gap: 3 }}>
                   {cat?.sections.map((_, si) => (
                     <span key={si} style={{ width: 6, height: 6, borderRadius: '50%', background: si === nav.activeSection ? 'var(--accent)' : 'var(--ink-4)', transition: 'background 0.2s' }} />
@@ -86,12 +154,13 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
         </div>
 
         {/* Content area */}
-        <div style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
+        <div id="main-content" role="main" style={{ flex: 1, overflow: 'hidden', position: 'relative' }}>
           {categories.map((cat, ci) => (
             <div
               key={cat.id}
               style={{ display: nav.activeCategory === ci ? 'flex' : 'none', flexDirection: 'column', height: '100%' }}
               role="tabpanel"
+              id={`panel-${cat.id}`}
             >
               <div className="mx-auto max-w-7xl px-2 md:px-4 py-4" style={{ width: '100%', height: '100%', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
                 {cat.sections.map((sectionId, si) => {

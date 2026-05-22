@@ -69,7 +69,8 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
 
       {/* Progress ring */}
       <div className="flex items-center gap-4 mt-2">
-        <svg width="80" height="80">
+        <svg width="80" height="80" role="img" aria-label={`回合进度: ${totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0}%, ${doneCount}/${totalCount} 任务完成`}>
+          <title>回合进度: {totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0}%, {doneCount}/{totalCount} 任务完成</title>
           <circle cx="40" cy="40" r="32" fill="none" stroke="var(--ink-4)" strokeWidth="6" strokeDasharray="3 3" />
           <circle cx="40" cy="40" r="32" fill="none" stroke="var(--ink)" strokeWidth="5"
             strokeDasharray={`${(totalCount > 0 ? doneCount / totalCount : 0) * 2 * Math.PI * 32} ${2 * Math.PI * 32}`}

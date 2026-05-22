@@ -73,8 +73,9 @@ export default function App() {
       className="sk-chip"
       style={{ cursor: 'pointer' }}
       title={theme === 'light' ? '切换深色模式' : '切换浅色模式'}
+      aria-label="切换深浅模式"
     >
-      {theme === 'light' ? <Sun size={14} /> : <Moon size={14} />}
+      {theme === 'light' ? <Sun size={14} aria-hidden="true" /> : <Moon size={14} aria-hidden="true" />}
     </button>
   )
 
