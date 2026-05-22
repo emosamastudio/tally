@@ -22,7 +22,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
   in_progress: '进行中',
   pending: '待处理',
   blocked: '阻塞',
-  hold: 'Hold',
+  hold: '搁置',
   deferred: '暂缓',
 }
 

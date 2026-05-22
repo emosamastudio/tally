@@ -16,18 +16,18 @@ interface DashboardLayoutProps {
 const SECTION_LABELS: Record<string, string> = {
   'overview-panel': '概览面板',
   'stage-matrix': '阶段矩阵',
-  'feature-progress': '功能进度',
+  'feature-progress': '功能矩阵',
   'feature-deps': '功能依赖',
   'current-round': '当前回合',
-  'agent-activity': '活跃Agent',
+  'agent-activity': '活跃 Agent',
   'round-timeline': '回合时间线',
   'round-analytics': '回合分析',
   'task-table': '任务列表',
-  'agent-contribution': 'Agent贡献',
-  'dependency-graph': '依赖图',
+  'agent-contribution': 'Agent 贡献',
+  'dependency-graph': '依赖关系图',
 }
 
-const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入 · Esc 返回', 2: '↑↓ 项目 · Esc 返回' }
+const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入 · 1-5 跳转', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入 · Esc 返回', 2: '↑↓ 项目 · Esc 返回' }
 
 export default function DashboardLayout({ header, categories, children }: DashboardLayoutProps) {
   const nav = useKeyboardNav({ categories })
@@ -144,7 +144,18 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                 <span style={{ color: 'var(--ink-2)' }}>{cat?.label} › {SECTION_LABELS[sectionId] ?? sectionId}</span>
                 <span style={{ display: 'flex', gap: 3 }}>
                   {cat?.sections.map((_, si) => (
-                    <span key={si} style={{ width: 6, height: 6, borderRadius: '50%', background: si === nav.activeSection ? 'var(--accent)' : 'var(--ink-4)', transition: 'background 0.2s' }} />
+                    <button
+                      key={si}
+                      onClick={() => { nav.focusSection(nav.activeCategory, si) }}
+                      aria-label={`切换到第 ${si + 1} 个板块`}
+                      style={{
+                        width: 8, height: 8, borderRadius: '50%',
+                        background: si === nav.activeSection ? 'var(--accent)' : 'var(--ink-4)',
+                        transition: 'background 0.2s, transform 0.15s',
+                        cursor: 'pointer', border: 'none', padding: 0,
+                        transform: si === nav.activeSection ? 'scale(1.3)' : 'scale(1)',
+                      }}
+                    />
                   ))}
                 </span>
                 <span className="sk-mono" style={{ fontSize: 9 }}>{nav.activeSection + 1}/{cat?.sections.length}</span>

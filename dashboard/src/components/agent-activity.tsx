@@ -141,7 +141,7 @@ export default function AgentActivity({ rounds, tasks }: AgentActivityProps) {
                           borderColor: 'var(--ink-4)',
                         }}
                       >
-                        {t.status === 'completed' ? 'done' : t.status === 'in_progress' ? 'wip' : t.status}
+                        {t.status === 'completed' ? '已完成' : t.status === 'in_progress' ? '进行中' : t.status}
                       </span>
                     </div>
                   ))}
