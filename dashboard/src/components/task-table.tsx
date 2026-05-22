@@ -438,7 +438,9 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
   }, [lookupTasks])
 
   const handleNavigate = useCallback((taskId: string) => {
-    // Switch to 'all' filters so the task is visible
+    // Switch to Tasks category (index 3)
+    nav?.focusSection(3, 0)
+    // Reset filters so the task is visible
     setSource('all')
     setStatus('all')
     setStage('')
@@ -451,8 +453,15 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
       if (el) {
         el.scrollIntoView({ behavior: 'smooth', block: 'center' })
       }
-    }, 100)
-  }, [])
+    }, 150)
+  }, [nav])
+
+  // Register as global task navigator
+  useEffect(() => {
+    if (nav?.setNavigateToTask) {
+      nav.setNavigateToTask(() => handleNavigate)
+    }
+  }, [nav?.setNavigateToTask, handleNavigate])
 
   // Reset to page 1 whenever filters or search changes
   useEffect(() => {

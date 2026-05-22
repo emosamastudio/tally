@@ -1,7 +1,19 @@
 // src/components/overview-panel.tsx
 import HealthHeader from '@/components/health-header'
 import AttentionPanel from '@/components/attention-panel'
+import { NavContext } from '@/components/dashboard-layout'
+import { useContext } from 'react'
 import type { Task, Round, BlockItem, FeatureMeta } from '@/lib/types'
+
+function relativeDate(dateStr: string): string {
+  const today = new Date()
+  const d = new Date(dateStr)
+  const diffDays = Math.floor((today.getTime() - d.getTime()) / (1000 * 60 * 60 * 24))
+  if (diffDays === 0) return '今天'
+  if (diffDays === 1) return '昨天'
+  if (diffDays < 7) return `${diffDays} 天前`
+  return dateStr
+}
 
 interface OverviewPanelProps {
   tasks: Task[]
@@ -13,6 +25,7 @@ interface OverviewPanelProps {
 }
 
 export default function OverviewPanel({ tasks, activeRound, blocks, features, sectionId, rounds }: OverviewPanelProps) {
+  const nav = useContext(NavContext)
   // Recent completions: last 5 done tasks
   const recentDone = tasks
     .filter((t) => t.status === 'completed' && t.completedAt)
@@ -72,9 +85,11 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
             {recentDone.map((t) => (
               <div key={t.id} className="flex items-baseline gap-2" style={{ fontSize: 11 }}>
                 <span style={{ color: 'var(--accent-3)', fontSize: 14 }}>✓</span>
-                <span className="sk-mono" style={{ color: 'var(--ink-3)', minWidth: 48 }}>{t.id}</span>
+                <span className="sk-mono" style={{ color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
+                  onClick={() => nav?.navigateToTask?.(t.id)}
+                  title="在任务表中查看">{t.id}</span>
                 <span className="sk-body truncate" style={{ flex: 1, color: 'var(--ink-2)' }}>{t.name}</span>
-                <span className="sk-mono" style={{ color: 'var(--ink-4)', fontSize: 10 }}>{t.completedAt}</span>
+                <span className="sk-mono" style={{ color: 'var(--ink-4)', fontSize: 10 }}>{relativeDate(t.completedAt ?? '')}</span>
               </div>
             ))}
           </div>

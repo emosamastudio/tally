@@ -22,6 +22,9 @@ export interface NavState {
   focusSection: (catIdx: number, secIdx: number) => void
   /** Incremented each time a no-op Enter or Esc is pressed, so the UI can flash feedback */
   feedbackTrigger: number
+  /** Cross-panel task navigation: jump to task in task table */
+  navigateToTask?: (taskId: string) => void
+  setNavigateToTask?: (fn: (taskId: string) => void) => void
 }
 
 export const NavContext = createContext<NavState | null>(null)
@@ -32,6 +35,7 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   const [activeSection, setActiveSection] = useState(0)
   const [focusLevel, setFocusLevel] = useState<0 | 1 | 2>(0)
   const [focusedItemIndex, setFocusedItemIndex] = useState(0)
+  const [navigateToTask, setNavigateToTask] = useState<((taskId: string) => void) | undefined>(undefined)
   const [feedbackTrigger, setFeedbackTrigger] = useState(0)
 
   const itemRegistry = useRef<Map<string, string[]>>(new Map())
@@ -175,6 +179,6 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   return {
     activeCategory, activeSection, focusedItemIndex, focusLevel,
     items, sectionId, registerItems, focusSection,
-    feedbackTrigger,
+    feedbackTrigger, navigateToTask, setNavigateToTask,
   }
 }

@@ -1,5 +1,7 @@
 // src/components/attention-panel.tsx
 import { useState, useMemo } from 'react'
+import { NavContext } from '@/components/dashboard-layout'
+import { useContext } from 'react'
 import { Card } from '@/components/ui/card'
 import type { Task, BlockItem } from '@/lib/types'
 import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
@@ -89,6 +91,7 @@ const typeColor: Record<string, string> = { blocked: 'var(--danger)', drift: 'va
 
 export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps) {
   const items = useMemo(() => buildItems(tasks), [tasks])
+  const nav = useContext(NavContext)
 
   const [expandedDrifts, setExpandedDrifts] = useState<Record<string, boolean>>({})
   const [showAllOverflow, setShowAllOverflow] = useState(false)
@@ -192,7 +195,9 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
           }}
         >
           <span className="sk-mono" style={{ fontSize: 14, color: typeColor[item.type], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon[item.type]}</span>
-          <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{item.taskId}</span>
+          <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
+            onClick={(e) => { e.stopPropagation(); nav?.navigateToTask?.(item.taskId) }}
+            title={`在任务表中查看 ${item.taskId}`}>{item.taskId}</span>
           <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{item.taskName}</span>
           <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)', maxWidth: 200, textAlign: 'right' }}>{item.detail}</span>
           <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={item.action}>{'📋'}</span>
