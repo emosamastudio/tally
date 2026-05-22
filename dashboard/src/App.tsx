@@ -186,12 +186,12 @@ export default function App() {
           {
             id: 'execution',
             label: '执行',
-            sections: ['current-round', 'agent-activity', 'round-timeline', 'round-analytics'],
+            sections: ['current-round', 'agent-activity', 'round-timeline', 'round-analytics', 'agent-contribution'],
           },
           {
             id: 'tasks',
             label: '任务',
-            sections: ['task-table', 'agent-contribution'],
+            sections: ['task-table'],
           },
           {
             id: 'graphs',
