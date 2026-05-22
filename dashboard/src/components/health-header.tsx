@@ -42,8 +42,9 @@ export default function HealthHeader({ tasks, blocks }: HealthHeaderProps) {
     .sort((a, b) => b[1].total - a[1].total)[0]
 
   // Health color
-  const healthColor = pct >= 80 ? 'var(--accent-3)' : pct >= 50 ? 'var(--accent-2)' : 'var(--danger)'
-  const healthLabel = pct >= 80 ? '正常' : pct >= 50 ? '需关注' : '风险'
+  const isNew = total === 0
+  const healthColor = isNew ? 'var(--ink-3)' : pct >= 80 ? 'var(--accent-3)' : pct >= 50 ? 'var(--accent-2)' : 'var(--danger)'
+  const healthLabel = isNew ? '新项目' : pct >= 80 ? '正常' : pct >= 50 ? '需关注' : '风险'
   const issues = blocked + driftCount + unapproved + blocks.length
   const hasIssues = issues > 0
 

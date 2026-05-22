@@ -139,6 +139,16 @@ export default function App() {
           <CardContent className="p-8">
             <h1 className="sk-h1" style={{ color: 'var(--danger)' }}>数据加载失败</h1>
             <p className="sk-body" style={{ fontSize: 13, marginTop: 8 }}>{state.message}</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12 }}>
+              请确认 tally.json 存在且 CLI 服务器正在运行 (tally dashboard)
+            </p>
+            <button
+              className="sk-chip accent"
+              style={{ marginTop: 16, cursor: 'pointer', fontSize: 13, padding: '8px 20px' }}
+              onClick={() => _setRefreshKey((k: number) => k + 1)}
+            >
+              重试
+            </button>
           </CardContent>
         </Card>
       </div>

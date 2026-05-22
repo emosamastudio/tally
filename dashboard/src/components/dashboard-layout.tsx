@@ -27,7 +27,7 @@ const SECTION_LABELS: Record<string, string> = {
   'dependency-graph': '依赖图',
 }
 
-const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入', 2: '↑↓ 项目 · Esc 返回' }
+const LEVEL_HINT: Record<number, string> = { 0: '←→ 选择分类 · Enter 进入', 1: '←→ 分类 · ↑↓ 板块 · Enter 进入 · Esc 返回', 2: '↑↓ 项目 · Esc 返回' }
 
 export default function DashboardLayout({ header, categories, children }: DashboardLayoutProps) {
   const nav = useKeyboardNav({ categories })
@@ -177,7 +177,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                         flexDirection: 'column',
                         flex: 1,
                         overflow: 'auto',
-                        borderLeft: isActive ? '3px solid var(--accent)' : '3px solid transparent',
+                        borderLeft: isActive ? (nav.focusLevel === 0 ? '3px dashed var(--accent)' : '3px solid var(--accent)') : '3px solid transparent',
                         background: isL2 ? 'rgba(245,180,60,0.04)' : 'transparent',
                         borderRadius: '0 var(--sk-radius) var(--sk-radius) 0',
                         paddingLeft: isActive ? 12 : 0,

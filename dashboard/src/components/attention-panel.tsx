@@ -301,7 +301,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
   }
 
   return (
-    <Card style={{ padding: '12px 16px', borderLeft: '3px solid var(--danger)' }}>
+    <Card style={{ padding: '12px 16px', borderLeft: items.length > 0 ? '3px solid var(--danger)' : '3px solid var(--accent-3)' }}>
       <div className="flex items-baseline justify-between mb-2">
         <h3 className="sk-h3" style={{ fontSize: 14 }}>需要关注 &middot; {items.length} 项</h3>
         <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
