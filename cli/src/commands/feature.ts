@@ -43,6 +43,53 @@ export function addFeature(
   return feature
 }
 
+function requireFeature(doc: TallyDocument, id: string): FeatureEntry {
+  const normalizedId = requireNonEmpty('id', id)
+  const feature = doc._meta.features.find((existing) => existing.id === normalizedId)
+  if (!feature) {
+    throw new Error(`Feature "${normalizedId}" not found in _meta.features`)
+  }
+  return feature
+}
+
+function validateFeatureDependencies(doc: TallyDocument, featureId: string, deps: string[]): void {
+  if (deps.includes(featureId)) {
+    throw new Error(`Invalid feature dependsOn: feature "${featureId}" cannot depend on itself`)
+  }
+  for (const dep of deps) {
+    if (!doc._meta.features.some((existing) => existing.id === dep)) {
+      throw new Error(`Feature dependency "${dep}" not found in _meta.features`)
+    }
+  }
+}
+
+export function editFeature(
+  doc: TallyDocument,
+  id: string,
+  updates: Partial<Pick<FeatureEntry, 'name' | 'status' | 'specRefs' | 'dependsOn' | 'owner'>>,
+): FeatureEntry {
+  const feature = requireFeature(doc, id.trim())
+
+  if (updates.name !== undefined) {
+    feature.name = requireNonEmpty('name', updates.name)
+  }
+  if (updates.status !== undefined) {
+    feature.status = updates.status
+  }
+  if (updates.specRefs !== undefined) {
+    feature.specRefs = updates.specRefs
+  }
+  if (updates.dependsOn !== undefined) {
+    validateFeatureDependencies(doc, feature.id, updates.dependsOn)
+    feature.dependsOn = updates.dependsOn
+  }
+  if (updates.owner !== undefined) {
+    feature.owner = updates.owner === null ? null : requireNonEmpty('owner', updates.owner)
+  }
+
+  return feature
+}
+
 export function featureCommand(): Command {
   const cmd = new Command('feature')
   cmd.description('Feature registry operations')
@@ -77,6 +124,47 @@ export function featureCommand(): Command {
         })
         writeLedger(doc)
         console.log(`Registered feature ${feature.id}: ${feature.name}`)
+      })
+    })
+
+  cmd.command('edit')
+    .description('Update mutable feature metadata in _meta.features')
+    .argument('<id>', 'Feature ID')
+    .option('--name <name>', 'Feature display name')
+    .option('--status <status>', 'Feature status: design, contract_frozen, implementing, stable')
+    .option('--spec-refs <refs>', 'Comma-separated spec references')
+    .option('--depends-on <featureIds>', 'Comma-separated feature dependencies')
+    .option('--owner <owner>', 'Feature owner')
+    .option('--json-output', 'Output errors as JSON')
+    .action((id: string, opts: Record<string, string | boolean | undefined>) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
+        const status = opts.status as string | undefined
+        if (status !== undefined && !['design', 'contract_frozen', 'implementing', 'stable'].includes(status)) {
+          throw new Error(`Invalid feature status "${status}"`)
+        }
+
+        const doc = readLedger()
+        const updates: Partial<Pick<FeatureEntry, 'name' | 'status' | 'specRefs' | 'dependsOn' | 'owner'>> = {}
+        if (typeof opts.name === 'string') {
+          updates.name = opts.name.trim()
+        }
+        if (status !== undefined) {
+          updates.status = status as FeatureStatus
+        }
+        if (opts.specRefs !== undefined) {
+          updates.specRefs = parseList(opts.specRefs as string | undefined)
+        }
+        if (opts.dependsOn !== undefined) {
+          updates.dependsOn = parseList(opts.dependsOn as string | undefined)
+        }
+        if (opts.owner !== undefined) {
+          const owner = typeof opts.owner === 'string' ? opts.owner.trim() : ''
+          updates.owner = owner === '' ? null : owner
+        }
+
+        const feature = editFeature(doc, id, updates)
+        writeLedger(doc)
+        console.log(`Updated feature ${feature.id}: ${feature.name}`)
       })
     })
 

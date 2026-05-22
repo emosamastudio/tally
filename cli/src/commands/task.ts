@@ -26,6 +26,7 @@ function inferErrorCode(message: string): string {
   if (message.includes('not approved')) return 'APPROVAL_REQUIRED'
   if (message.includes('frozen feature')) return 'FEATURE_FROZEN'
   if (message.includes('Feature dependency')) return 'FEATURE_DEP_NOT_FOUND'
+  if (message.includes('Feature "') && message.includes('not found in _meta.features')) return 'FEATURE_NOT_FOUND'
   if (message.includes('Stage module') && message.includes('not found in _meta.modules')) return 'STAGE_MODULE_NOT_FOUND'
   if (message.includes('does not include module')) return 'STAGE_MODULE_MISMATCH'
   if (message.includes('Stage "') && message.includes('already exists')) return 'STAGE_ALREADY_EXISTS'

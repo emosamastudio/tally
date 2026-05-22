@@ -294,6 +294,73 @@ describe('tally end-to-end', () => {
     ])
   })
 
+  it('feature edit updates mutable metadata and validates dependencies', () => {
+    run(['init', 'feature-edit-command', '--no-hook'], dir)
+    run(['feature', 'add', 'f-base', '--module', 'core', '--name', 'Base Feature'], dir)
+    run(['feature', 'add', 'f-target', '--module', 'core', '--name', 'Target Feature'], dir)
+
+    run([
+      'feature',
+      'edit',
+      'f-target',
+      '--name',
+      ' Target Feature v2 ',
+      '--status',
+      'implementing',
+      '--spec-refs',
+      ' spec-a, spec-a, spec-b ',
+      '--depends-on',
+      ' f-base, f-base ',
+      '--owner',
+      ' main ',
+    ], dir)
+
+    const doc = readDoc(dir)
+    expect(doc._meta.features[1]).toEqual({
+      id: 'f-target',
+      module: 'core',
+      name: 'Target Feature v2',
+      status: 'implementing',
+      specRefs: ['spec-a', 'spec-b'],
+      dependsOn: ['f-base'],
+      owner: 'main',
+    })
+
+    const missingDep = runLaxSafe([
+      'feature',
+      'edit',
+      'f-target',
+      '--depends-on',
+      'f-missing',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(missingDep).error).toBe('FEATURE_DEP_NOT_FOUND')
+
+    const selfDep = runLaxSafe([
+      'feature',
+      'edit',
+      'f-target',
+      '--depends-on',
+      'f-target',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(selfDep).error).toBe('FEATURE_INVALID')
+  })
+
+  it('feature edit emits JSON errors for missing features', () => {
+    run(['init', 'feature-edit-json-errors', '--no-hook'], dir)
+
+    const out = runLaxSafe([
+      'feature',
+      'edit',
+      'f-missing',
+      '--name',
+      'Missing',
+      '--json-output',
+    ], dir)
+    expect(JSON.parse(out).error).toBe('FEATURE_NOT_FOUND')
+  })
+
   it('module add registers modules for historical taxonomy migration', () => {
     run(['init', 'module-register', '--no-hook'], dir)
     run(['module', 'add', 'runtime-adapters', '--name', 'Runtime Adapters'], dir)
