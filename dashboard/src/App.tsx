@@ -213,7 +213,7 @@ export default function App() {
           // 概览
           'overview-panel': (
             <ErrorBoundary fallbackName="概览">
-              <OverviewPanel sectionId="overview-panel" tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} />
+              <OverviewPanel sectionId="overview-panel" tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} rounds={rounds} />
             </ErrorBoundary>
           ),
           'progress-trend': (
