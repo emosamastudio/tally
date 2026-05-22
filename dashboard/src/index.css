@@ -114,6 +114,7 @@ html, body {
 .sk-chip.accent { background: var(--accent); }
 .sk-chip.danger { background: var(--danger); color: white; border-color: var(--danger); }
 .sk-chip.ok { background: var(--accent-3); }
+.sk-chip.accent-2 { background: var(--accent-2); }
 
 /* ── placeholder bars ───────────────────────────────── */
 
@@ -266,4 +267,15 @@ html, body {
 
 [data-theme="dark"] .sk-progress-track {
   background: var(--paper-2);
+}
+
+/* ── keyboard nav feedback pulse ──────────────────────── */
+
+@keyframes sk-flash {
+  0%, 100% { color: var(--ink-4); }
+  50% { color: var(--danger); }
+}
+
+.sk-flash {
+  animation: sk-flash 0.5s ease-in-out 2;
 }

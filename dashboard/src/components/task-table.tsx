@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Table, TableHeader, TableBody, TableRow, TableHead, TableCell } from '@/components/ui/table'
 import { Progress } from '@/components/ui/progress'
 import { ChevronDown, ChevronRight } from 'lucide-react'
+import { l2FocusStyle } from '@/hooks/useL2Navigation'
 import type { Task, TaskStatus, TaskSource, Priority } from '@/lib/types'
 
 interface TaskTableProps {
@@ -26,7 +27,7 @@ const STATUS_LABEL: Record<TaskStatus, string> = {
 
 const STATUS_CHIP: Record<TaskStatus, string> = {
   completed: 'ok',
-  in_progress: 'accent',
+  in_progress: 'accent-2',
   pending: '',
   blocked: 'danger',
   hold: '',
@@ -41,7 +42,7 @@ const PRIORITY_CHIP: Record<Priority, string> = {
 
 const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
   completed: 'var(--accent-3)',
-  in_progress: 'var(--accent)',
+  in_progress: 'var(--accent-2)',
   pending: 'var(--ink-4)',
   blocked: 'var(--danger)',
   hold: 'var(--ink-4)',
@@ -226,6 +227,13 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
   onNavigate?: (taskId: string) => void
 }) {
   const [expanded, setExpanded] = useState(false)
+  const nav = useContext(NavContext)
+
+  const isFocused =
+    nav != null &&
+    nav.focusLevel === 2 &&
+    nav.sectionId === 'task-table' &&
+    nav.items[nav.focusedItemIndex] === task.id
 
   return (
     <>
@@ -233,6 +241,7 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
         id={`task-row-${task.id}`}
         data-nav-item={task.id}
         className="cursor-pointer"
+        style={l2FocusStyle(isFocused)}
         onClick={() => setExpanded(!expanded)}
       >
         <TableCell className="w-8">

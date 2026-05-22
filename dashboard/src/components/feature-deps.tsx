@@ -145,7 +145,7 @@ export default function FeatureDeps({ features, tasks }: FeatureDepsProps) {
                       <div className="sk-mono" style={{ fontSize: 11, fontWeight: 600 }}>{f.id}</div>
                       <div className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{f.name}</div>
                       {stats && (
-                        <div className="sk-progress-track" style={{ height: 3 }}>
+                        <div className="sk-progress-track" style={{ height: 6, border: 'none' }}>
                           <div className="sk-progress-fill" style={{ width: `${pct}%`, background: STATUS_COLOR[(f as any).status as string] ?? 'var(--ink-4)' }} />
                         </div>
                       )}

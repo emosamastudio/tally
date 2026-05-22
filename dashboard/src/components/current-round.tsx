@@ -41,7 +41,10 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
   }
 
   const isActive = round.status === 'active'
-  const doneCount = round.tasks.length
+  const plannedIds = new Set(round.tasks.map((rt) => rt.taskId))
+  const doneCount = (allTasks ?? []).filter(
+    (t) => plannedIds.has(t.id) && t.status === 'completed',
+  ).length
   const totalCount = round.tasks.length
 
   // Build timeline data: all rounds sorted chronologically, excluding the active round shown above
@@ -69,7 +72,7 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
         <svg width="80" height="80">
           <circle cx="40" cy="40" r="32" fill="none" stroke="var(--ink-4)" strokeWidth="6" strokeDasharray="3 3" />
           <circle cx="40" cy="40" r="32" fill="none" stroke="var(--ink)" strokeWidth="5"
-            strokeDasharray={`${0.62 * 2 * Math.PI * 32} ${2 * Math.PI * 32}`}
+            strokeDasharray={`${(totalCount > 0 ? doneCount / totalCount : 0) * 2 * Math.PI * 32} ${2 * Math.PI * 32}`}
             transform="rotate(-90 40 40)" strokeLinecap="round" />
           <text x="40" y="46" textAnchor="middle" style={{ fontFamily: 'Caveat, cursive', fontSize: 24, fontWeight: 700, fill: 'var(--ink)' }}>
             {totalCount > 0 ? Math.round((doneCount / totalCount) * 100) : 0}%

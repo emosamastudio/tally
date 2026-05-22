@@ -6,29 +6,26 @@ import { useL2Navigation, l2FocusStyle } from '@/hooks/useL2Navigation'
 
 // ── Color scale ──
 
-function cellColor(pct: number, blocked: number): string {
-  if (blocked > 0) return 'var(--danger)'
+function cellColor(pct: number): string {
   if (pct >= 100) return 'var(--accent-3)'
-  if (pct >= 70) return '#5b9bd5'
   if (pct >= 40) return 'var(--accent-2)'
-  if (pct > 0) return 'var(--accent)'
-  return 'var(--ink-4)'
+  if (pct > 0) return '#f0b060'
+  return '#aaa3a3'
 }
 
 function cellBg(pct: number): string {
   if (pct >= 100) return 'rgba(107,200,177,0.15)'
-  if (pct >= 70) return 'rgba(91,155,213,0.10)'
   if (pct >= 40) return 'rgba(255,126,107,0.08)'
-  if (pct > 0) return 'rgba(245,180,60,0.06)'
+  if (pct > 0) return 'rgba(240,176,96,0.06)'
   return 'rgba(120,120,120,0.03)'
 }
 
 // ── Mini bar ──
 
-function MiniBar({ pct, blocked }: { pct: number; blocked: number }) {
+function MiniBar({ pct }: { pct: number }) {
   return (
-    <div className="sk-progress-track" style={{ height: 3, minWidth: 40 }}>
-      <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct, blocked) }} />
+    <div className="sk-progress-track" style={{ height: 6, minWidth: 40, border: 'none' }}>
+      <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct) }} />
     </div>
   )
 }
@@ -38,10 +35,9 @@ function MiniBar({ pct, blocked }: { pct: number; blocked: number }) {
 function Legend() {
   const items: [string, string][] = [
     ['100%', 'var(--accent-3)'],
-    ['≥70%', '#5b9bd5'],
     ['≥40%', 'var(--accent-2)'],
-    ['>0%', 'var(--accent)'],
-    ['0%', 'var(--ink-4)'],
+    ['>0%', '#f0b060'],
+    ['0%', '#aaa3a3'],
     ['阻塞', 'var(--danger)'],
   ]
   return (
@@ -161,7 +157,8 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
                     style={{
                       width: 140, flexShrink: 0, padding: '4px 8px',
                       borderBottom: '1px solid var(--ink-4)',
-                      cursor: 'pointer', background: 'none', borderTop: 'none', borderLeft: 'none', borderRight: 'none',
+                      cursor: 'pointer', background: 'none', borderTop: 'none', borderRight: 'none',
+                      borderLeft: f.blocked > 0 ? '3px solid var(--danger)' : 'none',
                       display: 'flex', flexDirection: 'column', gap: 2,
                       ...l2FocusStyle(isL2 && focusedIndex === i),
                     }}
@@ -169,7 +166,7 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
                   >
                     <span className="sk-mono truncate" style={{ fontSize: 10 }} title={f.name}>{f.id}</span>
                     <div className="flex items-center gap-2">
-                      <MiniBar pct={pct} blocked={f.blocked} />
+                      <MiniBar pct={pct} />
                       <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-3)' }}>{f.done}/{f.total}</span>
                     </div>
                   </button>
@@ -191,8 +188,8 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
                       >
                         {isOwn && (
                           <>
-                            <div className="sk-progress-track" style={{ height: 4 }}>
-                              <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct, f.blocked) }} />
+                            <div className="sk-progress-track" style={{ height: 6 }}>
+                              <div className="sk-progress-fill" style={{ width: `${Math.min(pct, 100)}%`, background: cellColor(pct) }} />
                             </div>
                             <div className="flex items-baseline justify-between" style={{ fontSize: 9 }}>
                               <span style={{ color: 'var(--ink-2)' }}>{pct}%</span>

@@ -20,6 +20,8 @@ export interface NavState {
   sectionId: string
   registerItems: (sectionId: string, itemIds: string[]) => void
   focusSection: (catIdx: number, secIdx: number) => void
+  /** Incremented each time a no-op Enter or Esc is pressed, so the UI can flash feedback */
+  feedbackTrigger: number
 }
 
 export const NavContext = createContext<NavState | null>(null)
@@ -30,6 +32,7 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   const [activeSection, setActiveSection] = useState(0)
   const [focusLevel, setFocusLevel] = useState<0 | 1 | 2>(0)
   const [focusedItemIndex, setFocusedItemIndex] = useState(0)
+  const [feedbackTrigger, setFeedbackTrigger] = useState(0)
 
   const itemRegistry = useRef<Map<string, string[]>>(new Map())
 
@@ -75,11 +78,13 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   const drillDown = useCallback(() => {
     if (focusLevel === 0) setFocusLevel(1)
     else if (focusLevel === 1 && currentItems > 0) { setFocusLevel(2); setFocusedItemIndex(0) }
+    else setFeedbackTrigger((v) => v + 1)
   }, [focusLevel, currentItems])
 
   const goBack = useCallback(() => {
     if (focusLevel === 2) setFocusLevel(1)
     else if (focusLevel === 1) setFocusLevel(0)
+    else setFeedbackTrigger((v) => v + 1)
   }, [focusLevel])
 
   const focusSection = useCallback((catIdx: number, secIdx: number) => {
@@ -143,5 +148,6 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
   return {
     activeCategory, activeSection, focusedItemIndex, focusLevel,
     items, sectionId, registerItems, focusSection,
+    feedbackTrigger,
   }
 }

@@ -1,5 +1,6 @@
 // src/components/dashboard-layout.tsx
 import type { ReactNode } from 'react'
+import { useEffect, useRef } from 'react'
 import { useKeyboardNav, NavContext } from '@/hooks/useKeyboardNav'
 import type { NavCategory } from '@/hooks/useKeyboardNav'
 
@@ -18,6 +19,17 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
   const nav = useKeyboardNav({ categories })
   const cat = categories[nav.activeCategory]
   const sectionId = cat?.sections[nav.activeSection]
+  const hintRef = useRef<HTMLDivElement>(null)
+
+  // Flash the hint bar when Enter/Esc are no-ops (e.g. Enter at L1 with no L2 items, Esc at L0)
+  useEffect(() => {
+    if (nav.feedbackTrigger === 0) return
+    const el = hintRef.current
+    if (!el) return
+    el.classList.add('sk-flash')
+    const timer = setTimeout(() => el.classList.remove('sk-flash'), 500)
+    return () => { clearTimeout(timer); el.classList.remove('sk-flash') }
+  }, [nav.feedbackTrigger])
 
   return (
     <NavContext.Provider value={nav}>
@@ -58,7 +70,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
             </nav>
 
             {/* Hint bar */}
-            <div className="flex items-center justify-between" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
+            <div ref={hintRef} className="flex items-center justify-between" style={{ fontSize: 10, color: 'var(--ink-4)', marginTop: 2 }}>
               <span>{LEVEL_HINT[nav.focusLevel]}</span>
               <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
                 <span style={{ color: 'var(--ink-2)' }}>{cat?.label} › {sectionId}</span>

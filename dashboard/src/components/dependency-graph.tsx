@@ -10,7 +10,7 @@ interface DependencyGraphProps {
 
 const STATUS_COLORS: Record<TaskStatus, { fill: string; stroke: string; text: string }> = {
   completed: { fill: 'rgba(107,200,177,0.18)', stroke: 'var(--accent-3)', text: 'var(--accent-3)' },
-  in_progress: { fill: 'rgba(255,210,63,0.18)', stroke: 'var(--accent)', text: 'var(--ink-2)' },
+  in_progress: { fill: 'rgba(255,126,107,0.18)', stroke: 'var(--accent-2)', text: 'var(--ink-2)' },
   pending: { fill: 'rgba(255,255,255,0.7)', stroke: 'var(--ink-3)', text: 'var(--ink-2)' },
   blocked: { fill: 'rgba(232,90,79,0.12)', stroke: 'var(--danger)', text: 'var(--danger)' },
   hold: { fill: 'rgba(255,255,255,0.5)', stroke: 'var(--ink-4)', text: 'var(--ink-3)' },
@@ -787,7 +787,7 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
             <p className="sk-body" style={{ fontSize: 13, marginTop: 2 }}>{tooltip.task.name}</p>
             <div className="flex items-center gap-2 mt-1.5">
               <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{tooltip.task.stage}</span>
-              <span className={`sk-chip ${tooltip.task.status === 'completed' ? 'ok' : tooltip.task.status === 'in_progress' ? 'accent' : tooltip.task.status === 'blocked' ? 'danger' : ''}`} style={{ fontSize: 10 }}>
+              <span className={`sk-chip ${tooltip.task.status === 'completed' ? 'ok' : tooltip.task.status === 'in_progress' ? 'accent-2' : tooltip.task.status === 'blocked' ? 'danger' : ''}`} style={{ fontSize: 10 }}>
                 {STATUS_LABEL[tooltip.task.status]}
               </span>
               {tooltip.task.dependencies.length > 0 && (
