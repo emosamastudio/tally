@@ -46,7 +46,12 @@ export default function AgentActivity({ rounds, tasks }: AgentActivityProps) {
       <Card>
         <CardHeader><CardTitle>活跃 Agent</CardTitle></CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无活跃 Agent</p>
+          <div>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无活跃 Agent</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              使用 <code className="sk-mono" style={{ fontSize: 11 }}>TALLY_AGENT_ID={'<id>'} tally round start</code> 启动 Agent 工作回合
+            </p>
+          </div>
         </CardContent>
       </Card>
     )

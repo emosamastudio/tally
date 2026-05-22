@@ -24,7 +24,12 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
           <CardTitle>当前回合</CardTitle>
         </CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无活跃回合</p>
+          <div>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无活跃回合</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              运行 <code className="sk-mono" style={{ fontSize: 11 }}>tally round start --dry-run --json</code> 预览可用任务
+            </p>
+          </div>
           {lastCompleted && (
             <div style={{ marginTop: 8, padding: '6px 8px', background: 'var(--paper-2)', borderRadius: 'var(--sk-radius)' }}>
               <div className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>最近完成</div>

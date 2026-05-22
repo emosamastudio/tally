@@ -21,7 +21,12 @@ export default function RoundTimeline({ rounds, tasks }: RoundTimelineProps) {
       <Card>
         <CardHeader><CardTitle>回合时间线</CardTitle></CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无回合数据</p>
+          <div>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无回合数据</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              运行 <code className="sk-mono" style={{ fontSize: 11 }}>tally round start</code> 开始第一个回合
+            </p>
+          </div>
         </CardContent>
       </Card>
     )

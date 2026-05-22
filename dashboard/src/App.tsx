@@ -22,6 +22,7 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
 import OverviewPanel from '@/components/overview-panel'
 import { HealthHeaderSkeleton } from '@/components/health-header'
+import ProgressTrend, { ProgressTrendSkeleton } from '@/components/progress-trend'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
@@ -88,7 +89,7 @@ export default function App() {
 
   if (state.status === 'loading' || state.status === 'idle') {
     const loadingCategories: NavCategory[] = [
-      { id: 'overview', label: '概览', sections: ['overview-panel'] },
+      { id: 'overview', label: '概览', sections: ['overview-panel', 'progress-trend'] },
       { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress'] },
       { id: 'execution', label: '执行', sections: ['current-round', 'agent-activity'] },
       { id: 'tasks', label: '任务', sections: ['task-table'] },
@@ -118,6 +119,7 @@ export default function App() {
         categories={loadingCategories}
         children={{
           'overview-panel': <HealthHeaderSkeleton />,
+          'progress-trend': <ProgressTrendSkeleton />,
           'stage-matrix': <StageMatrixSkeleton />,
           'feature-progress': <FeatureProgressSkeleton />,
           'current-round': <CurrentRoundSkeleton />,
@@ -174,7 +176,7 @@ export default function App() {
           {
             id: 'overview',
             label: '概览',
-            sections: ['overview-panel'],
+            sections: ['overview-panel', 'progress-trend'],
           },
           {
             id: 'planning',
@@ -202,6 +204,11 @@ export default function App() {
           'overview-panel': (
             <ErrorBoundary fallbackName="概览">
               <OverviewPanel sectionId="overview-panel" tasks={allTasks} activeRound={merged.activeRound} blocks={merged.activeBlocks} features={features} />
+            </ErrorBoundary>
+          ),
+          'progress-trend': (
+            <ErrorBoundary fallbackName="进度趋势">
+              <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
             </ErrorBoundary>
           ),
           // 规划

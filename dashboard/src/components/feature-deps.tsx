@@ -27,7 +27,12 @@ export default function FeatureDeps({ features, tasks }: FeatureDepsProps) {
       <Card>
         <CardHeader><CardTitle>功能依赖</CardTitle></CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无功能依赖数据</p>
+          <div>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无功能依赖数据</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              在 <code className="sk-mono" style={{ fontSize: 11 }}>_meta.features</code> 中配置 <code className="sk-mono" style={{ fontSize: 11 }}>dependsOn</code> 声明功能间依赖关系
+            </p>
+          </div>
         </CardContent>
       </Card>
     )

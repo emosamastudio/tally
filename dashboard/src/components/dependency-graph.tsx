@@ -484,9 +484,12 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
       <Card>
         <CardHeader><CardTitle>依赖关系图</CardTitle></CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: '32px 0' }}>
-            无依赖数据
-          </p>
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无依赖数据</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              任务间声明 <code className="sk-mono" style={{ fontSize: 11 }}>deps</code> 字段后将在此显示依赖图
+            </p>
+          </div>
         </CardContent>
       </Card>
     )
@@ -498,9 +501,12 @@ export default function DependencyGraph({ tasks }: DependencyGraphProps) {
       <Card>
         <CardHeader><CardTitle>依赖关系图</CardTitle></CardHeader>
         <CardContent>
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: '32px 0' }}>
-            无依赖数据
-          </p>
+          <div style={{ textAlign: 'center', padding: '32px 0' }}>
+            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无依赖数据</p>
+            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
+              任务间声明 <code className="sk-mono" style={{ fontSize: 11 }}>deps</code> 字段后将在此显示依赖图
+            </p>
+          </div>
         </CardContent>
       </Card>
     )
