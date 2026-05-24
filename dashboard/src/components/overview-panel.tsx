@@ -98,9 +98,6 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
           </div>
         </div>
       )}
-
-      {/* Row 4: Attention Panel */}
-      <AttentionPanel tasks={tasks} blocks={blocks} sectionId={sectionId} />
     </div>
   )
 }
