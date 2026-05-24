@@ -52,10 +52,7 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
       {/* Row 1: Health + Metrics */}
       <HealthHeader tasks={tasks} activeRound={activeRound} blocks={blocks} features={features} />
 
-      {/* Row 2: Attention Panel — most actionable, right after health */}
-      <AttentionPanel tasks={tasks} blocks={blocks} sectionId={sectionId} />
-
-      {/* Row 3: Active Agents (compact) */}
+      {/* Row 2: Active Agents (compact) */}
       {activeAgents.length > 0 && (
         <div style={{
           padding: '10px 16px', background: 'var(--paper-2)', borderRadius: 'var(--sk-radius)',
@@ -98,6 +95,9 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
           </div>
         </div>
       )}
+
+      {/* Row 5: Attention Panel */}
+      <AttentionPanel tasks={tasks} blocks={blocks} sectionId={sectionId} />
     </div>
   )
 }
