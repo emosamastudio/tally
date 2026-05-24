@@ -201,12 +201,7 @@ export default function App() {
           {
             id: 'tasks',
             label: '任务',
-            sections: ['task-table'],
-          },
-          {
-            id: 'graphs',
-            label: '图谱',
-            sections: ['dependency-graph'],
+            sections: ['task-table', 'dependency-graph'],
           },
         ]}
         children={{

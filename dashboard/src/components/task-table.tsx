@@ -50,7 +50,7 @@ const STATUS_DOT_COLORS: Record<TaskStatus, string> = {
 }
 
 const PAGE_SIZE_OPTIONS = [10, 30, 50, 100]
-const DEFAULT_PAGE_SIZE = 30
+const DEFAULT_PAGE_SIZE = 10
 
 /** BFS to find ancestors (dependencies) up to maxDepth */
 function findAncestors(
