@@ -565,7 +565,8 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
             <option value="pending">待处理</option>
             <option value="in_progress">进行中</option>
             <option value="blocked">阻塞</option>
-            <option value="hold">Hold</option>
+            <option value="hold">搁置</option>
+            <option value="deferred">暂缓</option>
             <option value="completed">已完成</option>
           </select>
           <select

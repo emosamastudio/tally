@@ -69,9 +69,9 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
               {categories.map((cat, ci) => (
                 <button key={cat.id} role="tab" aria-selected={nav.activeCategory === ci} aria-controls={`panel-${cat.id}`}
                   className="sk-chip shrink-0"
-                  style={{ fontSize:12, padding:'6px 14px', cursor:'pointer', background:nav.activeCategory===ci?'var(--accent)':'var(--paper-2)', color:nav.activeCategory===ci?'var(--paper)':'var(--ink-2)', borderColor:nav.activeCategory===ci?'var(--accent)':'var(--ink-4)', fontWeight:nav.activeCategory===ci?600:400, outline:nav.focusLevel===0&&nav.activeCategory===ci?'2px solid var(--ink)':'none', outlineOffset:nav.focusLevel===0&&nav.activeCategory===ci?2:0 }}
+                  style={{ fontSize:12, padding:'6px 14px', cursor:'pointer', background:nav.activeCategory===ci?'var(--accent)':'var(--paper-2)', color:nav.activeCategory===ci?'var(--ink)':'var(--ink-2)', borderColor:nav.activeCategory===ci?'var(--accent)':'var(--ink-4)', fontWeight:nav.activeCategory===ci?600:400, outline:nav.focusLevel===0&&nav.activeCategory===ci?'2px solid var(--ink)':'none', outlineOffset:nav.focusLevel===0&&nav.activeCategory===ci?2:0 }}
                   onClick={() => nav.focusSection(ci, 0)}>
-                  <span className="sk-mono" style={{ fontSize:10, color:nav.activeCategory===ci?'var(--paper)':'var(--ink-4)', marginRight:4 }}>{ci+1}</span>
+                  <span className="sk-mono" style={{ fontSize:10, color:nav.activeCategory===ci?'var(--ink)':'var(--ink-4)', marginRight:4 }}>{ci+1}</span>
                   {cat.label}
                   <span style={{ marginLeft:6, fontSize:10, opacity:0.6 }}>{cat.sections.length}</span>
                 </button>

@@ -184,7 +184,7 @@ export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) 
                   {/* Status counts: done / in_progress / not started */}
                   <div className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
                     已完成 {s.done} · 进行中 {s.inProgress} · 未开始 {Math.max(s.open - s.inProgress, 0)}
-                    {s.hold > 0 ? ` · hold ${s.hold}` : ''}
+                    {s.hold > 0 ? ` · 搁置 ${s.hold}` : ''}
                     {s.blocked > 0 ? ` · 阻塞 ${s.blocked}` : ''}
                   </div>
 
