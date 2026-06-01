@@ -124,7 +124,7 @@ function DepChain({
 
   if (!hasAncestors && !hasDescendants) {
     return (
-      <p className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)', marginTop: 2 }}>
+      <p className="sk-body sk-text-base" style={{ color: 'var(--ink-3)', marginTop: 2 }}>
         无依赖链 — 此任务无上下游依赖
       </p>
     )
@@ -140,7 +140,7 @@ function DepChain({
   const renderNode = (id: string, isCurrent: boolean) => {
     if (id === '...') {
       return (
-        <span key={`ellipsis-${Math.random()}`} className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', padding: '0 2px' }}>
+        <span key={`ellipsis-${Math.random()}`} className="sk-body sk-text-xs" style={{ color: 'var(--ink-4)', padding: '0 2px' }}>
           ...
         </span>
       )
@@ -172,9 +172,8 @@ function DepChain({
           }}
         />
         <span
-          className="sk-mono"
+          className="sk-mono sk-text-2xs"
           style={{
-            fontSize: 9,
             color: isCurrent ? 'var(--ink)' : 'var(--ink-3)',
             fontWeight: isCurrent ? 700 : 400,
           }}
@@ -186,7 +185,7 @@ function DepChain({
   }
 
   const renderArrow = (key: string) => (
-    <span key={key} className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)', padding: '0 1px', alignSelf: 'center' }}>
+    <span key={key} className="sk-body sk-text-xs" style={{ color: 'var(--ink-4)', padding: '0 1px', alignSelf: 'center' }}>
       &rarr;
     </span>
   )
@@ -214,7 +213,7 @@ function DepChain({
 
   return (
     <div className="flex items-center flex-wrap gap-1" style={{ marginTop: 8 }}>
-      <span className="sk-label" style={{ fontSize: 10, marginRight: 4 }}>依赖链</span>
+      <span className="sk-label sk-text-xs" style={{ marginRight: 4 }}>依赖链</span>
       <div className="flex items-center flex-wrap gap-1">{nodes}</div>
     </div>
   )
@@ -261,37 +260,37 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
           }
         </TableCell>
         <TableCell>
-          <span className="sk-mono" style={{ fontSize: 11 }}>{task.id}</span>
+          <span className="sk-mono sk-text-sm">{task.id}</span>
         </TableCell>
         <TableCell className="max-w-[180px]">
-          <span className="sk-body block truncate" style={{ fontSize: 13 }}>{task.name}</span>
+          <span className="sk-body block truncate sk-text-md">{task.name}</span>
         </TableCell>
         <TableCell>
-          <span className="sk-mono block truncate" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.stage}</span>
+          <span className="sk-mono block truncate sk-text-xs" style={{ color: 'var(--ink-3)' }}>{task.stage}</span>
         </TableCell>
         <TableCell>
-          <span className="sk-mono block truncate" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.module}</span>
+          <span className="sk-mono block truncate sk-text-xs" style={{ color: 'var(--ink-3)' }}>{task.module}</span>
         </TableCell>
         <TableCell>
-          <span className="sk-mono block truncate" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.feature ?? '—'}</span>
+          <span className="sk-mono block truncate sk-text-xs" style={{ color: 'var(--ink-3)' }}>{task.feature ?? '—'}</span>
         </TableCell>
         <TableCell>
-          <span className={`sk-chip shrink-0 ${PRIORITY_CHIP[task.priority]}`} style={{ fontSize: 10 }}>
+          <span className={`sk-chip shrink-0 ${PRIORITY_CHIP[task.priority]} sk-text-xs`}>
             {PRIORITY_LABEL[task.priority]}
           </span>
         </TableCell>
         <TableCell>
-          <span className={`sk-chip shrink-0 ${STATUS_CHIP[task.status]}`} style={{ fontSize: 10 }}>
+          <span className={`sk-chip shrink-0 ${STATUS_CHIP[task.status]} sk-text-xs`}>
             {STATUS_LABEL[task.status]}
           </span>
         </TableCell>
         <TableCell>
-          <span className="sk-mono" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+          <span className="sk-mono sk-text-sm" style={{ color: 'var(--ink-3)' }}>
             {task.dependencies.length > 0 ? task.dependencies.length : '—'}
           </span>
         </TableCell>
         <TableCell className="max-w-[140px]">
-          <span className="sk-body block truncate" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+          <span className="sk-body block truncate sk-text-base" style={{ color: 'var(--ink-3)' }}>
             {task.status === 'completed' ? task.evidence ?? '—' : task.nextAction ?? '—'}
           </span>
         </TableCell>
@@ -302,25 +301,25 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
             <div className="space-y-3" style={{ fontSize: 12 }}>
               {/* Task name as header */}
               <div>
-                <span className="sk-h3" style={{ fontSize: 18 }}>{task.name}</span>
+                <span className="sk-h3 sk-text-2xl">{task.name}</span>
                 <div className="flex gap-2 mt-1">
-                  <span className="sk-chip" style={{ fontSize: 10 }}>{task.module}</span>
-                  <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{task.stage}</span>
+                  <span className="sk-chip sk-text-xs">{task.module}</span>
+                  <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)' }}>{task.stage}</span>
                 </div>
               </div>
 
               {/* Timeline */}
               <div className="flex gap-4">
-                <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                <span className="sk-body sk-text-sm" style={{ color: 'var(--ink-3)' }}>
                   创建 {task.createdAt ?? '—'}
                 </span>
                 {task.completedAt && (
-                  <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  <span className="sk-body sk-text-sm" style={{ color: 'var(--ink-3)' }}>
                     完成 {task.completedAt}
                   </span>
                 )}
                 {task.order != null && (
-                  <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>
+                  <span className="sk-body sk-text-sm" style={{ color: 'var(--ink-3)' }}>
                     排序 #{task.order}
                   </span>
                 )}
@@ -330,25 +329,42 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
 
               {/* Acceptance criteria */}
               <div>
-                <span className="sk-label" style={{ fontSize: 10 }}>验收标准</span>
-                <p className="sk-body" style={{ fontSize: 12, marginTop: 2, whiteSpace: 'pre-wrap' }}>
+                <span className="sk-label sk-text-xs">验收标准</span>
+                <p className="sk-body sk-text-base" style={{ marginTop: 2, whiteSpace: 'pre-wrap' }}>
                   {task.acceptanceCriteria || '—'}
                 </p>
               </div>
 
+              {/* Linked implementation plan */}
+              {(task.planRef || task.planPath || task.planTaskRef || task.planContentHash) && (
+                <div>
+                  <span className="sk-label sk-text-xs">实施计划</span>
+                  <div className="flex flex-wrap gap-2" style={{ marginTop: 4 }}>
+                    {task.planRef && <span className="sk-chip sk-text-xs">Plan {task.planRef}</span>}
+                    {task.planTaskRef && <span className="sk-chip sk-text-xs">任务 {task.planTaskRef}</span>}
+                    {task.planPath && <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)' }}>{task.planPath}</span>}
+                    {task.planContentHash && (
+                      <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-4)' }}>
+                        {task.planContentHash.slice(0, 19)}
+                      </span>
+                    )}
+                  </div>
+                </div>
+              )}
+
               {/* Next action (for non-done tasks) */}
               {task.status !== 'completed' && task.nextAction && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>下一步</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.nextAction}</p>
+                  <span className="sk-label sk-text-xs">下一步</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>{task.nextAction}</p>
                 </div>
               )}
 
               {/* Evidence (for done tasks) */}
               {task.status === 'completed' && task.evidence && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>完成证据</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.evidence}</p>
+                  <span className="sk-label sk-text-xs">完成证据</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>{task.evidence}</p>
                 </div>
               )}
 
@@ -363,8 +379,8 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
               {/* Tags */}
               {task.tags.length > 0 && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>标签</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>
+                  <span className="sk-label sk-text-xs">标签</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>
                     {task.tags.join(', ')}
                   </p>
                 </div>
@@ -373,16 +389,16 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
               {/* Blocks */}
               {task.blocks && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>阻塞 / 风险</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.blocks}</p>
+                  <span className="sk-label sk-text-xs">阻塞 / 风险</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>{task.blocks}</p>
                 </div>
               )}
 
               {/* Claim info */}
               {task.claimedBy && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>认领</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>
+                  <span className="sk-label sk-text-xs">认领</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>
                     {task.claimedBy}{task.claimedAt ? ` · ${task.claimedAt}` : ''}
                   </p>
                 </div>
@@ -391,8 +407,8 @@ function TaskRow({ task, taskMap, reverseDepMap, onNavigate }: {
               {/* Follow-up rule */}
               {task.followUpRule && (
                 <div>
-                  <span className="sk-label" style={{ fontSize: 10 }}>后续规则</span>
-                  <p className="sk-body" style={{ fontSize: 12, marginTop: 2 }}>{task.followUpRule}</p>
+                  <span className="sk-label sk-text-xs">后续规则</span>
+                  <p className="sk-body sk-text-base" style={{ marginTop: 2 }}>{task.followUpRule}</p>
                 </div>
               )}
             </div>
@@ -477,7 +493,14 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
       if (featureFilter && t.feature !== featureFilter) return false
       if (search) {
         const q = search.toLowerCase()
-        if (!t.name.toLowerCase().includes(q) && !t.id.toLowerCase().includes(q)) return false
+        const searchable = [
+          t.name,
+          t.id,
+          t.planRef,
+          t.planTaskRef,
+          t.planPath,
+        ].filter(Boolean).join(' ').toLowerCase()
+        if (!searchable.includes(q)) return false
       }
       return true
     })
@@ -533,13 +556,13 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
         <div className="flex items-center justify-between">
           <div className="flex items-baseline gap-3">
             <CardTitle>任务列表</CardTitle>
-            <span className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+            <span className="sk-body sk-text-base" style={{ color: 'var(--ink-3)' }}>
               显示 {filtered.length} / {tasks.length}
             </span>
           </div>
           <div className="flex items-center gap-2">
             <Progress value={completionRate} accent className="w-24" />
-            <span className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)' }}>{completionRate}%</span>
+            <span className="sk-body sk-text-base" style={{ color: 'var(--ink-3)' }}>{completionRate}%</span>
           </div>
         </div>
       </CardHeader>
@@ -612,7 +635,7 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
 
         {/* Table */}
         {filtered.length === 0 ? (
-          <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)', textAlign: 'center', padding: '32px 0' }}>
+          <p className="sk-body" style={{ color: 'var(--ink-3)', textAlign: 'center', padding: '32px 0' }}>
             没有匹配当前筛选条件的任务。
           </p>
         ) : (
@@ -647,7 +670,6 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
                 value={pageSize}
                 onChange={(e) => { setPageSize(Number(e.target.value)); setCurrentPage(1) }}
                 className="sk-select"
-                style={{ fontSize: 11 }}
               >
                 {PAGE_SIZE_OPTIONS.map((n) => (
                   <option key={n} value={n}>{n} 条/页</option>
@@ -658,18 +680,18 @@ export default function TaskTable({ tasks, allTasks }: TaskTableProps) {
                   onClick={() => setCurrentPage((p) => Math.max(1, p - 1))}
                   disabled={currentPage === 1}
                   className="sk-chip"
-                  style={{ fontSize: 11, opacity: currentPage === 1 ? 0.3 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }}
+                  style={{ opacity: currentPage === 1 ? 0.3 : 1, cursor: currentPage === 1 ? 'default' : 'pointer' }}
                 >
                   上一页
                 </button>
-                <span className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)' }}>
+                <span className="sk-body sk-text-base" style={{ color: 'var(--ink-3)' }}>
                   第 {currentPage}/{totalPages} 页
                 </span>
                 <button
                   onClick={() => setCurrentPage((p) => Math.min(totalPages, p + 1))}
                   disabled={currentPage === totalPages}
                   className="sk-chip"
-                  style={{ fontSize: 11, opacity: currentPage === totalPages ? 0.3 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }}
+                  style={{ opacity: currentPage === totalPages ? 0.3 : 1, cursor: currentPage === totalPages ? 'default' : 'pointer' }}
                 >
                   下一页
                 </button>

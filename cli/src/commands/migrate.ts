@@ -67,9 +67,9 @@ function findColumn(headers: string[], name: string): number {
 }
 
 /**
- * Parse a legacy Markdown table into an array of Task objects.
+ * Parse a Markdown table into an array of Task objects.
  *
- * Expected headers (Chinese legacy format):
+ * Expected headers (Chinese table format):
  *   ID | 阶段 | 任务 | 优先级 | 状态 | 验收标准 | 依赖关系 | 阻塞/风险 | 下一步动作
  */
 function parseMarkdownTasks(markdown: string): Task[] {
@@ -126,7 +126,7 @@ function parseMarkdownTasks(markdown: string): Task[] {
     const now = new Date().toISOString().slice(0, 10)
     const createdAt = now
     const completedAt = status === 'done' ? now : null
-    const evidence = status === 'done' ? 'Migrated from legacy ledger' : null
+    const evidence = status === 'done' ? 'Imported from Markdown ledger' : null
 
     tasks.push({
       id,
@@ -141,6 +141,9 @@ function parseMarkdownTasks(markdown: string): Task[] {
       nextAction,
       evidence,
       rule: null,
+      aodsRefs: [],
+      codeRefs: [],
+      implementationTargets: [],
       feature: null,
       tags: [],
       order: null,
@@ -171,9 +174,9 @@ function parseMarkdownTasks(markdown: string): Task[] {
 
 export function migrateCommand(): Command {
   const cmd = new Command('migrate')
-  cmd.description('Migrate legacy Markdown task ledgers into tally.json')
+  cmd.description('Import Markdown task ledgers into .tally/tally.json')
     .requiredOption('--from <source>', 'Source format (tally-v0-markdown)')
-    .requiredOption('--source <path...>', 'Path(s) to legacy Markdown files')
+    .requiredOption('--source <path...>', 'Path(s) to Markdown task files')
     .action((opts: { from: string; source: string[] }) => {
       try {
         if (opts.from !== 'tally-v0-markdown') {
@@ -238,7 +241,7 @@ export function migrateCommand(): Command {
         }
 
         writeLedger(doc)
-        console.log(`Migrated ${allTasks.length} total tasks to tally.json`)
+        console.log(`Imported ${allTasks.length} total tasks to .tally/tally.json`)
       } catch (e) {
         console.error((e as Error).message)
         process.exit(1)

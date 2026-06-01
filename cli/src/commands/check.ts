@@ -19,7 +19,7 @@ export function checkCommand(): Command {
           console.log(JSON.stringify({ ...result, strict: opts.strict ?? false, failed }, null, 2))
         } else {
           if (!failed) {
-            console.log('tally.json: all checks passed')
+            console.log('.tally/tally.json: all checks passed')
             if (hasWarnings) {
               console.log(`  ${result.warnings.length} warning(s) (use --strict to block):`)
             }

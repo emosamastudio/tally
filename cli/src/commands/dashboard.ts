@@ -7,6 +7,7 @@ import { homedir } from 'os'
 import { ledgerPath, readLedger } from '../ledger-reader.js'
 import { loadConfig } from '../config.js'
 import type { TallyDocument } from '../types.js'
+import { findLedgerPathUp } from '../paths.js'
 
 const MIME: Record<string, string> = {
   '.html': 'text/html',
@@ -49,17 +50,6 @@ function resolvePath(path: string): string {
   return path.replace(/^~/, homedir())
 }
 
-function findTallyJson(startDir: string): string | null {
-  let dir = startDir
-  while (true) {
-    const candidate = join(dir, 'tally.json')
-    if (existsSync(candidate)) return candidate
-    const parent = join(dir, '..')
-    if (parent === dir) return null  // reached root
-    dir = parent
-  }
-}
-
 export function dashboardCommand(): Command {
   const cmd = new Command('dashboard')
   cmd.description('Start visualization dashboard')
@@ -68,7 +58,7 @@ export function dashboardCommand(): Command {
     .action(async (opts: { port?: string; open: boolean }) => {
       const config = loadConfig()
       const port = Number(opts.port) || config.dashboard.port
-      const jsonPath = findTallyJson(process.cwd()) ?? ledgerPath()
+      const jsonPath = findLedgerPathUp(process.cwd()) ?? ledgerPath()
 
       // Look for dashboard dist relative to CLI package
       const distDir = join(import.meta.dirname, '..', '..', '..', 'dashboard', 'dist')
@@ -115,7 +105,7 @@ export function dashboardCommand(): Command {
               const status = computeStatus(doc)
               results.push({ name: p.name, path: resolvedPath, ...status })
             } catch {
-              results.push({ name: p.name, path: resolvedPath, error: 'tally.json not found' })
+              results.push({ name: p.name, path: resolvedPath, error: 'Tally ledger not found' })
             }
           }
           res.setHeader('Content-Type', 'application/json')
@@ -124,29 +114,29 @@ export function dashboardCommand(): Command {
           return
         }
 
-        // API: serve tally.json (with optional project query param)
-        if (pathname === '/api/tally.json') {
+        // API: serve the Tally ledger (with optional project query param)
+        if (pathname === '/api/ledger') {
           const projectName = parsedUrl.searchParams.get('project')
           if (projectName) {
             const project = config.projects.find((p) => p.name === projectName)
             if (project) {
               const resolvedPath = resolvePath(project.path)
               try {
-                const data = readFileSync(join(resolvedPath, 'tally.json'), 'utf-8')
+                const data = readFileSync(ledgerPath(resolvedPath), 'utf-8')
                 res.setHeader('Content-Type', 'application/json')
                 res.setHeader('Access-Control-Allow-Origin', '*')
                 res.end(data)
               } catch {
                 res.statusCode = 404
                 res.setHeader('Content-Type', 'application/json')
-                res.end(JSON.stringify({ error: 'tally.json not found' }))
+                res.end(JSON.stringify({ error: 'Tally ledger not found' }))
               }
               return
             }
             // Project not in config — fall through to serve current project
           }
 
-          // Backward compatible: serve from current directory
+          // Serve the current project ledger
           try {
             const raw = readFileSync(jsonPath, 'utf-8')
             const doc = JSON.parse(raw) as TallyDocument
@@ -175,7 +165,7 @@ export function dashboardCommand(): Command {
             } catch {
               res.statusCode = 404
               res.setHeader('Content-Type', 'application/json')
-              res.end(JSON.stringify({ error: 'tally.json not found' }))
+              res.end(JSON.stringify({ error: 'Tally ledger not found' }))
             }
           }
           return
@@ -184,6 +174,15 @@ export function dashboardCommand(): Command {
         // Static: serve dashboard SPA
         const filePath = pathname === '/' ? join(distDir, 'index.html') : join(distDir, pathname)
         serveStatic(res, filePath)
+      })
+
+      server.on('error', (error: NodeJS.ErrnoException) => {
+        if (error.code === 'EADDRINUSE') {
+          console.error(`Dashboard port ${port} is already in use.`)
+          console.error(`Use "tally dashboard --port <number>" or set dashboard.port in .tally/config.yaml.`)
+          process.exit(1)
+        }
+        throw error
       })
 
       server.listen(port, () => {

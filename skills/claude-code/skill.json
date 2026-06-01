@@ -1,18 +1,18 @@
 {
   "name": "tally-use",
-  "skill_version": "0.4.0",
-  "aligned_release": "tally_v0.4.0",
+  "skill_version": "0.5.0",
+  "aligned_release": "tally_v0.5.0",
   "entrypoint": "tally.md",
   "compatibility": {
     "tally_v": 1,
     "tally_json_schema": "1.0"
   },
   "source_of_truth": [
-    "project tally.json",
-    "project .tallyrc.yaml",
+    "project .tally/tally.json",
+    "project .tally/config.yaml",
     "tally CLI --help output"
   ],
-  "expected_first_action": "Run tally status, read tally.json to understand task state, identify the task lane (round execution, task CRUD, validation, or handoff), then choose the minimal CLI command. Always use --json or --json-output for machine-parseable output.",
+  "expected_first_action": "Run tally status, read .tally/tally.json to understand task state, identify the task lane (round execution, task CRUD, validation, or handoff), then choose the minimal CLI command. Always use --json or --json-output for machine-parseable output.",
   "positive_triggers": [
     "Manage tasks in a Tally-enabled repository",
     "Start or close an execution round",
@@ -24,11 +24,11 @@
     "Visualize ledger data with tally dashboard",
     "Analyze dependencies with tally graph",
     "Export ledger data with tally export",
-    "Migrate from legacy Markdown ledgers"
+    "Import Markdown task ledgers"
   ],
   "negative_triggers": [
     "Edit a generic todo list outside a Tally ledger",
-    "Track tasks in chat memory without writing to tally.json",
-    "Edit tally.json directly instead of using CLI commands"
+    "Track tasks in chat memory without writing to .tally/tally.json",
+    "Edit .tally/tally.json directly instead of using CLI commands"
   ]
 }

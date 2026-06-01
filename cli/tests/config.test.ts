@@ -1,6 +1,6 @@
 // cli/tests/config.test.ts
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest'
-import { writeFileSync, mkdtempSync, rmSync } from 'fs'
+import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { loadConfig } from '../src/config.js'
 import type { TallyConfig } from '../src/types.js'
@@ -13,6 +13,11 @@ let mockHomeDir = ''
 vi.mock('os', () => ({
   homedir: () => mockHomeDir,
 }))
+
+function writeConfig(root: string, content: string): void {
+  mkdirSync(join(root, '.tally'), { recursive: true })
+  writeFileSync(join(root, '.tally', 'config.yaml'), content)
+}
 
 describe('config - defaults', () => {
   let homeDir: string
@@ -67,9 +72,9 @@ describe('config - merge', () => {
     delete process.env['TALLY_AGENT_ID']
   })
 
-  it('merges gates from local .tallyrc.yaml over defaults', () => {
-    writeFileSync(
-      join(cwd, '.tallyrc.yaml'),
+  it('merges gates from local .tally/config.yaml over defaults', () => {
+    writeConfig(
+      cwd,
       `gates:
   requireReview: true
   maxRisk: critical
@@ -87,9 +92,9 @@ describe('config - merge', () => {
     expect(config.gates.detectWriteConflicts).toBe(false) // from local
   })
 
-  it('merges gates from global .tallyrc.yaml over defaults', () => {
-    writeFileSync(
-      join(homeDir, '.tallyrc.yaml'),
+  it('merges gates from global .tally/config.yaml over defaults', () => {
+    writeConfig(
+      homeDir,
       `gates:
   requireReview: true
   maxRisk: medium
@@ -102,15 +107,15 @@ describe('config - merge', () => {
   })
 
   it('local gates override global gates', () => {
-    writeFileSync(
-      join(homeDir, '.tallyrc.yaml'),
+    writeConfig(
+      homeDir,
       `gates:
   requireReview: true
   maxRisk: medium
 `,
     )
-    writeFileSync(
-      join(cwd, '.tallyrc.yaml'),
+    writeConfig(
+      cwd,
       `gates:
   maxRisk: critical
 `,
@@ -130,15 +135,15 @@ describe('config - merge', () => {
 
   it('TALLY_AGENT_ID overrides local and global agent.id', () => {
     process.env['TALLY_AGENT_ID'] = 'env-agent'
-    writeFileSync(join(homeDir, '.tallyrc.yaml'), 'agent:\n  id: global-agent\n')
-    writeFileSync(join(cwd, '.tallyrc.yaml'), 'agent:\n  id: local-agent\n')
+    writeConfig(homeDir, 'agent:\n  id: global-agent\n')
+    writeConfig(cwd, 'agent:\n  id: local-agent\n')
     const config = loadConfig(cwd)
     expect(config.agent.id).toBe('env-agent')
   })
 
   it('local agent.id overrides global when no env var set', () => {
-    writeFileSync(join(homeDir, '.tallyrc.yaml'), 'agent:\n  id: global-agent\n')
-    writeFileSync(join(cwd, '.tallyrc.yaml'), 'agent:\n  id: local-agent\n')
+    writeConfig(homeDir, 'agent:\n  id: global-agent\n')
+    writeConfig(cwd, 'agent:\n  id: local-agent\n')
     const config = loadConfig(cwd)
     expect(config.agent.id).toBe('local-agent')
   })
@@ -167,8 +172,8 @@ describe('config - round merge (local > global > defaults)', () => {
   })
 
   it('global round config overrides defaults', () => {
-    writeFileSync(
-      join(homeDir, '.tallyrc.yaml'),
+    writeConfig(
+      homeDir,
       `round:
   maxTasks: 5
   allowParallel: true
@@ -180,15 +185,15 @@ describe('config - round merge (local > global > defaults)', () => {
   })
 
   it('local round config overrides global overrides defaults', () => {
-    writeFileSync(
-      join(homeDir, '.tallyrc.yaml'),
+    writeConfig(
+      homeDir,
       `round:
   maxTasks: 5
   allowParallel: true
 `,
     )
-    writeFileSync(
-      join(cwd, '.tallyrc.yaml'),
+    writeConfig(
+      cwd,
       `round:
   maxTasks: 3
 `,
@@ -215,8 +220,8 @@ describe('config - project merge', () => {
   })
 
   it('local projects take precedence and global projects dedupe by name', () => {
-    writeFileSync(
-      join(homeDir, '.tallyrc.yaml'),
+    writeConfig(
+      homeDir,
       `projects:
   - name: proj-a
     path: /home/a
@@ -224,8 +229,8 @@ describe('config - project merge', () => {
     path: /home/b
 `,
     )
-    writeFileSync(
-      join(cwd, '.tallyrc.yaml'),
+    writeConfig(
+      cwd,
       `projects:
   - name: proj-b
     path: /local/b

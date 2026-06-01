@@ -8,6 +8,7 @@ export type RoundStatus = 'active' | 'completed'
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical'
 export type ExecutionLane = 'contract' | 'writer' | 'runtime' | 'ui' | 'test' | 'review'
 export type FeatureStatus = 'design' | 'contract_frozen' | 'implementing' | 'stable'
+export type PlanStatus = 'active' | 'archived' | 'superseded'
 
 // ── Structured sub-types ──
 
@@ -61,6 +62,18 @@ export interface FeatureEntry {
   owner: string | null
 }
 
+export interface PlanEntry {
+  id: string
+  path: string
+  title: string
+  kind: string
+  requiredSkill: string | null
+  contentHash: string
+  status: PlanStatus
+  registeredAt: string
+  updatedAt: string
+}
+
 export interface TallyMeta {
   project: string
   tally_version: string
@@ -70,6 +83,7 @@ export interface TallyMeta {
   stages: StageEntry[]
   modules: ModuleEntry[]
   features: FeatureEntry[]
+  plans?: PlanEntry[]
 }
 
 // ── Task ──
@@ -87,6 +101,9 @@ export interface Task {
   nextAction: string | null
   evidence: string | null
   rule: string | null
+  aodsRefs: string[]
+  codeRefs: string[]
+  implementationTargets: string[]
   feature: string | null
   tags: string[]
   order: number | null
@@ -95,6 +112,11 @@ export interface Task {
   claimedAt: string | null
   createdAt: string
   completedAt: string | null
+  // ── External implementation plan reference ──
+  planRef?: string | null
+  planPath?: string | null
+  planTaskRef?: string | null
+  planContentHash?: string | null
   // ── Scheduling & safety fields ──
   writeScopes: string[]
   acceptanceCriteria: AcceptanceCriteria | null
@@ -262,6 +284,9 @@ export interface TemplateTaskInput {
   feature?: string
   priority?: string
   acceptance?: string
+  aodsRefs?: string[]
+  codeRefs?: string[]
+  implementationTargets?: string[]
   writeScopes?: string[]
   deps?: string[]
   depsRefs?: string[]

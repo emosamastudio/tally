@@ -1,11 +1,11 @@
 ---
 name: tally-use
-description: Use when managing tasks in a Tally-enabled project — CLI-driven task ledger with round discipline, multi-agent safety, auto-retry, JSON error output, and visualization. Trigger on tally commands, task management, round operations, ledger validation, or tally.json.
+description: Use when managing tasks in a Tally-enabled project — CLI-driven task ledger with round discipline, multi-agent safety, auto-retry, JSON error output, and visualization. Trigger on tally commands, task management, round operations, ledger validation, or .tally/tally.json.
 ---
 
 # Tally Use
 
-Use this skill as a Tally workflow adapter. Tally is an agent-native task management CLI with multi-agent scheduling safety. The skill file is the canonical usage reference — the CLI is the sole write gate to tally.json.
+Use this skill as a Tally workflow adapter. Tally is an agent-native task management CLI with multi-agent scheduling safety. The skill file is the canonical usage reference — the CLI is the sole write gate to `.tally/tally.json`.
 
 ## Agent Loop (CRITICAL)
 
@@ -28,11 +28,18 @@ tally round close --auto-next --auto-retry --integrate --json
 
 Step 4: close → integration check → start next → deconflict → claim. One command.
 
+If tasks reference a Superpowers implementation plan, check plan health before execution:
+
+```bash
+tally plan check --json
+tally export --format agent-brief --task U-001
+```
+
 ## First Action
 
 1. Detect project state:
    - Run `tally status` to see current done/open/hold/blocked counts
-   - Read `tally.json` via Read tool to understand task details
+   - Read `.tally/tally.json` via Read tool to understand task details
 2. Identify the task lane: round execution, task CRUD, ledger validation, or handoff
 3. **Always use `--json` or `--json-output` for machine-parseable output**
 4. Choose the minimal correct command path:
@@ -40,11 +47,14 @@ Step 4: close → integration check → start next → deconflict → claim. One
    - Start: `tally round start "scope" --auto-retry --json`
    - Done: `tally task done <ids> --evidence "..." --test "..." --commit "..." --no-forbidden`
    - Batch create: `tally task add --template plan.json`
+   - Register plan: `tally plan register docs/superpowers/plans/<plan>.md --json-output`
+   - Link plan: `tally task link-plan <id> --plan <plan-id> --task-ref "<ref>" --json-output`
+   - Check plans: `tally plan check --json`
    - Close: `tally round close --auto-next --auto-retry --integrate --json`
 
 ## Write Discipline (CRITICAL)
 
-**NEVER edit `tally.json` directly.** ALL writes go through CLI commands.
+**NEVER edit `.tally/tally.json` directly.** ALL writes go through CLI commands.
 
 ## JSON Error Output
 
@@ -66,7 +76,7 @@ All commands support `--json` / `--json-output` for machine-parseable errors:
 ## Auto-Retry & Auto-Next
 
 - `--auto-retry`: On conflict, auto-excludes failing tasks and retries (max 10 iterations)
-- `--auto-next`: On close, auto-starts next round with same scope
+- `--auto-next`: On close, auto-starts next round with same scope. If no eligible tasks remain, JSON output is still `ok: true` and includes `nextRoundSkipped.reason = "no_eligible_tasks"`.
 - `--dry-run`: Preview task selection without claiming (bypasses active-round guard)
 - `--integrate`: Cross-round, cross-agent integration check on close
 
@@ -125,9 +135,25 @@ When `acceptanceCriteria.forbiddenSideEffects` is set, `--no-forbidden` must con
 ## Task Fields
 
 **Core**: `id`, `status`, `priority`, `stage`, `module`, `name`, `acceptance`, `feature`, `deps`, `blocks`, `nextAction`, `evidence`, `rule`
+**Traceability**: `aodsRefs`, `codeRefs`, `implementationTargets`
 **Scheduling**: `writeScopes`, `riskLevel` (low|medium|high|critical), `executionLane` (contract|writer|runtime|ui|test|review), `requiresReview`, `rollbackPlan`, `assignedAgent`, `approvedBy`
-**Planning**: `acceptanceCriteria` {requiredTests, passConditions, forbiddenSideEffects, negativeCases}, `executionPlan` {inputs, outputs, steps}
+**Planning**: `acceptanceCriteria` {requiredTests, passConditions, forbiddenSideEffects, negativeCases}, `executionPlan` {inputs, outputs, steps}, `planRef`, `planPath`, `planTaskRef`, `planContentHash`
 **Tracking**: `resourceRequirements`, `repos`, `deliveryNode`
+
+## Plan Registry
+
+Tally does not replace a Superpowers plan. The plan explains how to implement; Tally tracks execution, claims, evidence, and handoff.
+
+Commands:
+
+```bash
+tally plan register docs/superpowers/plans/2026-06-01-demo.md --json-output
+tally task link-plan U-001 --plan plan:demo-implementation-plan --task-ref "Task 1" --json-output
+tally plan check --json
+tally export --format agent-brief --task U-001
+```
+
+Use `tally plan check --json` before starting linked work. It detects missing plan files, hash drift, unknown plan IDs, and task refs that no longer appear in the plan.
 
 ## Feature Registry
 

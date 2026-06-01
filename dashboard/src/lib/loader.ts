@@ -12,6 +12,7 @@ import type {
   ModuleBreakdown,
   ModuleMeta,
   FeatureMeta,
+  PlanMeta,
   ProjectInfo,
 } from './types'
 
@@ -38,6 +39,10 @@ interface TallyTaskRaw {
   claimedAt: string | null
   createdAt: string
   completedAt: string | null
+  planRef?: string | null
+  planPath?: string | null
+  planTaskRef?: string | null
+  planContentHash?: string | null
   writeScopes?: string[]
   riskLevel?: string
   requiresReview?: boolean
@@ -101,11 +106,24 @@ interface TallyFeatureRaw {
   dependsOn?: string[]
 }
 
+interface TallyPlanRaw {
+  id: string
+  path: string
+  title: string
+  kind: string
+  requiredSkill: string | null
+  contentHash: string
+  status: string
+  registeredAt: string
+  updatedAt: string
+}
+
 interface TallyMetaRaw {
   project?: string
   stages?: TallyStageRaw[]
   modules?: TallyModuleRaw[]
   features?: TallyFeatureRaw[]
+  plans?: TallyPlanRaw[]
   updated?: string
 }
 
@@ -244,6 +262,10 @@ function adaptTask(raw: TallyTaskRaw, source: TaskSource, order: number): Task {
     completedAt: raw.completedAt,
     completedOrder: raw.completedOrder ?? undefined,
     order: raw.order ?? order,
+    planRef: raw.planRef ?? null,
+    planPath: raw.planPath ?? null,
+    planTaskRef: raw.planTaskRef ?? null,
+    planContentHash: raw.planContentHash ?? null,
     writeScopes: raw.writeScopes,
     riskLevel: raw.riskLevel,
     requiresReview: raw.requiresReview,
@@ -332,6 +354,21 @@ function adaptFeatures(meta: TallyMetaRaw | undefined, tasks: Task[]): FeatureMe
   return [...featMap.entries()].map(([id, f]) => ({ id, ...f }))
 }
 
+function adaptPlans(meta: TallyMetaRaw | undefined): PlanMeta[] {
+  if (!meta?.plans) return []
+  return meta.plans.map((p) => ({
+    id: p.id,
+    path: p.path,
+    title: p.title,
+    kind: p.kind,
+    requiredSkill: p.requiredSkill,
+    contentHash: p.contentHash,
+    status: p.status,
+    registeredAt: p.registeredAt,
+    updatedAt: p.updatedAt,
+  }))
+}
+
 // ── Main adapter ──
 
 export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
@@ -342,6 +379,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
   const stages: StageStatus[] = computeStages(tasks, raw._meta?.stages, raw._meta?.modules)
   const modules: ModuleMeta[] = adaptModules(raw._meta)
   const features: FeatureMeta[] = adaptFeatures(raw._meta, tasks)
+  const plans: PlanMeta[] = adaptPlans(raw._meta)
 
   const activeRound = rounds.find((r) => r.status === 'active') ?? null
   const activeBlocks = blocks
@@ -375,6 +413,7 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
     rounds,
     modules,
     features,
+    plans,
     projectName: raw._meta?.project ?? 'Tally',
     updated: raw._meta?.updated ?? null,
   }
@@ -384,10 +423,10 @@ export function adaptTallyDocument(raw: TallyDocumentRaw): LedgerData {
 
 export async function loadLedgerData(projectName?: string): Promise<LedgerData> {
   const url = projectName
-    ? `/api/tally.json?project=${encodeURIComponent(projectName)}`
-    : '/api/tally.json'
+    ? `/api/ledger?project=${encodeURIComponent(projectName)}`
+    : '/api/ledger'
   const res = await fetch(url)
-  if (!res.ok) throw new Error(`Failed to load tally.json: ${res.status}`)
+  if (!res.ok) throw new Error(`Failed to load Tally ledger: ${res.status}`)
   const raw = await res.json()
   return adaptTallyDocument(raw)
 }

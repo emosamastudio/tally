@@ -22,19 +22,21 @@ import { Card, CardContent } from '@/components/ui/card'
 import { ErrorBoundary } from '@/components/error-boundary'
 import OverviewPanel from '@/components/overview-panel'
 import { HealthHeaderSkeleton } from '@/components/health-header'
-import ProgressTrend, { ProgressTrendSkeleton } from '@/components/progress-trend'
 import CurrentRound, { CurrentRoundSkeleton } from '@/components/current-round'
 import StageMatrix, { StageMatrixSkeleton } from '@/components/stage-matrix'
 import TaskTable, { TaskTableSkeleton } from '@/components/task-table'
-import DependencyGraph, { DependencyGraphSkeleton } from '@/components/dependency-graph'
 import AgentActivity, { AgentActivitySkeleton } from '@/components/agent-activity'
-import RoundTimeline from '@/components/round-timeline'
 import FeatureDeps from '@/components/feature-deps'
+import PlanRegistry, { PlanRegistrySkeleton } from '@/components/plan-registry'
 import {
   LazyRoundAnalytics,
   LazyAgentContribution,
   LazyFeatureProgress,
+  LazyProgressTrend,
+  LazyDependencyGraph,
   FeatureProgressSkeleton,
+  ProgressTrendSkeleton,
+  DependencyGraphSkeleton,
 } from '@/components/lazy-wrappers'
 
 function formatTime(date: Date): string {
@@ -82,7 +84,7 @@ export default function App() {
 
   // Refresh indicator
   const refreshIndicator = lastRefreshed ? (
-    <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)' }}>
+    <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)' }}>
       更新于 {formatTime(lastRefreshed)}
     </span>
   ) : null
@@ -90,7 +92,7 @@ export default function App() {
   if (state.status === 'loading' || state.status === 'idle') {
     const loadingCategories: NavCategory[] = [
       { id: 'overview', label: '概览', sections: ['overview-panel', 'progress-trend'] },
-      { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress'] },
+      { id: 'planning', label: '规划', sections: ['stage-matrix', 'feature-progress', 'plan-registry'] },
       { id: 'execution', label: '执行', sections: ['current-round', 'agent-activity'] },
       { id: 'tasks', label: '任务', sections: ['task-table'] },
       { id: 'graphs', label: '图谱', sections: ['dependency-graph'] },
@@ -100,8 +102,8 @@ export default function App() {
         header={
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
             <div className="shrink-0">
-              <h1 className="sk-h1" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
-              <p className="sk-mono" style={{ fontSize: 11, color: 'var(--ink-3)', maxWidth: 300 }}>加载中...</p>
+              <h1 className="sk-h1 sk-dashboard-title">Tally 仪表盘</h1>
+              <p className="sk-mono sk-text-sm" style={{ color: 'var(--ink-3)', maxWidth: 300 }}>加载中...</p>
             </div>
             <div className="flex gap-2 items-center flex-wrap">
               {projects.length > 0 ? (
@@ -122,6 +124,7 @@ export default function App() {
           'progress-trend': <ProgressTrendSkeleton />,
           'stage-matrix': <StageMatrixSkeleton />,
           'feature-progress': <FeatureProgressSkeleton />,
+          'plan-registry': <PlanRegistrySkeleton />,
           'current-round': <CurrentRoundSkeleton />,
           'agent-activity': <AgentActivitySkeleton />,
           'task-table': <TaskTableSkeleton />,
@@ -138,9 +141,9 @@ export default function App() {
         <Card className="max-w-lg" dashed style={{ zIndex: 1 }}>
           <CardContent className="p-8">
             <h1 className="sk-h1" style={{ color: 'var(--danger)' }}>数据加载失败</h1>
-            <p className="sk-body" style={{ fontSize: 13, marginTop: 8 }}>{state.message}</p>
-            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)', marginTop: 12 }}>
-              请确认 tally.json 存在且 CLI 服务器正在运行 (tally dashboard)
+            <p className="sk-body" style={{ marginTop: 8 }}>{state.message}</p>
+            <p className="sk-body sk-text-sm" style={{ color: 'var(--ink-3)', marginTop: 12 }}>
+              请确认 .tally/tally.json 存在且 CLI 服务器正在运行 (tally dashboard)
             </p>
             <button
               className="sk-chip accent"
@@ -155,7 +158,7 @@ export default function App() {
     )
   }
 
-  const { merged, os, rounds, features } = state.data
+  const { merged, os, rounds, features, plans } = state.data
   const allTasks = os.tasks
 
   return (
@@ -164,7 +167,7 @@ export default function App() {
         header={
           <div className="flex flex-col md:flex-row items-start md:items-center justify-between w-full gap-4">
             <div className="flex items-baseline gap-4 min-w-0 flex-wrap">
-              <h1 className="sk-h1 shrink-0" style={{ fontSize: 44 }}>Tally 仪表盘</h1>
+              <h1 className="sk-h1 sk-dashboard-title shrink-0">Tally 仪表盘</h1>
               {projects.length > 0 ? (
                 <select className="sk-select" value={selectedProject ?? ''} onChange={(e) => setSelectedProject(e.target.value)}>
                   {projects.map((p) => (<option key={p.name} value={p.name}>{p.name}</option>))}
@@ -191,12 +194,12 @@ export default function App() {
           {
             id: 'planning',
             label: '规划',
-            sections: ['stage-matrix', 'feature-progress', 'feature-deps'],
+            sections: ['stage-matrix', 'feature-progress', 'feature-deps', 'plan-registry'],
           },
           {
             id: 'execution',
             label: '执行',
-            sections: ['current-round', 'agent-activity', 'round-timeline', 'round-analytics', 'agent-contribution'],
+            sections: ['current-round', 'agent-activity', 'round-analytics', 'agent-contribution'],
           },
           {
             id: 'tasks',
@@ -213,7 +216,7 @@ export default function App() {
           ),
           'progress-trend': (
             <ErrorBoundary fallbackName="进度趋势">
-              <ProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
+              <LazyProgressTrend osHistory={os.progressHistory} appHistory={state.data.app.progressHistory} />
             </ErrorBoundary>
           ),
           // 规划
@@ -232,6 +235,11 @@ export default function App() {
               <FeatureDeps features={features} tasks={allTasks} />
             </ErrorBoundary>
           ),
+          'plan-registry': (
+            <ErrorBoundary fallbackName="实施计划">
+              <PlanRegistry plans={plans} tasks={allTasks} />
+            </ErrorBoundary>
+          ),
           // 执行
           'current-round': (
             <ErrorBoundary fallbackName="当前回合">
@@ -241,11 +249,6 @@ export default function App() {
           'agent-activity': (
             <ErrorBoundary fallbackName="活跃Agent">
               <AgentActivity rounds={rounds} tasks={allTasks} />
-            </ErrorBoundary>
-          ),
-          'round-timeline': (
-            <ErrorBoundary fallbackName="回合时间线">
-              <RoundTimeline rounds={rounds} tasks={allTasks} />
             </ErrorBoundary>
           ),
           'round-analytics': (
@@ -267,7 +270,7 @@ export default function App() {
           // 图谱
           'dependency-graph': (
             <ErrorBoundary fallbackName="依赖图">
-              <DependencyGraph tasks={allTasks} />
+              <LazyDependencyGraph tasks={allTasks} />
             </ErrorBoundary>
           ),
         }}

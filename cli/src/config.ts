@@ -4,6 +4,7 @@ import { join } from 'path'
 import { parse as parseYaml } from 'yaml'
 import { homedir } from 'os'
 import type { TallyConfig } from './types.js'
+import { DEFAULT_LOCAL_CONFIG_PATH, resolveLocalConfigPath } from './paths.js'
 
 const DEFAULTS: TallyConfig = {
   agent: { id: 'main' },
@@ -30,8 +31,8 @@ function loadYaml(path: string): Partial<TallyConfig> | null {
 }
 
 export function loadConfig(cwd: string = process.cwd()): TallyConfig {
-  const global = loadYaml(join(homedir(), '.tallyrc.yaml')) ?? {}
-  const local = loadYaml(join(cwd, '.tallyrc.yaml')) ?? {}
+  const global = loadYaml(join(homedir(), DEFAULT_LOCAL_CONFIG_PATH)) ?? {}
+  const local = loadYaml(resolveLocalConfigPath(cwd)) ?? {}
   const envId = process.env['TALLY_AGENT_ID']
 
   // Merge projects: local + global, dedup by name

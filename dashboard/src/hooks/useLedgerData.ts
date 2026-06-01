@@ -44,8 +44,8 @@ export function useLedgerData(projectName: string | null, refreshKey?: number) {
     if (state.status !== 'ready') return
 
     const buildUrl = projectName
-      ? `/api/tally.json?project=${encodeURIComponent(projectName)}`
-      : '/api/tally.json'
+      ? `/api/ledger?project=${encodeURIComponent(projectName)}`
+      : '/api/ledger'
 
     const interval = setInterval(async () => {
       try {

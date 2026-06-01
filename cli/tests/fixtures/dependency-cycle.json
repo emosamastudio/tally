@@ -4,9 +4,27 @@
     "tally_version": "1.0",
     "created": "2026-05-10",
     "updated": "2026-05-10",
-    "agents": [{ "id": "main", "name": "主会话" }],
-    "stages": [{ "id": "S1", "name": "Core", "modules": ["core"] }],
-    "modules": [{ "id": "core", "name": "Core Module" }],
+    "agents": [
+      {
+        "id": "main",
+        "name": "主会话"
+      }
+    ],
+    "stages": [
+      {
+        "id": "S1",
+        "name": "Core",
+        "modules": [
+          "core"
+        ]
+      }
+    ],
+    "modules": [
+      {
+        "id": "core",
+        "name": "Core Module"
+      }
+    ],
     "features": []
   },
   "tasks": [
@@ -18,12 +36,14 @@
       "module": "core",
       "name": "Task One",
       "acceptance": "passes",
-      "deps": ["U-002"],
+      "deps": [
+        "U-002"
+      ],
       "blocks": null,
       "nextAction": "do it",
       "evidence": null,
       "rule": null,
-"feature": null,
+      "feature": null,
       "tags": [],
       "order": 1,
       "completedOrder": null,
@@ -42,7 +62,10 @@
       "resourceRequirements": [],
       "repos": [],
       "deliveryNode": null,
-      "approvedBy": null
+      "approvedBy": null,
+      "aodsRefs": [],
+      "codeRefs": [],
+      "implementationTargets": []
     },
     {
       "id": "U-002",
@@ -52,12 +75,14 @@
       "module": "core",
       "name": "Task Two",
       "acceptance": "passes",
-      "deps": ["U-001"],
+      "deps": [
+        "U-001"
+      ],
       "blocks": null,
       "nextAction": "do it",
       "evidence": null,
       "rule": null,
-"feature": null,
+      "feature": null,
       "tags": [],
       "order": 2,
       "completedOrder": null,
@@ -76,7 +101,10 @@
       "resourceRequirements": [],
       "repos": [],
       "deliveryNode": null,
-      "approvedBy": null
+      "approvedBy": null,
+      "aodsRefs": [],
+      "codeRefs": [],
+      "implementationTargets": []
     }
   ],
   "rounds": [],

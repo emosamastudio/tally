@@ -3,6 +3,7 @@ import { writeFileSync, readFileSync, existsSync } from 'fs'
 import { join } from 'path'
 import { parse as parseYaml, stringify as stringifyYaml } from 'yaml'
 import type { TallyDocument } from '../types.js'
+import { ensureParentDir, resolveLedgerPath, resolveLocalConfigPath } from '../paths.js'
 
 const TEMPLATE: TallyDocument = {
   _meta: {
@@ -20,6 +21,7 @@ const TEMPLATE: TallyDocument = {
       { id: 'core', name: 'Core' },
     ],
     features: [],
+    plans: [],
   },
   tasks: [],
   rounds: [],
@@ -40,7 +42,8 @@ function installPreCommitHook(cwd: string): void {
 }
 
 function registerProject(cwd: string, projectName: string): void {
-  const rcPath = join(cwd, '.tallyrc.yaml')
+  const rcPath = resolveLocalConfigPath(cwd)
+  ensureParentDir(rcPath)
   let config: Record<string, unknown> = {}
 
   if (existsSync(rcPath)) {
@@ -64,7 +67,7 @@ function registerProject(cwd: string, projectName: string): void {
   const projects = (config['projects'] as Array<{ name: string; path: string }>) ?? []
   const alreadyRegistered = projects.some((p) => p.path === cwd || p.name === projectName)
   if (alreadyRegistered) {
-    console.log(`Project "${projectName}" already registered in .tallyrc.yaml`)
+    console.log(`Project "${projectName}" already registered in ${rcPath}`)
     return
   }
 
@@ -72,26 +75,45 @@ function registerProject(cwd: string, projectName: string): void {
   config['projects'] = projects
 
   writeFileSync(rcPath, stringifyYaml(config), 'utf-8')
-  console.log(`Project "${projectName}" registered in .tallyrc.yaml`)
+  console.log(`Project "${projectName}" registered in ${rcPath}`)
 }
 
 export function initCommand(): Command {
   const cmd = new Command('init')
-  cmd.description('Initialize a new tally.json in the current directory')
+  cmd.description('Initialize a new .tally/tally.json ledger in the current directory')
     .argument('[name]', 'Project name', 'my-project')
     .option('--no-hook', 'Skip pre-commit hook installation')
-    .option('--no-register', 'Skip registering project in .tallyrc.yaml')
+    .option('--no-register', 'Skip registering project in .tally/config.yaml')
     .action((name: string, opts: { hook: boolean; register: boolean }) => {
       const cwd = process.cwd()
-      const path = join(cwd, 'tally.json')
+      const path = resolveLedgerPath(cwd)
       if (existsSync(path)) {
-        console.error(`tally.json already exists at ${path}`)
+        console.error(`Tally ledger already exists at ${path}`)
         process.exit(1)
       }
       const doc = { ...TEMPLATE }
       doc._meta = { ...doc._meta, project: name }
+      ensureParentDir(path)
       writeFileSync(path, JSON.stringify(doc, null, 2) + '\n', 'utf-8')
-      console.log(`Created tally.json for "${name}" at ${path}`)
+      const configPath = resolveLocalConfigPath(cwd)
+      ensureParentDir(configPath)
+      if (!existsSync(configPath)) {
+        writeFileSync(configPath, stringifyYaml({
+          agent: { id: 'main' },
+          round: { maxTasks: 10, allowParallel: false },
+          lint: { strict: false },
+          dashboard: { port: 5173 },
+          projects: [],
+          gates: {
+            requireFeature: true,
+            requireReview: false,
+            featureFreeze: [],
+            maxRisk: 'high',
+            detectWriteConflicts: true,
+          },
+        }), 'utf-8')
+      }
+      console.log(`Created Tally ledger for "${name}" at ${path}`)
       if (opts.hook) installPreCommitHook(cwd)
       if (opts.register) registerProject(cwd, name)
     })

@@ -47,6 +47,8 @@ function withLazy<T extends object>(factory: () => Promise<{ default: ComponentT
 export const LazyRoundAnalytics = withLazy(() => import('./round-analytics'))
 export const LazyAgentContribution = withLazy(() => import('./agent-contribution'))
 export const LazyFeatureProgress = withLazy(() => import('./feature-progress'))
+export const LazyProgressTrend = withLazy(() => import('./progress-trend'))
+export const LazyDependencyGraph = withLazy(() => import('./dependency-graph'))
 
 // Skeletons (extracted here so App.tsx doesn't eagerly import the chart modules)
 export function RoundAnalyticsSkeleton() {
@@ -59,4 +61,12 @@ export function AgentContributionSkeleton() {
 
 export function FeatureProgressSkeleton() {
   return <PageSkeleton title="功能进度" height={260} />
+}
+
+export function ProgressTrendSkeleton() {
+  return <PageSkeleton title="进度趋势" height={260} />
+}
+
+export function DependencyGraphSkeleton() {
+  return <PageSkeleton title="依赖图" height={360} />
 }

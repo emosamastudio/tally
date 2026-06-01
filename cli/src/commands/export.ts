@@ -103,9 +103,16 @@ function exportAgentBrief(doc: TallyDocument, taskId?: string): string {
   const parts: string[] = []
   for (const t of tasks) {
     const feat = t.feature ? doc._meta.features.find((f) => f.id === t.feature) : null
+    const plan = t.planRef ? (doc._meta.plans ?? []).find((p) => p.id === t.planRef) : null
+    const planPath = t.planPath ?? plan?.path ?? null
+    const planHash = t.planContentHash ?? plan?.contentHash ?? null
     parts.push(`## ${t.id}: ${t.name}`)
     parts.push(`- **Module**: ${t.module}`)
     parts.push(`- **Feature**: ${t.feature ?? '(none)'} ${feat ? `(${feat.name})` : ''}`)
+    parts.push(`- **Plan**: ${t.planRef ?? '(none)'}`)
+    parts.push(`- **Plan Path**: ${planPath ?? '(none)'}`)
+    parts.push(`- **Plan Task**: ${t.planTaskRef ?? '(none)'}`)
+    parts.push(`- **Plan Hash**: ${planHash ?? '(none)'}`)
     parts.push(`- **Priority**: ${t.priority}`)
     parts.push(`- **Risk**: ${t.riskLevel}`)
     parts.push(`- **Lane**: ${t.executionLane ?? '(none)'}`)
@@ -137,7 +144,7 @@ function exportAgentBrief(doc: TallyDocument, taskId?: string): string {
 
 export function exportCommand(): Command {
   const cmd = new Command('export')
-  cmd.description('Export tally.json to stdout in the specified format')
+  cmd.description('Export .tally/tally.json to stdout in the specified format')
     .requiredOption('--format <format>', 'Output format: json, csv, markdown, or agent-brief')
     .option('--task <id>', 'Task ID for agent-brief export')
     .action((opts: { format: string; task?: string }) => {

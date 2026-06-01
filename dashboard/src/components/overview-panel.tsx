@@ -58,18 +58,18 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
           padding: '10px 16px', background: 'var(--paper-2)', borderRadius: 'var(--sk-radius)',
           border: '1.6px solid var(--ink)', display: 'flex', alignItems: 'center', gap: 16, flexWrap: 'wrap',
         }}>
-          <span className="sk-label" style={{ fontSize: 11 }}>活跃</span>
+          <span className="sk-label">活跃</span>
           {activeAgents.map((a) => (
             <span key={a.executor} className="flex items-center gap-2">
-              <span className="sk-mono" style={{ fontSize: 11, fontWeight: 600 }}>{a.executor}</span>
-              <span className="sk-chip" style={{ fontSize: 9, background: a.done === a.total ? 'var(--accent-3)' : 'var(--accent-2)', color: 'var(--paper)' }}>
+              <span className="sk-mono sk-text-sm" style={{ fontWeight: 600 }}>{a.executor}</span>
+              <span className="sk-chip sk-text-2xs" style={{ background: a.done === a.total ? 'var(--accent-3)' : 'var(--accent-2)', color: 'var(--paper)' }}>
                 {a.done}/{a.total}
               </span>
-              <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)' }}>{a.scope}</span>
+              <span className="sk-body sk-text-xs" style={{ color: 'var(--ink-3)' }}>{a.scope}</span>
             </span>
           ))}
           {activeAgents.length === 0 && (
-            <span className="sk-body" style={{ fontSize: 11, color: 'var(--ink-3)' }}>暂无活跃 Agent</span>
+            <span className="sk-body sk-text-sm" style={{ color: 'var(--ink-3)' }}>暂无活跃 Agent</span>
           )}
         </div>
       )}
@@ -80,16 +80,16 @@ export default function OverviewPanel({ tasks, activeRound, blocks, features, se
           padding: '10px 16px', background: 'var(--paper-2)', borderRadius: 'var(--sk-radius)',
           border: '1.6px solid var(--ink)',
         }}>
-          <div className="sk-label" style={{ fontSize: 11, marginBottom: 6 }}>最近完成</div>
+          <div className="sk-label" style={{ marginBottom: 6 }}>最近完成</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
             {recentDone.map((t) => (
-              <div key={t.id} className="flex items-baseline gap-2" style={{ fontSize: 11 }}>
+              <div key={t.id} className="flex items-baseline gap-2">
                 <span style={{ color: 'var(--accent-3)', fontSize: 14 }}>✓</span>
-                <span className="sk-mono" style={{ color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
+                <span className="sk-mono sk-text-sm" style={{ color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
                   onClick={() => nav?.navigateToTask?.(t.id)}
                   title="在任务表中查看">{t.id}</span>
-                <span className="sk-body truncate" style={{ flex: 1, color: 'var(--ink-2)' }}>{t.name}</span>
-                <span className="sk-mono" style={{ color: 'var(--ink-4)', fontSize: 10 }}>{relativeDate(t.completedAt ?? '')}</span>
+                <span className="sk-body truncate sk-text-base" style={{ flex: 1, color: 'var(--ink-2)' }}>{t.name}</span>
+                <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-4)' }}>{relativeDate(t.completedAt ?? '')}</span>
               </div>
             ))}
           </div>

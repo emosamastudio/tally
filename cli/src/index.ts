@@ -7,6 +7,7 @@ import { statusCommand } from './commands/status.js'
 import { taskCommand } from './commands/task.js'
 import { roundCommand } from './commands/round.js'
 import { exportCommand } from './commands/export.js'
+import { planCommand } from './commands/plan.js'
 import { syncCommand } from './commands/sync.js'
 import { graphCommand } from './commands/graph.js'
 import { upgradeCommand } from './commands/upgrade.js'
@@ -18,7 +19,7 @@ import { moduleCommand } from './commands/module.js'
 import { stageCommand } from './commands/stage.js'
 
 const program = new Command()
-program.name('tally').description('Agent-native task management').version('0.4.0')
+program.name('tally').description('Agent-native task management').version('0.5.0')
 
 program.addCommand(initCommand())
 program.addCommand(lintCommand())
@@ -30,6 +31,7 @@ program.addCommand(moduleCommand())
 program.addCommand(stageCommand())
 program.addCommand(roundCommand())
 program.addCommand(exportCommand())
+program.addCommand(planCommand())
 program.addCommand(syncCommand())
 program.addCommand(graphCommand())
 program.addCommand(upgradeCommand())

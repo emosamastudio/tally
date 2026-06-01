@@ -1,7 +1,8 @@
 // cli/src/ledger-writer.ts
 import { writeFileSync, renameSync, existsSync, readFileSync, unlinkSync, openSync, fsyncSync, closeSync, copyFileSync } from 'fs'
-import { join } from 'path'
+import { basename, dirname, join } from 'path'
 import type { TallyDocument } from './types.js'
+import { ensureParentDir, resolveLedgerPath } from './paths.js'
 
 const LOCK_TIMEOUT_MS = 30_000 // stale lock threshold
 const LOCK_RETRY_MS = 100
@@ -13,8 +14,8 @@ interface LockInfo {
   startedAt: string
 }
 
-function lockPath(cwd: string, filename: string): string {
-  return join(cwd, `.${filename}.lock`)
+function lockPath(fullPath: string): string {
+  return join(dirname(fullPath), `.${basename(fullPath)}.lock`)
 }
 
 function readLock(path: string): LockInfo | null {
@@ -47,8 +48,10 @@ function isStale(lock: LockInfo): boolean {
 }
 
 /** Acquire a file lock, waiting up to MAX_LOCK_WAIT_MS. Throws on timeout. */
-export function acquireLock(cwd: string, filename: string = 'tally.json', command: string = 'tally'): void {
-  const lockFile = lockPath(cwd, filename)
+export function acquireLock(cwd: string, command: string = 'tally'): void {
+  const fullPath = resolveLedgerPath(cwd)
+  ensureParentDir(fullPath)
+  const lockFile = lockPath(fullPath)
   const started = Date.now()
 
   while (Date.now() - started < MAX_LOCK_WAIT_MS) {
@@ -81,8 +84,9 @@ export function acquireLock(cwd: string, filename: string = 'tally.json', comman
 }
 
 /** Release a previously acquired lock. */
-export function releaseLock(cwd: string, filename: string = 'tally.json'): void {
-  const lockFile = lockPath(cwd, filename)
+export function releaseLock(cwd: string): void {
+  const fullPath = resolveLedgerPath(cwd)
+  const lockFile = lockPath(fullPath)
   try {
     const existing = readLock(lockFile)
     if (existing && existing.pid === process.pid) {
@@ -96,17 +100,17 @@ export function releaseLock(cwd: string, filename: string = 'tally.json'): void 
 export function writeLedger(
   doc: TallyDocument,
   cwd: string = process.cwd(),
-  filename: string = 'tally.json',
 ): void {
-  acquireLock(cwd, filename, 'tally')
+  acquireLock(cwd, 'tally')
   try {
     doc._meta.updated = new Date().toISOString().slice(0, 10)
-    const fullPath = join(cwd, filename)
-    const tmpPath = join(cwd, `.${filename}.tmp`)
+    const fullPath = resolveLedgerPath(cwd)
+    ensureParentDir(fullPath)
+    const tmpPath = join(dirname(fullPath), `.${basename(fullPath)}.tmp`)
     const json = JSON.stringify(doc, null, 2) + '\n'
 
     // Backup: save current ledger before overwriting
-    const bakPath = join(cwd, `.${filename}.bak`)
+    const bakPath = join(dirname(fullPath), `.${basename(fullPath)}.bak`)
     if (existsSync(fullPath)) {
       try { copyFileSync(fullPath, bakPath) } catch { /* best-effort */ }
     }
@@ -118,6 +122,6 @@ export function writeLedger(
     closeSync(fd)
     renameSync(tmpPath, fullPath)
   } finally {
-    releaseLock(cwd, filename)
+    releaseLock(cwd)
   }
 }

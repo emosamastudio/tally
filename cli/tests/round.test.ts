@@ -56,6 +56,9 @@ function makeTask(
     nextAction: 'do it',
     evidence: null,
     rule: null,
+    aodsRefs: [],
+    codeRefs: [],
+    implementationTargets: [],
     feature: feature ?? null,
     tags: [],
     order,
@@ -510,6 +513,24 @@ describe('round start', () => {
     } finally {
       rmSync(dir2, { recursive: true, force: true })
     }
+  })
+
+  it('close --auto-next treats no remaining eligible tasks as a clean skip', () => {
+    startRound('last task', { cwd: dir, agentId: 'main', taskIds: ['U-001'] })
+    const doc = readLedger(dir)
+    const task = doc.tasks.find((t) => t.id === 'U-001')!
+    task.status = 'done'
+    task.evidence = 'done [test: ok]'
+    task.completedAt = '2026-05-10'
+    task.completedOrder = 1
+    task.order = null
+    task.nextAction = null
+    doc.tasks = doc.tasks.filter((t) => t.id === 'U-001')
+    writeLedger(doc, dir)
+
+    const result = closeRound({ cwd: dir, agentId: 'main', autoNext: true })
+    expect(result.nextRound).toBeUndefined()
+    expect(result.nextRoundSkipped?.reason).toBe('no_eligible_tasks')
   })
 })
 

@@ -2,6 +2,17 @@
 
 Agent-native task management — a CLI-driven task ledger with round discipline, multi-agent safety, auto-retry, and visualization. Tally is designed for AI agents to autonomously manage work through a structured round-based workflow. The dashboard is the sole human interface.
 
+New projects store Tally state under `.tally/`:
+
+```text
+.tally/
+  tally.json
+  config.yaml
+```
+
+Only `.tally/tally.json` and `.tally/config.yaml` are part of the current Tally
+standard.
+
 ## Installation
 
 ```bash
@@ -16,7 +27,7 @@ npx tally <command>
 
 ## Quick Start
 
-Initialize a new tally ledger in your project:
+Initialize a new Tally ledger in your project:
 
 ```bash
 tally init
@@ -46,11 +57,43 @@ Close the round:
 tally round close
 ```
 
+## Superpowers Plan Integration
+
+Tally does not replace a Superpowers implementation plan.
+
+Use them together like this:
+
+- Superpowers plan: the detailed recipe. It explains what to change, which files to touch, which commands to run, and how to verify.
+- Tally: the execution ledger. It records which task is being worked on, who claimed it, which round it belongs to, and what evidence proves it was done.
+
+Typical flow:
+
+```bash
+tally plan register docs/superpowers/plans/2026-06-01-demo.md
+
+tally task link-plan U-001 \
+  --plan plan:demo-implementation-plan \
+  --task-ref "Task 1"
+
+tally plan check
+
+tally export --format agent-brief --task U-001
+```
+
+What gets stored:
+
+- `_meta.plans[]` stores the registered plan path, title, type, required skill, status, and content hash.
+- `task.planRef` points to a registered plan.
+- `task.planTaskRef` points to the relevant task/heading inside that plan.
+- `task.planContentHash` keeps a snapshot so `tally plan check` can warn when the plan changed after the task was linked.
+
+The rule of thumb: if an agent needs to know exactly how to implement something, read the plan. If an agent needs to know what to do next, what is claimed, and what is already proven, use Tally.
+
 ## Command Reference
 
 | Command | Description |
 |---------|-------------|
-| `tally init` | Initialize a new tally.json in the current directory |
+| `tally init` | Initialize a new `.tally/tally.json` ledger in the current directory |
 | `tally status` | Show current task state summary |
 | `tally check` | Deep validation with semantic checks and warnings |
 | `tally lint` | Fast structural validation (pre-commit) |
@@ -64,6 +107,10 @@ tally round close
 | `tally task next` | Recommend the single best next task (--strategy, --lane) |
 | `tally task annotate <id>` | Metadata-only edit, safe for done tasks |
 | `tally task approve <id>` | Human approval for high-risk tasks |
+| `tally task link-plan <id>` | Link a task to a registered implementation plan |
+| `tally plan register <path>` | Register a Superpowers-style plan and store its hash |
+| `tally plan list` | List registered plans |
+| `tally plan check` | Check plan files, hash drift, and task plan references |
 | `tally round start <scope>` | Start round (--auto-retry, --dry-run, --strategy, --json) |
 | `tally round report` | Mid-round progress report |
 | `tally round close` | Close round (--auto-next, --integrate, --json) |
@@ -72,11 +119,11 @@ tally round close
 | `tally export` | Export (json, csv, markdown, agent-brief) |
 | `tally graph` | Dependency graph (--level task\|feature) |
 | `tally dashboard` | Start the dashboard HTTP server |
-| `tally sync` / `tally upgrade` / `tally migrate` | Sync, schema upgrade, legacy import |
+| `tally sync` / `tally upgrade` / `tally migrate` | Sync, schema upgrade, Markdown import |
 
-## Config (.tallyrc.yaml)
+## Config (.tally/config.yaml)
 
-Tally reads `.tallyrc.yaml` from the project root. Example:
+Tally reads `.tally/config.yaml` from the project root. Example:
 
 ```yaml
 agent:
@@ -113,6 +160,13 @@ gates:
 | `gates.maxRisk` | `high` | Maximum risk level allowed in rounds |
 | `gates.detectWriteConflicts` | `true` | Detect overlapping write scopes |
 
+Dashboard port behavior:
+
+- `tally dashboard` uses `dashboard.port`, default `5173`.
+- Dashboard Vite dev/preview also uses fixed port `5173` with strict port mode.
+- If the port is occupied, startup fails with a clear error instead of silently switching to a random port.
+- For dashboard frontend development, run the API server separately with `tally dashboard --port 5199 --no-open`; the Vite dev server proxies `/api` to `http://localhost:5199`.
+
 ## Round Safety Checks
 
 When starting a round, Tally enforces multi-agent safety:
@@ -148,7 +202,7 @@ Tally supports multiple agents working on the same ledger. Each agent sets its i
 export TALLY_AGENT_ID=agent-alpha
 ```
 
-Agents must be registered in `tally.json` under `_meta.agents`. Before starting a round, pull the latest ledger:
+Agents must be registered in `.tally/tally.json` under `_meta.agents`. Before starting a round, pull the latest ledger:
 
 ```bash
 git pull
@@ -162,19 +216,19 @@ tally round close
 tally sync
 ```
 
-If a round start fails due to a claim conflict, re-read `tally.json`, adjust task selection, and retry.
+If a round start fails due to a claim conflict, re-read `.tally/tally.json`, adjust task selection, and retry.
 
 ## Data Model
 
 See `standard/templates/tally-schema.md` for the full data model reference.
 
-Key task fields (v0.4.0):
+Key task fields (v0.5.0):
 
 | Category | Fields |
 |----------|--------|
 | Core | `id`, `status`, `priority`, `stage`, `module`, `name`, `acceptance`, `feature` |
 | Scheduling | `writeScopes`, `riskLevel`, `executionLane`, `requiresReview`, `rollbackPlan`, `assignedAgent`, `approvedBy` |
-| Planning | `acceptanceCriteria`, `executionPlan` |
+| Planning | `aodsRefs`, `codeRefs`, `implementationTargets`, `acceptanceCriteria`, `executionPlan`, `planRef`, `planPath`, `planTaskRef`, `planContentHash` |
 | Tracking | `resourceRequirements`, `repos`, `deliveryNode` |
 
 ## Development
@@ -186,7 +240,7 @@ npm install
 # Build both CLI and dashboard
 npm run build
 
-# Run tests (329 tests)
+# Run tests (336 tests)
 npm test
 
 # Coverage report
@@ -215,6 +269,7 @@ tally/
 ├── standard/               # Standard documents
 │   ├── manifest.yaml       # Agent plugin manifest
 │   └── templates/          # Copyable templates
-├── tally.json              # Task ledger (never edit directly)
-└── .tallyrc.yaml           # Project config
+└── .tally/
+    ├── tally.json          # Task ledger (never edit directly)
+    └── config.yaml         # Project config
 ```

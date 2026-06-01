@@ -43,6 +43,9 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        aodsRefs: [],
+        codeRefs: [],
+        implementationTargets: [],
         feature: null,
         tags: [],
         order: 1,
@@ -77,6 +80,9 @@ function validDoc(): TallyDocument {
         nextAction: 'do it',
         evidence: null,
         rule: null,
+        aodsRefs: [],
+        codeRefs: [],
+        implementationTargets: [],
         feature: null,
         tags: [],
         order: 2,
@@ -334,7 +340,7 @@ describe('getTaskDetail', () => {
     doc.tasks.push({
       id: 'U-003', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
       name: 'Task 3', acceptance: 'pass', deps: ['U-002'], blocks: null,
-      nextAction: null, evidence: null, rule: null, tags: [],
+      nextAction: null, evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], tags: [],
       order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
     })
@@ -788,7 +794,7 @@ describe('listTasks', () => {
     doc.tasks.push({
       id: 'U-003', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
       name: 'Task 3', acceptance: 'pass', deps: [], blocks: null,
-      nextAction: null, evidence: null, rule: null, tags: ['bug'],
+      nextAction: null, evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], tags: ['bug'],
       order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
     })
@@ -1279,7 +1285,7 @@ describe('listTasks extended', () => {
     doc.tasks.push({
       id: 'U-003', status: 'blocked', priority: 'P1', stage: 'S1', module: 'core',
       name: 'Task 3', acceptance: 'pass', deps: [], blocks: 'waiting',
-      nextAction: null, evidence: null, rule: null, tags: [],
+      nextAction: null, evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], tags: [],
       order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
     } as any)
@@ -1352,7 +1358,7 @@ describe('markTasksDone DoneTaskResult fields', () => {
     doc.tasks.push({
       id: 'U-005', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
       name: 'Task 5', acceptance: 'pass', deps: [], blocks: null,
-      nextAction: null, evidence: null, rule: null, tags: [],
+      nextAction: null, evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], tags: [],
       order: 3, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
     } as any)

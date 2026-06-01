@@ -19,7 +19,7 @@ export interface NavState {
   items: string[]
   sectionId: string
   registerItems: (sectionId: string, itemIds: string[]) => void
-  focusSection: (catIdx: number, secIdx: number) => void
+  focusSection: (catIdx: number, secIdx: number, restoreSaved?: boolean) => void
   /** Incremented each time a no-op Enter or Esc is pressed, so the UI can flash feedback */
   feedbackTrigger: number
   /** Cross-panel task navigation: jump to task in task table */
@@ -106,10 +106,9 @@ export function useKeyboardNav({ categories }: UseKeyboardNavOptions): NavState 
     else setFeedbackTrigger((v) => v + 1)
   }, [focusLevel])
 
-  const focusSection = useCallback((catIdx: number, secIdx: number) => {
+  const focusSection = useCallback((catIdx: number, secIdx: number, restoreSaved = false) => {
     sectionMemory.current.set(activeCategory, activeSection)
-    // Use saved position if this is a tab click (secIdx=0)
-    const saved = secIdx === 0 ? sectionMemory.current.get(catIdx) : undefined
+    const saved = restoreSaved ? sectionMemory.current.get(catIdx) : undefined
     setActiveCategory(catIdx); setActiveSection(saved ?? secIdx)
     setFocusLevel(1); setFocusedItemIndex(0)
   }, [activeCategory, activeSection])

@@ -1,12 +1,20 @@
-import { execSync } from 'child_process'
+import { execFileSync, execSync } from 'child_process'
 import { Command } from 'commander'
+import { existsSync } from 'fs'
+import { relative } from 'path'
+import { ledgerPath } from '../ledger-reader.js'
+import { resolveLocalConfigPath } from '../paths.js'
 
 export function syncCommand(): Command {
   const cmd = new Command('sync')
-  cmd.description('Git add, commit, and push tally.json')
+  cmd.description('Git add, commit, and push the Tally ledger')
     .action(() => {
       try {
-        execSync('git add tally.json', { stdio: 'pipe' })
+        const cwd = process.cwd()
+        const addPaths = [ledgerPath(cwd), resolveLocalConfigPath(cwd)]
+          .filter((path) => existsSync(path))
+          .map((path) => relative(cwd, path))
+        execFileSync('git', ['add', ...addPaths], { stdio: 'pipe' })
         try {
           execSync('git commit -m "tally: sync"', { stdio: 'pipe' })
         } catch {
@@ -26,7 +34,7 @@ export function syncCommand(): Command {
           const doc = readLedger()
           const result = validateDocument(doc)
           if (!result.valid) {
-            console.error('tally.json is invalid after merge. Resolve conflicts manually.')
+            console.error('.tally/tally.json is invalid after merge. Resolve conflicts manually.')
             process.exit(4)
           }
           execSync('git push', { stdio: 'inherit' })

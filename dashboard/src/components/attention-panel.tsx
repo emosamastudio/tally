@@ -165,7 +165,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
       <Card style={{ padding: '10px 16px' }}>
         <div className="flex items-center gap-2">
           <span style={{ color: 'var(--accent-3)', fontSize: 16 }}>{'✓'}</span>
-          <span className="sk-body" style={{ fontSize: 12, color: 'var(--ink-3)' }}>无需关注的事项</span>
+          <span className="sk-body sk-text-base" style={{ color: 'var(--ink-3)' }}>无需关注的事项</span>
         </div>
       </Card>
     )
@@ -195,12 +195,12 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
           }}
         >
           <span className="sk-mono" style={{ fontSize: 14, color: typeColor[item.type], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon[item.type]}</span>
-          <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
+          <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)', minWidth: 48, cursor: 'pointer', textDecoration: 'underline' }}
             onClick={(e) => { e.stopPropagation(); nav?.navigateToTask?.(item.taskId) }}
             title={`在任务表中查看 ${item.taskId}`}>{item.taskId}</span>
-          <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{item.taskName}</span>
-          <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-3)', maxWidth: 200, textAlign: 'right' }}>{item.detail}</span>
-          <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={item.action}>{'📋'}</span>
+          <span className="sk-body truncate sk-text-sm" style={{ flex: 1 }}>{item.taskName}</span>
+          <span className="sk-body sk-text-xs" style={{ color: 'var(--ink-3)', maxWidth: 200, textAlign: 'right' }}>{item.detail}</span>
+          <span className="sk-mono sk-text-2xs" style={{ color: 'var(--ink-4)', cursor: 'pointer' }} title={item.action}>{'📋'}</span>
         </div>,
       )
       slotIdx++
@@ -224,10 +224,10 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
           onClick={() => setExpandedDrifts((prev) => ({ ...prev, [row.detail]: !isExpanded }))}
         >
           <span className="sk-mono" style={{ fontSize: 14, color: typeColor['drift'], width: 16, textAlign: 'center', flexShrink: 0 }}>{typeIcon['drift']}</span>
-          <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>
+          <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)', minWidth: 48 }}>
             {isExpanded ? '▼' : '▶'}
           </span>
-          <span className="sk-body truncate" style={{ fontSize: 11, flex: 1, fontWeight: 600 }}>
+          <span className="sk-body truncate sk-text-sm" style={{ flex: 1, fontWeight: 600 }}>
             {row.count} 个任务{row.detail}
           </span>
         </div>,
@@ -251,9 +251,9 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
                 ...l2FocusStyle(isL2 && focusedIndex === slotIdx),
               }}
             >
-              <span className="sk-mono" style={{ fontSize: 10, color: 'var(--ink-3)', minWidth: 48 }}>{child.taskId}</span>
-              <span className="sk-body truncate" style={{ fontSize: 11, flex: 1 }}>{child.taskName}</span>
-              <span className="sk-mono" style={{ fontSize: 9, color: 'var(--ink-4)', cursor: 'pointer' }} title={child.action}>{'📋'}</span>
+              <span className="sk-mono sk-text-xs" style={{ color: 'var(--ink-3)', minWidth: 48 }}>{child.taskId}</span>
+              <span className="sk-body truncate sk-text-sm" style={{ flex: 1 }}>{child.taskName}</span>
+              <span className="sk-mono sk-text-2xs" style={{ color: 'var(--ink-4)', cursor: 'pointer' }} title={child.action}>{'📋'}</span>
             </div>,
           )
           slotIdx++
@@ -279,7 +279,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
         onClick={() => setShowAllOverflow(true)}
       >
         <span className="sk-mono" style={{ fontSize: 12 }}>{'▶'}</span>
-        <span className="sk-body" style={{ fontSize: 11 }}>还有 {hiddenCount} 项...</span>
+        <span className="sk-body sk-text-sm">还有 {hiddenCount} 项...</span>
       </div>,
     )
     // slotIdx++ not needed here, fold is last element
@@ -300,7 +300,7 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
         onClick={() => setShowAllOverflow(false)}
       >
         <span className="sk-mono" style={{ fontSize: 12 }}>{'▲'}</span>
-        <span className="sk-body" style={{ fontSize: 11 }}>收起</span>
+        <span className="sk-body sk-text-sm">收起</span>
       </div>,
     )
   }
@@ -308,8 +308,8 @@ export default function AttentionPanel({ tasks, sectionId }: AttentionPanelProps
   return (
     <Card style={{ padding: '12px 16px', borderLeft: items.length > 0 ? '3px solid var(--danger)' : '3px solid var(--accent-3)' }}>
       <div className="flex items-baseline justify-between mb-2">
-        <h3 className="sk-h3" style={{ fontSize: 14 }}>需要关注 &middot; {items.length} 项</h3>
-        <span className="sk-body" style={{ fontSize: 10, color: 'var(--ink-4)' }}>
+        <h3 className="sk-h3 sk-text-lg">需要关注 &middot; {items.length} 项</h3>
+        <span className="sk-body sk-text-xs" style={{ color: 'var(--ink-4)' }}>
           {'⊘'}阻塞 {'⚠'}漂移 !未审批
         </span>
       </div>

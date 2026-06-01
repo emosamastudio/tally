@@ -247,6 +247,9 @@ describe('validateDocument', () => {
       nextAction: null,
       evidence: 'commit abc123',
       rule: null,
+      aodsRefs: [],
+      codeRefs: [],
+      implementationTargets: [],
       feature: null,
       tags: [],
       order: null,
@@ -317,6 +320,38 @@ describe('feature reference validation', () => {
     tasks[0].feature = 'f1'
     const result = lintDocument(doc)
     expect(result.valid).toBe(true)
+  })
+
+  it('should pass lintDocument when task planRef exists in _meta.plans', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const meta = doc._meta as Record<string, unknown>
+    meta.plans = [{
+      id: 'plan:test',
+      path: 'docs/superpowers/plans/test.md',
+      title: 'Test Plan',
+      kind: 'superpowers',
+      requiredSkill: 'superpowers:subagent-driven-development',
+      contentHash: 'sha256:abc',
+      status: 'active',
+      registeredAt: '2026-06-01T00:00:00.000Z',
+      updatedAt: '2026-06-01T00:00:00.000Z',
+    }]
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].planRef = 'plan:test'
+    tasks[0].planPath = 'docs/superpowers/plans/test.md'
+    tasks[0].planTaskRef = 'Task 1'
+    tasks[0].planContentHash = 'sha256:abc'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(true)
+  })
+
+  it('should fail lintDocument when task planRef is not registered', () => {
+    const doc = loadFixture('valid-tally.json') as Record<string, unknown>
+    const tasks = doc.tasks as Array<Record<string, unknown>>
+    tasks[0].planRef = 'plan:missing'
+    const result = lintDocument(doc)
+    expect(result.valid).toBe(false)
+    expect(result.errors.some((e) => e.path.includes('planRef') && e.message.includes('not found'))).toBe(true)
   })
 
   it('should detect feature-module mismatch in validateDocument', () => {

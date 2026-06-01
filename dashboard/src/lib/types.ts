@@ -32,6 +32,11 @@ export interface Task {
   completedAt: string | null
   completedOrder?: number
   order: number
+  // External implementation plan reference
+  planRef?: string | null
+  planPath?: string | null
+  planTaskRef?: string | null
+  planContentHash?: string | null
   // v0.4.0 scheduling & safety fields
   writeScopes?: string[]
   riskLevel?: string
@@ -116,6 +121,18 @@ export interface FeatureMeta {
   dependsOn?: string[]
 }
 
+export interface PlanMeta {
+  id: string
+  path: string
+  title: string
+  kind: string
+  requiredSkill: string | null
+  contentHash: string
+  status: 'active' | 'archived' | 'superseded' | string
+  registeredAt: string
+  updatedAt: string
+}
+
 export interface LedgerData {
   os: {
     tasks: Task[]
@@ -141,6 +158,7 @@ export interface LedgerData {
   rounds: Round[]
   modules: ModuleMeta[]
   features: FeatureMeta[]
+  plans: PlanMeta[]
   projectName: string
   updated: string | null
 }

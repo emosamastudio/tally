@@ -1,5 +1,5 @@
 name: tally
-version: "0.4.0"
+version: "0.5.0"
 description: Agent-native task management with CLI-driven ledger, round discipline, auto-retry, auto-next, JSON error output, and visualization
 commands:
   - tally status
@@ -16,6 +16,10 @@ commands:
   - tally task list
   - tally task show
   - tally task approve
+  - tally task link-plan
+  - tally plan register
+  - tally plan list
+  - tally plan check
   - tally sync
   - tally graph
   - tally export
@@ -24,7 +28,7 @@ commands:
   - tally upgrade
   - tally migrate
 rules:
-  - Never edit tally.json directly -- always use CLI
+  - Never edit .tally/tally.json directly -- always use CLI
   - Always prefer batch forms (multiple IDs in one command)
   - New tasks discovered during execution go into the ledger, not the current round
   - Before commit, run tally lint
@@ -32,6 +36,7 @@ rules:
   - High/critical risk tasks need rollback plan and review flag
   - Round start validates write scopes, risk gates, feature freeze, and approval
   - Use structured evidence on task done (--test, --commit, --review, --provider, --notes)
+  - Use tally plan check before executing tasks linked to implementation plans
   - Choose round strategy wisely: feature-focused for cohesion, risk-first for priority, parallel-max for throughput
 round_strategies:
   - parallel-max: maximize parallelism, group by module then feature (default)
@@ -46,8 +51,13 @@ safety_checks:
 task_fields:
   core: [id, status, priority, stage, module, name, acceptance, feature, deps, blocks, nextAction, evidence, rule, tags]
   scheduling: [writeScopes, riskLevel, executionLane, requiresReview, rollbackPlan, assignedAgent, approvedBy]
-  planning: [acceptanceCriteria, executionPlan]
+  planning: [acceptanceCriteria, executionPlan, planRef, planPath, planTaskRef, planContentHash]
   tracking: [resourceRequirements, repos, deliveryNode]
+plan_registry:
+  purpose: Link Tally tasks to external implementation plans without replacing those plans
+  fields: [id, path, title, kind, requiredSkill, contentHash, status, registeredAt, updatedAt]
+  statuses: [active, archived, superseded]
+  commands: [tally plan register, tally task link-plan, tally plan check, tally export --format agent-brief]
 feature_registry:
   fields: [id, module, name, status, specRefs, dependsOn, owner]
   statuses: [design, contract_frozen, implementing, stable]

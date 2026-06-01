@@ -61,11 +61,11 @@ export default function HealthHeader({ tasks, blocks }: HealthHeaderProps) {
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               border: '2px solid var(--ink)',
             }}>
-              <span className="sk-num" style={{ fontSize: 16 }}>{pct}%</span>
+              <span className="sk-num sk-text-xl">{pct}%</span>
             </div>
             <div>
-              <div className="sk-h3" style={{ fontSize: 16 }}>项目健康</div>
-              <span className="sk-chip" style={{ fontSize: 10, background: healthColor, color: 'var(--paper)' }}>{healthLabel}</span>
+              <div className="sk-h3 sk-text-xl">项目健康</div>
+              <span className="sk-chip sk-text-xs" style={{ background: healthColor, color: 'var(--paper)' }}>{healthLabel}</span>
             </div>
           </div>
 
@@ -105,7 +105,7 @@ export default function HealthHeader({ tasks, blocks }: HealthHeaderProps) {
 function MetricBadge({ label, value, sub, color, pulse }: { label: string; value: string; sub: string; color: string; pulse?: boolean }) {
   return (
     <div style={{ minWidth: 64 }}>
-      <div className="sk-label" style={{ fontSize: 10 }}>{label}</div>
+      <div className="sk-label sk-text-xs">{label}</div>
       <div className="sk-num" style={{ fontSize: 28, color, position: 'relative' }}>
         {value}
         {pulse && (

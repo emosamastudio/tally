@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { writeFileSync, mkdtempSync, rmSync } from 'fs'
+import { mkdirSync, writeFileSync, mkdtempSync, rmSync } from 'fs'
 import { join } from 'path'
 import { readLedger, ledgerPath } from '../src/ledger-reader'
 import { writeLedger } from '../src/ledger-writer'
@@ -28,8 +28,9 @@ describe('ledger-reader', () => {
   beforeEach(() => { dir = mkdtempSync('/tmp/tally-test-') })
   afterEach(() => rmSync(dir, { recursive: true, force: true }))
 
-  it('reads a valid tally.json', () => {
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(validDoc, null, 2))
+  it('reads a valid .tally/tally.json', () => {
+    mkdirSync(join(dir, '.tally'), { recursive: true })
+    writeFileSync(join(dir, '.tally', 'tally.json'), JSON.stringify(validDoc, null, 2))
     const doc = readLedger(dir)
     expect(doc._meta.project).toBe('test')
   })
@@ -39,18 +40,14 @@ describe('ledger-reader', () => {
   })
 
   it('throws on invalid JSON', () => {
-    writeFileSync(join(dir, 'tally.json'), 'not json')
+    mkdirSync(join(dir, '.tally'), { recursive: true })
+    writeFileSync(join(dir, '.tally', 'tally.json'), 'not json')
     expect(() => readLedger(dir)).toThrow(/not valid JSON/)
   })
 
   it('ledgerPath returns the full path to the ledger file', () => {
     const path = ledgerPath(dir)
-    expect(path).toBe(join(dir, 'tally.json'))
-  })
-
-  it('ledgerPath accepts a custom filename', () => {
-    const path = ledgerPath(dir, 'custom.json')
-    expect(path).toBe(join(dir, 'custom.json'))
+    expect(path).toBe(join(dir, '.tally', 'tally.json'))
   })
 
   it('reads full document with all v0.2.0 fields present', () => {
@@ -89,6 +86,9 @@ describe('ledger-reader', () => {
           nextAction: 'scaffold route',
           evidence: null,
           rule: null,
+          aodsRefs: [],
+          codeRefs: [],
+          implementationTargets: [],
           feature: 'feat-1',
           tags: ['auth', 'api'],
           order: 1,
@@ -155,7 +155,8 @@ describe('ledger-reader', () => {
       ],
     }
 
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(fullDoc, null, 2))
+    mkdirSync(join(dir, '.tally'), { recursive: true })
+    writeFileSync(join(dir, '.tally', 'tally.json'), JSON.stringify(fullDoc, null, 2))
     const doc = readLedger(dir)
 
     // Meta

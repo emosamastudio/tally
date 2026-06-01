@@ -31,6 +31,30 @@
       { "id": "bridge-contract", "module": "contracts", "name": "Bridge契约定义" },
       { "id": "runtime-engine", "module": "runtime", "name": "Runtime引擎" },
       { "id": "speech-tts", "module": "speech", "name": "语音合成" }
+    ],
+    "plans": [
+      {
+        "id": "plan:provider-runtime-round",
+        "path": "docs/superpowers/plans/2026-05-10-provider-runtime.md",
+        "title": "Provider + Runtime Implementation Plan",
+        "kind": "superpowers",
+        "requiredSkill": "superpowers:subagent-driven-development",
+        "contentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
+        "status": "active",
+        "registeredAt": "2026-05-10T09:00:00.000Z",
+        "updatedAt": "2026-05-10T09:00:00.000Z"
+      },
+      {
+        "id": "plan:speech-pipeline",
+        "path": "docs/superpowers/plans/2026-05-08-speech-pipeline.md",
+        "title": "Speech Pipeline Implementation Plan",
+        "kind": "superpowers",
+        "requiredSkill": "superpowers:subagent-driven-development",
+        "contentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
+        "status": "active",
+        "registeredAt": "2026-05-08T15:30:00.000Z",
+        "updatedAt": "2026-05-08T15:30:00.000Z"
+      }
     ]
   },
   "tasks": [
@@ -121,6 +145,10 @@
       "acceptance": "CoreDependencyContainer 可注入 clock/id_provider/audit_sink",
       "deps": ["U-008"], "blocks": null, "nextAction": "完成 Leihuo provider adapter",
       "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
+      "planRef": "plan:provider-runtime-round",
+      "planPath": "docs/superpowers/plans/2026-05-10-provider-runtime.md",
+      "planTaskRef": "Task 1",
+      "planContentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "order": 9, "completedOrder": null,
       "claimedBy": "main", "claimedAt": "2026-05-06", "createdAt": "2026-05-06", "completedAt": null
     },
@@ -151,6 +179,10 @@
       "acceptance": "voice ID 可配置，合成延迟 < 500ms",
       "deps": ["U-009"], "blocks": null, "nextAction": "调通 Huoshan auth token 刷新逻辑",
       "evidence": null, "rule": null, "feature": null, "tags": [],
+      "planRef": "plan:speech-pipeline",
+      "planPath": "docs/superpowers/plans/2026-05-08-speech-pipeline.md",
+      "planTaskRef": "Task 2",
+      "planContentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "order": 12, "completedOrder": null,
       "claimedBy": "app-dev", "claimedAt": "2026-05-07", "createdAt": "2026-05-07", "completedAt": null
     },
@@ -161,6 +193,10 @@
       "acceptance": "fixture 模式下 IFA agent loop 可完整执行一轮",
       "deps": ["U-009"], "blocks": null, "nextAction": null,
       "evidence": null, "rule": null, "feature": null, "tags": ["blocking-release"],
+      "planRef": "plan:provider-runtime-round",
+      "planPath": "docs/superpowers/plans/2026-05-10-provider-runtime.md",
+      "planTaskRef": "Task 2",
+      "planContentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "order": 13, "completedOrder": null,
       "claimedBy": null, "claimedAt": null, "createdAt": "2026-05-07", "completedAt": null
     },
@@ -202,6 +238,10 @@
       "deps": ["U-011"], "blocks": null, "nextAction": null,
       "evidence": "架构评审通过，无阻塞意见",
       "rule": null, "feature": null, "tags": ["design-needed", "quick-win"], "order": 17, "completedOrder": 10,
+      "planRef": "plan:speech-pipeline",
+      "planPath": "docs/superpowers/plans/2026-05-08-speech-pipeline.md",
+      "planTaskRef": "Task 1",
+      "planContentHash": "sha256:2222222222222222222222222222222222222222222222222222222222222222",
       "claimedBy": "app-dev", "claimedAt": "2026-05-08", "createdAt": "2026-05-08", "completedAt": "2026-05-08"
     },
     {
@@ -314,6 +354,10 @@
       "acceptance": "ledger 数据从 .md 迁移到 sqlite，查询延迟 < 10ms",
       "deps": ["U-012"], "blocks": null, "nextAction": "设计 schema migration 策略",
       "evidence": null, "rule": null, "feature": null, "tags": [],
+      "planRef": "plan:provider-runtime-round",
+      "planPath": "docs/superpowers/plans/2026-05-10-provider-runtime.md",
+      "planTaskRef": "Task 3",
+      "planContentHash": "sha256:1111111111111111111111111111111111111111111111111111111111111111",
       "order": 28, "completedOrder": null,
       "claimedBy": "main", "claimedAt": "2026-05-10", "createdAt": "2026-05-10", "completedAt": null
     },

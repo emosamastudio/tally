@@ -6,7 +6,7 @@ import type { CheckError, CheckResult, LintError, LintResult } from './types.js'
 // ── JSON Schema ──
 
 /**
- * JSON Schema v2020-12 for the Tally document (tally.json).
+ * JSON Schema v2020-12 for the Tally document (.tally/tally.json).
  *
  * Validates field types, required fields, enum membership, and array/item
  * shapes.  Constraints that require cross-field or cross-item reasoning
@@ -80,6 +80,35 @@ export const TALLY_JSON_SCHEMA = {
             additionalProperties: false,
           },
         },
+        plans: {
+          type: 'array',
+          items: {
+            type: 'object',
+            properties: {
+              id: { type: 'string' },
+              path: { type: 'string' },
+              title: { type: 'string' },
+              kind: { type: 'string' },
+              requiredSkill: { type: ['string', 'null'] },
+              contentHash: { type: 'string' },
+              status: { enum: ['active', 'archived', 'superseded'] },
+              registeredAt: { type: 'string' },
+              updatedAt: { type: 'string' },
+            },
+            required: [
+              'id',
+              'path',
+              'title',
+              'kind',
+              'requiredSkill',
+              'contentHash',
+              'status',
+              'registeredAt',
+              'updatedAt',
+            ],
+            additionalProperties: false,
+          },
+        },
       },
       required: ['project', 'tally_version', 'created', 'updated', 'agents', 'stages', 'modules', 'features'],
       additionalProperties: false,
@@ -103,6 +132,9 @@ export const TALLY_JSON_SCHEMA = {
           nextAction: { type: ['string', 'null'] },
           evidence: { type: ['string', 'null'] },
           rule: { type: ['string', 'null'] },
+          aodsRefs: { type: 'array', items: { type: 'string' } },
+          codeRefs: { type: 'array', items: { type: 'string' } },
+          implementationTargets: { type: 'array', items: { type: 'string' } },
           feature: { type: ['string', 'null'] },
           tags: { type: 'array', items: { type: 'string' } },
           order: { type: ['integer', 'null'] },
@@ -111,6 +143,10 @@ export const TALLY_JSON_SCHEMA = {
           claimedAt: { type: ['string', 'null'] },
           createdAt: { type: 'string' },
           completedAt: { type: ['string', 'null'] },
+          planRef: { type: ['string', 'null'] },
+          planPath: { type: ['string', 'null'] },
+          planTaskRef: { type: ['string', 'null'] },
+          planContentHash: { type: ['string', 'null'] },
           writeScopes: { type: 'array', items: { type: 'string' } },
           acceptanceCriteria: {
             type: ['object', 'null'],
@@ -154,6 +190,9 @@ export const TALLY_JSON_SCHEMA = {
           'nextAction',
           'evidence',
           'rule',
+          'aodsRefs',
+          'codeRefs',
+          'implementationTargets',
           'feature',
           'tags',
           'order',
@@ -687,6 +726,52 @@ function checkFeatureReferences(doc: Record<string, unknown>): LintError[] {
   return errors
 }
 
+/** Check that task.planRef references a registered _meta.plans[].id. */
+function checkPlanReferences(doc: Record<string, unknown>): LintError[] {
+  const errors: LintError[] = []
+  const meta = safeGet(doc, '_meta')
+  const plans = meta != null && typeof meta === 'object'
+    ? (meta as Record<string, unknown>).plans
+    : undefined
+
+  const planIds = new Set<string>()
+  if (Array.isArray(plans)) {
+    const seen = new Map<string, number>()
+    for (let i = 0; i < plans.length; i++) {
+      const plan = plans[i]
+      if (plan == null || typeof plan !== 'object') continue
+      const id = (plan as Record<string, unknown>).id as string | undefined
+      if (!id) continue
+      const prev = seen.get(id)
+      if (prev !== undefined) {
+        errors.push({
+          path: formatPath('_meta', 'plans', i, 'id'),
+          message: `Duplicate plan ID "${id}" (first seen at /_meta/plans/${prev}/id)`,
+        })
+      } else {
+        seen.set(id, i)
+        planIds.add(id)
+      }
+    }
+  }
+
+  const tasks = safeGet(doc, 'tasks')
+  if (!Array.isArray(tasks)) return errors
+
+  for (let i = 0; i < tasks.length; i++) {
+    const t = tasks[i] as Record<string, unknown>
+    const planRef = t.planRef as string | null | undefined
+    if (planRef != null && !planIds.has(planRef)) {
+      errors.push({
+        path: formatPath('tasks', i, 'planRef'),
+        message: `Task planRef "${planRef}" not found in _meta.plans`,
+      })
+    }
+  }
+
+  return errors
+}
+
 // ── Public API ──
 
 /**
@@ -729,6 +814,9 @@ export function lintDocument(doc: unknown): LintResult {
 
     // 6. Forbidden side effects check
     errors.push(...checkForbiddenSideEffects(record))
+
+    // 7. Plan references
+    errors.push(...checkPlanReferences(record))
   }
 
   return {

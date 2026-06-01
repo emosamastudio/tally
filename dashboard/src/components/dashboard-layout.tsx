@@ -15,12 +15,13 @@ interface DashboardLayoutProps {
 
 const SECTION_LABELS: Record<string, string> = {
   'overview-panel': '概览面板',
+  'progress-trend': '进度趋势',
   'stage-matrix': '阶段矩阵',
   'feature-progress': '功能矩阵',
   'feature-deps': '功能依赖',
-  'current-round': '当前回合',
+  'plan-registry': '实施计划',
+  'current-round': '回合',
   'agent-activity': '活跃 Agent',
-  'round-timeline': '回合时间线',
   'round-analytics': '回合分析',
   'task-table': '任务列表',
   'agent-contribution': 'Agent 贡献',
@@ -70,7 +71,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                 <button key={cat.id} role="tab" aria-selected={nav.activeCategory === ci} aria-controls={`panel-${cat.id}`}
                   className="sk-chip shrink-0"
                   style={{ fontSize:12, padding:'6px 14px', cursor:'pointer', background:nav.activeCategory===ci?'var(--accent)':'var(--paper-2)', color:nav.activeCategory===ci?'var(--ink)':'var(--ink-2)', borderColor:nav.activeCategory===ci?'var(--accent)':'var(--ink-4)', fontWeight:nav.activeCategory===ci?600:400, outline:nav.focusLevel===0&&nav.activeCategory===ci?'2px solid var(--ink)':'none', outlineOffset:nav.focusLevel===0&&nav.activeCategory===ci?2:0 }}
-                  onClick={() => nav.focusSection(ci, 0)}>
+                  onClick={() => nav.focusSection(ci, 0, true)}>
                   <span className="sk-mono" style={{ fontSize:10, color:nav.activeCategory===ci?'var(--ink)':'var(--ink-4)', marginRight:4 }}>{ci+1}</span>
                   {cat.label}
                   <span style={{ marginLeft:6, fontSize:10, opacity:0.6 }}>{cat.sections.length}</span>
@@ -86,14 +87,12 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
         </div>
 
         {/* Content area with left sidebar */}
-        <div id="main-content" role="main" style={{ flex:1, overflow:'hidden', display:'flex' }}>
+        <div id="main-content" role="main" className="sk-dashboard-main">
           {/* Section sidebar — vertical nav on the left */}
           {currentSections > 1 && (
-            <nav style={{
-              width: 140, flexShrink: 0, overflow:'auto',
+            <nav className="sk-section-nav" style={{
               borderRight: '1px solid var(--ink-4)',
               background: 'var(--paper-2)',
-              display: 'flex', flexDirection: 'column', gap: 0,
             }}>
               {cat?.sections.map((sid, si) => {
                 const isActive = si === nav.activeSection
@@ -101,7 +100,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                   <button
                     key={sid}
                     onClick={() => nav.focusSection(nav.activeCategory, si)}
-                    className="text-left"
+                    className="sk-section-nav-button text-left"
                     style={{
                       padding: '8px 12px', cursor: 'pointer',
                       background: isActive ? 'var(--paper)' : 'transparent',
@@ -124,7 +123,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
           )}
 
           {/* Main content */}
-          <div style={{ flex:1, overflow:'hidden', position:'relative' }}>
+          <div className="sk-dashboard-content">
             {categories.map((cat, ci) => {
               const isActiveCat = nav.activeCategory === ci
               return (
@@ -138,7 +137,7 @@ export default function DashboardLayout({ header, categories, children }: Dashbo
                   transition: 'opacity 0.15s',
                   zIndex: isActiveCat ? 1 : 0,
                 }}>
-                <div className="px-2 md:px-4 py-4" style={{ width:'100%', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column' }}>
+                <div className="sk-dashboard-panel-pad px-2 md:px-4 py-4" style={{ width:'100%', height:'100%', overflow:'hidden', display:'flex', flexDirection:'column' }}>
                   {cat.sections.map((sectionId, si) => {
                     const content = children[sectionId]
                     if (!content) return null

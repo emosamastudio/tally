@@ -1,7 +1,6 @@
 // src/components/current-round.tsx
-import { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronDown, ChevronRight, Clock, CheckCircle2, Play } from 'lucide-react'
+import { Clock, CheckCircle2, Play } from 'lucide-react'
 import type { Round, Task } from '@/lib/types'
 
 interface CurrentRoundProps {
@@ -13,21 +12,20 @@ interface CurrentRoundProps {
 }
 
 export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoundProps) {
-  const [showHistory, setShowHistory] = useState(false)
 
   if (!round) {
     // Show most recent completed round if available
     const lastCompleted = allRounds?.filter((r) => r.status === 'completed').sort((a, b) => (b.completedAt ?? '').localeCompare(a.completedAt ?? ''))[0]
     return (
-      <Card tilt={1}>
+      <Card>
         <CardHeader>
           <CardTitle>当前回合</CardTitle>
         </CardHeader>
         <CardContent>
           <div>
-            <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>无活跃回合</p>
-            <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
-              运行 <code className="sk-mono" style={{ fontSize: 11 }}>tally round start --dry-run --json</code> 预览可用任务
+            <p className="sk-body" style={{ color: 'var(--ink-3)' }}>无活跃回合</p>
+            <p className="sk-body sk-text-sm" style={{ color: 'var(--ink-4)', marginTop: 4 }}>
+              运行 <code className="sk-mono sk-text-sm">tally round start --dry-run --json</code> 预览可用任务
             </p>
           </div>
           {lastCompleted && (
@@ -52,16 +50,15 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
   ).length
   const totalCount = round.tasks.length
 
-  // Build timeline data: all rounds sorted chronologically, excluding the active round shown above
+  // Build timeline data: all rounds sorted chronologically
   const roundsArr = allRounds ?? []
   const timelineRounds = roundsArr
-    .filter((r) => r.id !== round.id)
     .sort((a, b) => a.startDate.localeCompare(b.startDate))
 
   return (
-    <Card tilt={1} style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+    <Card style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <div className="flex justify-between items-baseline">
-        <h3 className="sk-h3">当前回合</h3>
+        <h3 className="sk-h3">回合</h3>
         <span className={`sk-chip ${isActive ? 'accent' : 'ok'}`}>
           {isActive ? '进行中' : '已完成'}
         </span>
@@ -69,7 +66,7 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
 
       <div className="min-w-0">
         <div className="sk-body truncate" style={{ fontSize: 13 }}>{round.id}</div>
-        <div className="sk-label truncate" style={{ fontSize: 11, marginTop: 2 }}>{round.startDate} · {round.executor}</div>
+        <div className="sk-label truncate" style={{ marginTop: 2 }}>{round.startDate} · {round.executor}</div>
       </div>
 
       {/* Progress ring */}
@@ -124,40 +121,23 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
         </>
       )}
 
-      {/* Collapsible Round History */}
+      {/* Round History — always visible */}
       {timelineRounds.length > 0 && (
         <>
           <hr className="sk-rule dashed" style={{ margin: '4px 0' }} />
-          <button
-            onClick={() => setShowHistory((v) => !v)}
-            className="flex items-center gap-1.5 sk-body"
-            style={{
-              fontSize: 12,
-              cursor: 'pointer',
-              background: 'none',
-              border: 'none',
-              padding: 0,
-              color: 'var(--ink-2)',
-              fontFamily: 'inherit',
-            }}
-          >
-            {showHistory ? <ChevronDown size={14} /> : <ChevronRight size={14} />}
-            回合历史 ({timelineRounds.length})
-          </button>
+          <div className="sk-label" style={{ fontSize: 11, marginBottom: 2 }}>回合历史 · {timelineRounds.length}</div>
+          <div className="relative">
+            {/* Vertical timeline line */}
+            <div
+              className="absolute left-[12px] top-1 bottom-1"
+              style={{
+                width: 2,
+                background: 'var(--ink-4)',
+                borderRadius: 1,
+              }}
+            />
 
-          {showHistory && (
-            <div className="relative" style={{ marginTop: 8 }}>
-              {/* Vertical timeline line */}
-              <div
-                className="absolute left-[12px] top-1 bottom-1"
-                style={{
-                  width: 2,
-                  background: 'var(--ink-4)',
-                  borderRadius: 1,
-                }}
-              />
-
-              <div className="space-y-3">
+            <div className="space-y-3">
                 {timelineRounds.map((r) => {
                   const plannedIds = new Set(r.tasks.map((rt) => rt.taskId))
                   const rDoneCount = (allTasks ?? []).filter(
@@ -235,7 +215,6 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
                 })}
               </div>
             </div>
-          )}
         </>
       )}
     </Card>
@@ -244,9 +223,9 @@ export default function CurrentRound({ round, allRounds, allTasks }: CurrentRoun
 
 export function CurrentRoundSkeleton() {
   return (
-    <Card tilt={1}>
+    <Card>
       <div className="flex justify-between">
-        <h3 className="sk-h3">当前回合</h3>
+        <h3 className="sk-h3">回合</h3>
       </div>
       <div className="space-y-3 mt-3">
         <span className="sk-bar long dark" style={{ height: 7 }} />

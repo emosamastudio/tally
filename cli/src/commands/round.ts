@@ -479,6 +479,10 @@ export interface CloseRoundResult {
   done: number
   reverted: number
   nextRound?: StartRoundResult
+  nextRoundSkipped?: {
+    reason: 'no_eligible_tasks'
+    message: string
+  }
   integration?: IntegrationReport
 }
 
@@ -636,13 +640,25 @@ export function closeRound(input: CloseRoundInput = {}): CloseRoundResult {
 
   // Auto-next: close and immediately start a new round
   if (input.autoNext) {
-    const nextResult = startRound(round.scope, {
-      cwd,
-      agentId,
-      strategy: input.nextStrategy ?? 'parallel-max',
-      autoRetry: input.nextAutoRetry ?? true,
-    })
-    result.nextRound = nextResult
+    try {
+      const nextResult = startRound(round.scope, {
+        cwd,
+        agentId,
+        strategy: input.nextStrategy ?? 'parallel-max',
+        autoRetry: input.nextAutoRetry ?? true,
+      })
+      result.nextRound = nextResult
+    } catch (e) {
+      const message = (e as Error).message
+      if (message.includes('No eligible tasks')) {
+        result.nextRoundSkipped = {
+          reason: 'no_eligible_tasks',
+          message,
+        }
+      } else {
+        throw e
+      }
+    }
   }
 
   return result
@@ -716,6 +732,9 @@ function formatRoundClose(result: CloseRoundResult): string {
   lines.push(`Round closed: ${result.roundId}`)
   lines.push(`  Done: ${result.done}`)
   lines.push(`  Reverted to pending: ${result.reverted}`)
+  if (result.nextRoundSkipped) {
+    lines.push(`  Auto-next skipped: ${result.nextRoundSkipped.message}`)
+  }
   return lines.join('\n')
 }
 

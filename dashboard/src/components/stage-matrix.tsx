@@ -107,7 +107,12 @@ export default function StageMatrix({ stages, onStageClick }: StageMatrixProps) 
       </div>
 
       <CardContent className="p-0">
-        <div className="overflow-x-auto pb-1" style={{ scrollbarWidth: 'thin' }}>
+        {sorted.length * CARD_WIDTH > 720 && (
+          <div className="sk-scroll-hint">
+            横向滚动查看全部阶段 →
+          </div>
+        )}
+        <div className="sk-scroll-rail overflow-x-auto pb-2" style={{ scrollbarWidth: 'thin' }}>
           <div className="flex" style={{ minWidth: sorted.length * CARD_WIDTH, position: 'relative' }}>
             {sorted.map((s, i, arr) => {
               const total = s.done + s.open + s.hold + s.blocked

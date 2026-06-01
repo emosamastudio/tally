@@ -22,6 +22,7 @@ export class TallyError extends Error {
 /** Derive an error code from an error message by pattern matching. */
 function inferErrorCode(message: string): string {
   if (message.includes('write scope')) return 'WRITE_SCOPE_CONFLICT'
+  if (message.includes('Plan "') || message.includes('planRef')) return 'PLAN_REFERENCE_INVALID'
   if (message.includes('risk level') && message.includes('exceeding')) return 'RISK_GATE'
   if (message.includes('not approved')) return 'APPROVAL_REQUIRED'
   if (message.includes('frozen feature')) return 'FEATURE_FROZEN'
@@ -183,6 +184,9 @@ export interface AddTaskInput {
   deps?: string[]
   tags?: string[]
   feature?: string
+  aodsRefs?: string[]
+  codeRefs?: string[]
+  implementationTargets?: string[]
   writeScopes?: string[]
   acceptanceCriteria?: Record<string, unknown>
   executionPlan?: Record<string, unknown>
@@ -194,6 +198,10 @@ export interface AddTaskInput {
   resourceRequirements?: string[]
   repos?: string[]
   deliveryNode?: string
+  planRef?: string
+  planPath?: string
+  planTaskRef?: string
+  planContentHash?: string
 }
 
 export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
@@ -215,6 +223,9 @@ export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
       nextAction: null,
       evidence: null,
       rule: null,
+      aodsRefs: input.aodsRefs ?? [],
+      codeRefs: input.codeRefs ?? [],
+      implementationTargets: input.implementationTargets ?? [],
       feature: input.feature ?? null,
       tags: input.tags ?? [],
       order: nextOrder(doc),
@@ -223,6 +234,10 @@ export function addTasks(doc: TallyDocument, inputs: AddTaskInput[]): Task[] {
       claimedAt: null,
       createdAt: today(),
       completedAt: null,
+      planRef: input.planRef ?? null,
+      planPath: input.planPath ?? null,
+      planTaskRef: input.planTaskRef ?? null,
+      planContentHash: input.planContentHash ?? null,
       writeScopes: input.writeScopes ?? [],
       acceptanceCriteria: (input.acceptanceCriteria as Task['acceptanceCriteria']) ?? null,
       executionPlan: (input.executionPlan as Task['executionPlan']) ?? null,
@@ -299,6 +314,9 @@ const DONE_TASK_METADATA_FIELDS = new Set([
   'module',
   'tags',
   'feature',
+  'aodsRefs',
+  'codeRefs',
+  'implementationTargets',
   'writeScopes',
   'acceptanceCriteria',
   'executionPlan',
@@ -310,6 +328,10 @@ const DONE_TASK_METADATA_FIELDS = new Set([
   'resourceRequirements',
   'repos',
   'deliveryNode',
+  'planRef',
+  'planPath',
+  'planTaskRef',
+  'planContentHash',
 ])
 
 export function editTask(
@@ -371,6 +393,9 @@ export function editTask(
   if (fields.nextAction !== undefined) task.nextAction = fields.nextAction as string | null
   if (fields.tags !== undefined) task.tags = fields.tags as string[]
   if (fields.feature !== undefined) task.feature = fields.feature as string | null
+  if (fields.aodsRefs !== undefined) task.aodsRefs = fields.aodsRefs as string[]
+  if (fields.codeRefs !== undefined) task.codeRefs = fields.codeRefs as string[]
+  if (fields.implementationTargets !== undefined) task.implementationTargets = fields.implementationTargets as string[]
   if (fields.writeScopes !== undefined) task.writeScopes = fields.writeScopes as string[]
   if (fields.acceptanceCriteria !== undefined) task.acceptanceCriteria = fields.acceptanceCriteria as Task['acceptanceCriteria']
   if (fields.executionPlan !== undefined) task.executionPlan = fields.executionPlan as Task['executionPlan']
@@ -394,8 +419,31 @@ export function editTask(
   if (fields.resourceRequirements !== undefined) task.resourceRequirements = fields.resourceRequirements as string[]
   if (fields.repos !== undefined) task.repos = fields.repos as string[]
   if (fields.deliveryNode !== undefined) task.deliveryNode = fields.deliveryNode as string | null
+  if (fields.planRef !== undefined) task.planRef = fields.planRef as string | null
+  if (fields.planPath !== undefined) task.planPath = fields.planPath as string | null
+  if (fields.planTaskRef !== undefined) task.planTaskRef = fields.planTaskRef as string | null
+  if (fields.planContentHash !== undefined) task.planContentHash = fields.planContentHash as string | null
 
   return task
+}
+
+export function linkTaskToPlan(
+  doc: TallyDocument,
+  id: string,
+  planId: string,
+  taskRef?: string | null,
+): Task {
+  const plan = (doc._meta.plans ?? []).find((entry) => entry.id === planId)
+  if (!plan) {
+    throw new Error(`Plan "${planId}" not found in _meta.plans`)
+  }
+
+  return editTask(doc, id, {
+    planRef: plan.id,
+    planPath: plan.path,
+    planTaskRef: taskRef ?? null,
+    planContentHash: plan.contentHash,
+  }, { allowDoneMetadata: true })
 }
 
 export interface DoneTaskResult {
@@ -598,7 +646,19 @@ export function formatTaskDetail(detail: TaskDetail): string {
     lines.push(`Quality:     ${bar} ${score}/100`)
   }
   lines.push(`Rule:        ${t.rule ?? '(none)'}`)
+  lines.push(`AODS Refs:   ${(t.aodsRefs ?? []).length > 0 ? (t.aodsRefs ?? []).join(', ') : '(none)'}`)
+  lines.push(`Code Refs:   ${(t.codeRefs ?? []).length > 0 ? (t.codeRefs ?? []).join(', ') : '(none)'}`)
+  lines.push(`Targets:     ${(t.implementationTargets ?? []).length > 0 ? (t.implementationTargets ?? []).join(', ') : '(none)'}`)
   lines.push(`Feature:     ${t.feature ?? '(none)'}`)
+  if (t.planRef || t.planPath || t.planTaskRef || t.planContentHash) {
+    const planParts = [
+      t.planRef ?? '(unregistered)',
+      t.planTaskRef ? `task=${t.planTaskRef}` : null,
+      t.planPath ? `path=${t.planPath}` : null,
+      t.planContentHash ? `hash=${t.planContentHash}` : null,
+    ].filter(Boolean)
+    lines.push(`Plan:        ${planParts.join(' ')}`)
+  }
   lines.push(`Risk:        ${t.riskLevel}`)
   lines.push(`Lane:        ${t.executionLane ?? '(none)'}`)
   lines.push(`Write Scopes: ${t.writeScopes.length > 0 ? t.writeScopes.join(', ') : '(none)'}`)
@@ -745,6 +805,10 @@ export function taskCommand(): Command {
     .option('--repos <repos>', 'Comma-separated repo names')
     .option('--delivery-node <node>', 'Delivery milestone node')
     .option('--resource-requirements <resources>', 'Comma-separated resource requirements')
+    .option('--plan-ref <ref>', 'Registered plan ID')
+    .option('--plan-path <path>', 'Plan path snapshot')
+    .option('--plan-task-ref <ref>', 'Task heading/reference inside the plan')
+    .option('--plan-content-hash <hash>', 'Plan content hash snapshot')
     .option('--allow-done-metadata', 'Allow metadata-only edits on completed tasks')
     .option('--json-output', 'Output errors as JSON')
     .action((id: string, opts: Record<string, string | boolean | undefined>) => {
@@ -800,6 +864,10 @@ export function taskCommand(): Command {
         if (opts.resourceRequirements !== undefined) {
           fields.resourceRequirements = (opts.resourceRequirements as string).split(',').map((r: string) => r.trim()).filter(Boolean)
         }
+        if (opts.planRef !== undefined) fields.planRef = opts.planRef === '' ? null : opts.planRef
+        if (opts.planPath !== undefined) fields.planPath = opts.planPath === '' ? null : opts.planPath
+        if (opts.planTaskRef !== undefined) fields.planTaskRef = opts.planTaskRef === '' ? null : opts.planTaskRef
+        if (opts.planContentHash !== undefined) fields.planContentHash = opts.planContentHash === '' ? null : opts.planContentHash
 
         if (Object.keys(fields).length === 0) {
           throw new Error('No fields specified. Use --name, --priority, --stage, --module, --acceptance, --deps, --next-action, --tags, --feature, --risk-level, --execution-lane, --write-scopes, etc.')
@@ -810,6 +878,36 @@ export function taskCommand(): Command {
         })
         writeLedger(doc)
         console.log(`Updated ${task.id}: ${task.name}`)
+      })
+    })
+
+  // tally task link-plan <id> --plan <plan-id> [--task-ref "..."]
+  cmd.command('link-plan')
+    .description('Link a task to a registered implementation plan')
+    .argument('<id>', 'Task ID (e.g. U-001)')
+    .requiredOption('--plan <plan>', 'Registered plan ID')
+    .option('--task-ref <ref>', 'Task heading/reference inside the plan')
+    .option('--json-output', 'Output result/errors as JSON')
+    .action((id: string, opts: { plan: string; taskRef?: string; jsonOutput?: boolean }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
+        const doc = readLedger()
+        const task = linkTaskToPlan(doc, id, opts.plan, opts.taskRef === '' ? null : opts.taskRef)
+        writeLedger(doc)
+
+        if (opts.jsonOutput) {
+          console.log(JSON.stringify({
+            ok: true,
+            task: {
+              id: task.id,
+              planRef: task.planRef,
+              planPath: task.planPath,
+              planTaskRef: task.planTaskRef,
+              planContentHash: task.planContentHash,
+            },
+          }))
+        } else {
+          console.log(`Linked ${task.id} to plan ${task.planRef}${task.planTaskRef ? ` (${task.planTaskRef})` : ''}`)
+        }
       })
     })
 
@@ -906,6 +1004,10 @@ export function taskCommand(): Command {
     .option('--execution-lane <lane>', 'Execution lane')
     .option('--repos <repos>', 'Comma-separated repos')
     .option('--tags <tags>', 'Comma-separated tags')
+    .option('--plan-ref <ref>', 'Registered plan ID')
+    .option('--plan-path <path>', 'Plan path snapshot')
+    .option('--plan-task-ref <ref>', 'Task heading/reference inside the plan')
+    .option('--plan-content-hash <hash>', 'Plan content hash snapshot')
     .option('--acceptance-criteria-json <json>', 'AcceptanceCriteria JSON')
     .option('--execution-plan-json <json>', 'ExecutionPlan JSON')
     .option('--json-output', 'Output errors as JSON')
@@ -914,6 +1016,7 @@ export function taskCommand(): Command {
         const METADATA_FIELDS = new Set([
           'module', 'feature', 'deliveryNode', 'executionLane', 'repos', 'tags',
           'acceptanceCriteria', 'executionPlan',
+          'planRef', 'planPath', 'planTaskRef', 'planContentHash',
         ])
         const doc = readLedger()
         const task = doc.tasks.find((t) => t.id === id)
@@ -926,6 +1029,10 @@ export function taskCommand(): Command {
         if (opts.executionLane !== undefined && METADATA_FIELDS.has('executionLane')) fields.executionLane = opts.executionLane === '' ? null : opts.executionLane
         if (opts.repos !== undefined && METADATA_FIELDS.has('repos')) fields.repos = (opts.repos as string).split(',').map((r: string) => r.trim()).filter(Boolean)
         if (opts.tags !== undefined && METADATA_FIELDS.has('tags')) fields.tags = (opts.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean)
+        if (opts.planRef !== undefined && METADATA_FIELDS.has('planRef')) fields.planRef = opts.planRef === '' ? null : opts.planRef
+        if (opts.planPath !== undefined && METADATA_FIELDS.has('planPath')) fields.planPath = opts.planPath === '' ? null : opts.planPath
+        if (opts.planTaskRef !== undefined && METADATA_FIELDS.has('planTaskRef')) fields.planTaskRef = opts.planTaskRef === '' ? null : opts.planTaskRef
+        if (opts.planContentHash !== undefined && METADATA_FIELDS.has('planContentHash')) fields.planContentHash = opts.planContentHash === '' ? null : opts.planContentHash
         if (opts.acceptanceCriteriaJson !== undefined) {
           fields.acceptanceCriteria = JSON.parse(opts.acceptanceCriteriaJson)
         }

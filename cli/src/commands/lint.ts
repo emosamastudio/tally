@@ -4,7 +4,7 @@ import { lintDocument } from '../schema.js'
 
 export function lintCommand(): Command {
   const cmd = new Command('lint')
-  cmd.description('Validate tally.json structure (fast, for pre-commit)')
+  cmd.description('Validate .tally/tally.json structure (fast, for pre-commit)')
     .option('--strict', 'Treat warnings as errors')
     .option('--json', 'Output JSON')
     .action((opts: { strict: boolean; json: boolean }) => {
@@ -14,7 +14,7 @@ export function lintCommand(): Command {
         if (opts.json) {
           console.log(JSON.stringify(result, null, 2))
         } else if (result.valid) {
-          console.log('tally.json: ok')
+          console.log('.tally/tally.json: ok')
         } else {
           for (const e of result.errors) {
             console.error(`  ${e.path}: ${e.message}`)

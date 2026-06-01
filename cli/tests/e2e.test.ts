@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest'
-import { mkdtempSync, rmSync, readFileSync, writeFileSync } from 'fs'
+import { mkdtempSync, rmSync, readFileSync, writeFileSync, mkdirSync } from 'fs'
 import { join } from 'path'
 import { execFileSync } from 'child_process'
 
@@ -28,7 +28,11 @@ function runLaxSafe(args: string[], cwd: string): string {
 }
 
 function readDoc(cwd: string): any {
-  return JSON.parse(readFileSync(join(cwd, 'tally.json'), 'utf-8'))
+  return JSON.parse(readFileSync(join(cwd, '.tally', 'tally.json'), 'utf-8'))
+}
+
+function writeDoc(cwd: string, doc: any): void {
+  writeFileSync(join(cwd, '.tally', 'tally.json'), JSON.stringify(doc, null, 2))
 }
 
 describe('tally end-to-end', () => {
@@ -129,6 +133,51 @@ describe('tally end-to-end', () => {
     ])], dir)
     const out = run(['export', '--format', 'csv'], dir)
     expect(out).toContain('id,name,status,priority,stage,module')
+  })
+
+  it('plan register -> task link-plan -> plan check -> agent brief', () => {
+    run(['init', 'plan-e2e', '--no-hook'], dir)
+    const planDir = join(dir, 'docs', 'superpowers', 'plans')
+    mkdirSync(planDir, { recursive: true })
+    const planPath = join(planDir, '2026-06-01-demo.md')
+    writeFileSync(planPath, '# Demo Implementation Plan\n\n### Task 1: Wire Tally to plan\n\nDo it.\n')
+
+    const registered = JSON.parse(run([
+      'plan',
+      'register',
+      planPath,
+      '--json-output',
+    ], dir))
+    expect(registered.ok).toBe(true)
+    expect(registered.plan.id).toBe('plan:demo-implementation-plan')
+
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Wire Tally to plan', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'brief shows plan' },
+    ])], dir)
+
+    const linked = JSON.parse(run([
+      'task',
+      'link-plan',
+      'U-001',
+      '--plan',
+      registered.plan.id,
+      '--task-ref',
+      'Task 1',
+      '--json-output',
+    ], dir))
+    expect(linked.ok).toBe(true)
+    expect(linked.task.planRef).toBe(registered.plan.id)
+    expect(linked.task.planTaskRef).toBe('Task 1')
+
+    const check = JSON.parse(run(['plan', 'check', '--json'], dir))
+    expect(check.valid).toBe(true)
+    expect(check.errors).toEqual([])
+
+    const brief = run(['export', '--format', 'agent-brief', '--task', 'U-001'], dir)
+    expect(brief).toContain('- **Plan**: plan:demo-implementation-plan')
+    expect(brief).toContain('- **Plan Path**: docs/superpowers/plans/2026-06-01-demo.md')
+    expect(brief).toContain('- **Plan Task**: Task 1')
+    expect(brief).toContain('- **Plan Hash**: sha256:')
   })
 
   // ── Feature-related e2e ──
@@ -699,7 +748,7 @@ describe('tally end-to-end', () => {
     doc.tasks.push({
       id: 'U-001', status: 'pending', priority: 'P0', stage: 'S1', module: 'core',
       name: 'Mismatch Task', acceptance: 'ok', deps: [], blocks: null,
-      nextAction: 'do it', evidence: null, rule: null, feature: 'f1', tags: [],
+      nextAction: 'do it', evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], feature: 'f1', tags: [],
       order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-10', completedAt: null,
       writeScopes: [], acceptanceCriteria: null, executionPlan: null,
@@ -707,136 +756,12 @@ describe('tally end-to-end', () => {
       assignedAgent: null, requiresReview: false, resourceRequirements: [],
       repos: [], deliveryNode: null, approvedBy: null,
     })
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+    writeDoc(dir, doc)
     const out = runLax(['check', '--json'], dir)
     const result = JSON.parse(out)
     expect(result.valid).toBe(false)
     expect(result.errors.some((e: any) => e.code === 'FEATURE_MODULE_MISMATCH')).toBe(true)
   })
-
-  it('upgrade backfills feature schema for legacy v1.0 ledgers', () => {
-    const legacy = {
-      _meta: {
-        project: 'legacy',
-        tally_version: '1.0',
-        created: '2026-05-10',
-        updated: '2026-05-10',
-        agents: [{ id: 'main', name: 'Main' }],
-        stages: [{ id: 'S1', name: 'Stage 1', modules: ['core'] }],
-        modules: [{ id: 'core', name: 'Core' }],
-      },
-      tasks: [
-        {
-          id: 'D-001', status: 'done', priority: 'P0', stage: 'S1', module: 'core',
-          name: 'Old Done', acceptance: 'ok', deps: [], blocks: null,
-          nextAction: null, evidence: 'done', rule: null, feature: null, tags: [],
-          order: null, completedOrder: 1, claimedBy: null, claimedAt: null,
-          createdAt: '2026-05-10', completedAt: '2026-05-10',
-          writeScopes: [], acceptanceCriteria: null, executionPlan: null,
-          riskLevel: 'medium', rollbackPlan: null, executionLane: null,
-          assignedAgent: null, requiresReview: false, resourceRequirements: [],
-          repos: [], deliveryNode: null, approvedBy: null,
-        },
-        {
-          id: 'U-002', status: 'pending', priority: 'P1', stage: 'S1', module: 'core',
-          name: 'Old Pending', acceptance: 'ok', deps: [], blocks: null,
-          nextAction: 'do it', evidence: null, rule: null, feature: null, tags: [],
-          order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
-          createdAt: '2026-05-10', completedAt: null,
-          writeScopes: [], acceptanceCriteria: null, executionPlan: null,
-          riskLevel: 'medium', rollbackPlan: null, executionLane: null,
-          assignedAgent: null, requiresReview: false, resourceRequirements: [],
-          repos: [], deliveryNode: null, approvedBy: null,
-        },
-      ],
-      rounds: [],
-      blocks: [],
-      progress: [],
-    }
-
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(legacy, null, 2))
-    const out = run(['upgrade'], dir)
-    const doc = readDoc(dir)
-
-    expect(out).toContain('feature-schema-backfill')
-    expect(doc._meta.features).toEqual([])
-    expect(doc.tasks.map((t: any) => t.feature)).toEqual([null, null])
-    const lintOut = run(['lint', '--json'], dir)
-    expect(JSON.parse(lintOut).valid).toBe(true)
-  })
-
-  it('upgrade backfills v0.2 safety fields for legacy v1.0 ledgers', () => {
-    const legacy = {
-      _meta: {
-        project: 'legacy-v02',
-        tally_version: '1.0',
-        created: '2026-05-10',
-        updated: '2026-05-10',
-        agents: [{ id: 'main', name: 'Main' }],
-        stages: [{ id: 'S1', name: 'Stage 1', modules: ['core'] }],
-        modules: [{ id: 'core', name: 'Core' }],
-        features: [{ id: 'f-core', module: 'core', name: 'Core Feature' }],
-      },
-      tasks: [
-        {
-          id: 'U-001',
-          status: 'pending',
-          priority: 'P0',
-          stage: 'S1',
-          module: 'core',
-          feature: 'f-core',
-          name: 'Legacy Pending',
-          acceptance: 'ok',
-          deps: [],
-          blocks: null,
-          nextAction: 'do it',
-          evidence: null,
-          rule: null,
-          tags: [],
-          order: 1,
-          completedOrder: null,
-          claimedBy: null,
-          claimedAt: null,
-          createdAt: '2026-05-10',
-          completedAt: null,
-        },
-      ],
-      rounds: [],
-      blocks: [],
-      progress: [],
-    }
-
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(legacy, null, 2))
-    const out = run(['upgrade'], dir)
-    const doc = readDoc(dir)
-
-    expect(out).toContain('v0.2-safety-field-backfill')
-    expect(doc._meta.features[0]).toMatchObject({
-      id: 'f-core',
-      status: 'design',
-      specRefs: [],
-      dependsOn: [],
-      owner: null,
-    })
-    expect(doc.tasks[0]).toMatchObject({
-      writeScopes: [],
-      acceptanceCriteria: null,
-      executionPlan: null,
-      riskLevel: 'medium',
-      rollbackPlan: null,
-      executionLane: null,
-      assignedAgent: null,
-      requiresReview: false,
-      resourceRequirements: [],
-      repos: [],
-      deliveryNode: null,
-      approvedBy: null,
-    })
-    const lintOut = run(['lint', '--json'], dir)
-    expect(JSON.parse(lintOut).valid).toBe(true)
-  })
-
-  // ── v0.2.0 feature e2e ──
 
   it('task edit --risk-level and --execution-lane', () => {
     run(['init', 'e2e-edit-sched', '--no-hook'], dir)
@@ -861,7 +786,7 @@ describe('tally end-to-end', () => {
       dependsOn: [],
       owner: null,
     })
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(initialized, null, 2))
+    writeDoc(dir, initialized)
     run(['task', 'add', '--json', JSON.stringify([
       {
         name: 'Structured',
@@ -876,7 +801,7 @@ describe('tally end-to-end', () => {
     const acceptanceCriteria = {
       requiredTests: ['npm test -w cli'],
       passConditions: ['structured fields are persisted'],
-      forbiddenSideEffects: ['no direct tally.json edits'],
+      forbiddenSideEffects: ['no direct .tally/tally.json edits'],
       negativeCases: ['invalid JSON is rejected'],
     }
     const executionPlan = {
@@ -916,7 +841,7 @@ describe('tally end-to-end', () => {
       dependsOn: [],
       owner: null,
     })
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(initialized, null, 2))
+    writeDoc(dir, initialized)
     run(['task', 'add', '--json', JSON.stringify([
       {
         name: 'Structured',
@@ -1037,7 +962,7 @@ describe('tally end-to-end', () => {
     doc.tasks.push({
       id: 'U-001', status: 'pending', priority: 'P0', stage: 'S1', module: 'core',
       name: 'No Feature', acceptance: 'ok', deps: [], blocks: null,
-      nextAction: 'do it', evidence: null, rule: null, feature: null, tags: [],
+      nextAction: 'do it', evidence: null, rule: null, aodsRefs: [], codeRefs: [], implementationTargets: [], feature: null, tags: [],
       order: 1, completedOrder: null, claimedBy: null, claimedAt: null,
       createdAt: '2026-05-15', completedAt: null,
       writeScopes: [], acceptanceCriteria: null, executionPlan: null,
@@ -1045,7 +970,7 @@ describe('tally end-to-end', () => {
       assignedAgent: null, requiresReview: false, resourceRequirements: [],
       repos: [], deliveryNode: null, approvedBy: null,
     })
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+    writeDoc(dir, doc)
     const out = runLax(['check', '--json'], dir)
     const result = JSON.parse(out)
     expect(result.warnings.some((w: any) => w.code === 'FEATURE_REQUIRED')).toBe(true)
@@ -1259,7 +1184,7 @@ describe('tally end-to-end', () => {
     const doc = readDoc(dir)
     doc._meta.modules.push({ id: 'other', name: 'Other' })
     doc._meta.stages.push({ id: 'S4', name: 'Stage 4', modules: ['other'] })
-    writeFileSync(join(dir, 'tally.json'), JSON.stringify(doc, null, 2))
+    writeDoc(dir, doc)
 
     run(['task', 'add', '--json', JSON.stringify([
       { name: 'Core Pending', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },

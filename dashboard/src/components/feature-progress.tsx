@@ -89,7 +89,7 @@ export default function FeatureProgress({ features, tasks }: FeatureProgressProp
           <div>
             <p className="sk-body" style={{ fontSize: 13, color: 'var(--ink-3)' }}>暂无功能数据</p>
             <p className="sk-body" style={{ fontSize: 11, color: 'var(--ink-4)', marginTop: 4 }}>
-              在 <code className="sk-mono" style={{ fontSize: 11 }}>tally.json</code> 的 <code className="sk-mono" style={{ fontSize: 11 }}>_meta.features</code> 中注册功能模块
+              在 <code className="sk-mono" style={{ fontSize: 11 }}>.tally/tally.json</code> 的 <code className="sk-mono" style={{ fontSize: 11 }}>_meta.features</code> 中注册功能模块
             </p>
           </div>
         </CardContent>
