@@ -2,6 +2,7 @@ import { Command } from 'commander'
 import { readLedger, ledgerPath } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
 import { lintDocument } from '../schema.js'
+import { summarizeEvidenceRepair } from '../evidence.js'
 import type { TallyDocument } from '../types.js'
 
 // Versioned migrations only. Tally no longer backfills pre-current ledger shapes.
@@ -58,6 +59,13 @@ export function upgradeCommand(): Command {
           console.error('.tally/tally.json has lint errors. Fix them before upgrading:')
           for (const e of preLint.errors) {
             console.error(`  ${e.path}: ${e.message}`)
+          }
+          const repair = summarizeEvidenceRepair(doc)
+          if (repair.missingDoneEvidence > 0 && repair.suggestedAction) {
+            console.error('')
+            console.error(`Missing evidence repair: ${repair.missingDoneEvidence} done task(s) need evidence backfill.`)
+            console.error(`Review evidence gaps: ${repair.missingReviewEvidence} done task(s).`)
+            console.error(`Suggested action: ${repair.suggestedAction}`)
           }
           process.exit(3)
         }

@@ -3,6 +3,7 @@ import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
 import { writeLedger } from '../ledger-writer.js'
 import type { AcceptanceCriteria, ExecutionPlan, Task, TallyDocument } from '../types.js'
+import { backfillTaskEvidence, buildStructuredEvidence } from '../evidence.js'
 import { loadTemplate, applyTemplate } from './template.js'
 
 // ── Helpers ──
@@ -927,14 +928,7 @@ export function taskCommand(): Command {
     .action((ids: string[], opts: { evidence: string; rule?: string; test?: string; commit?: string; review?: string; provider?: string; notes?: string; forbidden?: boolean; jsonOutput?: boolean }) => {
       wrapAction({ json: opts.jsonOutput }, () => {
         const doc = readLedger()
-        // Build structured evidence string from flags
-        const parts: string[] = [opts.evidence]
-        if (opts.test) parts.push(`[test: ${opts.test}]`)
-        if (opts.commit) parts.push(`[commit: ${opts.commit}]`)
-        if (opts.review) parts.push(`[review: ${opts.review}]`)
-        if (opts.provider) parts.push(`[provider: ${opts.provider}]`)
-        if (opts.notes) parts.push(`[notes: ${opts.notes}]`)
-        const evidence = parts.join(' ')
+        const evidence = buildStructuredEvidence(opts)
         const results = markTasksDone(doc, ids, evidence, opts.rule, opts.forbidden === false)
         writeLedger(doc)
 
@@ -952,6 +946,67 @@ export function taskCommand(): Command {
           console.log(`Marked ${results.length} task(s) as done:`)
           for (const r of results) {
             console.log(`  ${r.originalId} as done → ${r.doneAlias}: ${r.task.name}`)
+          }
+        }
+      })
+    })
+
+  // tally task evidence <id...> --evidence "..." [--append|--replace]
+  cmd.command('evidence')
+    .description('Backfill or intentionally update evidence for completed tasks')
+    .argument('<id...>', 'Done task IDs to update')
+    .requiredOption('--evidence <evidence>', 'Evidence text to record')
+    .option('--test <test>', 'Test results or test command output')
+    .option('--commit <commit>', 'Commit SHA or reference')
+    .option('--review <review>', 'Review reference or reviewer')
+    .option('--provider <provider>', 'Provider/model/usage evidence')
+    .option('--notes <notes>', 'Additional evidence notes')
+    .option('--no-forbidden', 'Confirm no forbidden side effects were triggered')
+    .option('--append', 'Append to existing evidence')
+    .option('--replace', 'Replace existing evidence')
+    .option('--allow-missing-review', 'Allow requiresReview done tasks without [review:] evidence')
+    .option('--json-output', 'Output result/errors as JSON')
+    .action((ids: string[], opts: {
+      evidence: string
+      test?: string
+      commit?: string
+      review?: string
+      provider?: string
+      notes?: string
+      forbidden?: boolean
+      append?: boolean
+      replace?: boolean
+      allowMissingReview?: boolean
+      jsonOutput?: boolean
+    }) => {
+      wrapAction({ json: opts.jsonOutput }, () => {
+        const doc = readLedger()
+        const evidence = buildStructuredEvidence({
+          ...opts,
+          noForbidden: opts.forbidden === false,
+        })
+        const results = backfillTaskEvidence(doc, ids, evidence, {
+          append: opts.append,
+          replace: opts.replace,
+          allowMissingReview: opts.allowMissingReview,
+        })
+        writeLedger(doc)
+
+        if (opts.jsonOutput) {
+          console.log(JSON.stringify({
+            ok: true,
+            updated: results.map((r) => ({
+              id: r.task.id,
+              name: r.task.name,
+              action: r.action,
+              previousEvidence: r.previousEvidence,
+              evidence: r.evidence,
+            })),
+          }))
+        } else {
+          console.log(`Updated evidence for ${results.length} task(s):`)
+          for (const r of results) {
+            console.log(`  ${r.task.id} ${r.action}: ${r.task.name}`)
           }
         }
       })

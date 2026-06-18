@@ -17,9 +17,10 @@ import { auditCommand } from './commands/audit.js'
 import { featureCommand } from './commands/feature.js'
 import { moduleCommand } from './commands/module.js'
 import { stageCommand } from './commands/stage.js'
+import { repairCommand } from './commands/repair.js'
 
 const program = new Command()
-program.name('tally').description('Agent-native task management').version('0.5.0')
+program.name('tally').description('Agent-native task management').version('0.6.0')
 
 program.addCommand(initCommand())
 program.addCommand(lintCommand())
@@ -35,6 +36,7 @@ program.addCommand(planCommand())
 program.addCommand(syncCommand())
 program.addCommand(graphCommand())
 program.addCommand(upgradeCommand())
+program.addCommand(repairCommand())
 program.addCommand(migrateCommand())
 program.addCommand(auditCommand())
 program.addCommand(dashboardCommand())

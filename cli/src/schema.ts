@@ -1,7 +1,8 @@
 // cli/src/schema.ts
 
 import Ajv from 'ajv/dist/2020.js'
-import type { CheckError, CheckResult, LintError, LintResult } from './types.js'
+import type { CheckError, CheckResult, LintError, LintResult, TallyDocument } from './types.js'
+import { summarizeEvidenceRepair } from './evidence.js'
 
 // ── JSON Schema ──
 
@@ -822,6 +823,9 @@ export function lintDocument(doc: unknown): LintResult {
   return {
     valid: errors.length === 0,
     errors,
+    evidenceRepair: record != null && typeof record === 'object'
+      ? summarizeEvidenceRepair(record as unknown as TallyDocument)
+      : undefined,
   }
 }
 
@@ -840,10 +844,12 @@ export function validateDocument(doc: unknown): CheckResult {
     path: e.path,
   }))
   const warnings: CheckError[] = []
+  let evidenceRepair = lintResult.evidenceRepair
 
   // Only run semantic checks if the document has the right shape
   const record = doc as Record<string, unknown> | null | undefined
   if (record != null && typeof record === 'object') {
+    evidenceRepair = summarizeEvidenceRepair(record as unknown as TallyDocument)
     const tasksRaw = safeGet(record, 'tasks')
     const roundsRaw = safeGet(record, 'rounds')
     const blocksRaw = safeGet(record, 'blocks')
@@ -1165,5 +1171,6 @@ export function validateDocument(doc: unknown): CheckResult {
     valid: checkErrors.length === 0,
     errors: checkErrors,
     warnings,
+    evidenceRepair,
   }
 }

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Tally Use"
+  short_description: "Manage Tally task ledgers safely from Codex."
+  default_prompt: "Use Tally to inspect this project's task ledger and choose the next safe CLI action."

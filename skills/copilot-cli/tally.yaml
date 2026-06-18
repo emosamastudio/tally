@@ -1,5 +1,5 @@
 name: tally
-version: "0.5.0"
+version: "0.6.0"
 description: Agent-native task management with CLI-driven ledger, round discipline, auto-retry, auto-next, JSON error output, and visualization
 commands:
   - tally status
@@ -10,6 +10,7 @@ commands:
   - tally round report
   - tally task add
   - tally task done
+  - tally task evidence
   - tally task edit
   - tally task block
   - tally task unblock
@@ -26,6 +27,8 @@ commands:
   - tally dashboard
   - tally init
   - tally upgrade
+  - tally audit evidence
+  - tally repair missing-evidence
   - tally migrate
 rules:
   - Never edit .tally/tally.json directly -- always use CLI
@@ -36,6 +39,8 @@ rules:
   - High/critical risk tasks need rollback plan and review flag
   - Round start validates write scopes, risk gates, feature freeze, and approval
   - Use structured evidence on task done (--test, --commit, --review, --provider, --notes)
+  - Use tally task evidence or tally repair missing-evidence only for honest historical evidence backfill on done tasks
+  - Never overwrite existing done-task evidence without explicit --append or --replace
   - Use tally plan check before executing tasks linked to implementation plans
   - Choose round strategy wisely: feature-focused for cohesion, risk-first for priority, parallel-max for throughput
 round_strategies:
@@ -63,5 +68,16 @@ feature_registry:
   statuses: [design, contract_frozen, implementing, stable]
 structured_evidence:
   flags: [--evidence, --test, --commit, --review, --provider, --notes]
+historical_evidence_repair:
+  commands: [tally audit evidence, tally task evidence, tally repair missing-evidence]
+  dry_run: tally repair missing-evidence --dry-run --json
+  safety:
+    - only_done_tasks
+    - no_default_overwrite
+    - no_completion_fact_changes
+    - requires_review_needs_review_flag_or_allow_missing_review
+  honest_evidence_examples:
+    test: not rerun during repair
+    review: missing prior review evidence recorded
 export_formats: [json, csv, markdown, agent-brief]
 graph_levels: [task, feature]

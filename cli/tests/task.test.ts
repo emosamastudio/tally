@@ -2,6 +2,11 @@
 import { describe, it, expect } from 'vitest'
 import type { TallyDocument } from '../src/types.js'
 import {
+  backfillTaskEvidence,
+  buildStructuredEvidence,
+  summarizeEvidenceRepair,
+} from '../src/evidence.js'
+import {
   today,
   nextTaskId,
   nextOrder,
@@ -179,6 +184,102 @@ describe('nextCompletedOrder', () => {
     doc.tasks[0].status = 'done'
     doc.tasks[0].completedOrder = 5
     expect(nextCompletedOrder(doc)).toBe(6)
+  })
+})
+
+describe('evidence backfill helpers', () => {
+  function doneWithoutEvidence(doc: TallyDocument, id = 'D-001') {
+    const task = doc.tasks[0]
+    task.id = id
+    task.status = 'done'
+    task.evidence = null
+    task.nextAction = null
+    task.order = null
+    task.completedOrder = 1
+    task.completedAt = '2026-05-11'
+    return task
+  }
+
+  it('builds structured evidence with the same tags used by task done', () => {
+    const evidence = buildStructuredEvidence({
+      evidence: 'Backfilled historical completion',
+      test: 'not rerun during repair',
+      commit: 'abc123',
+      review: 'historical review missing',
+      provider: 'codex',
+      notes: 'import cleanup',
+      noForbidden: true,
+    })
+    expect(evidence).toBe('Backfilled historical completion [test: not rerun during repair] [commit: abc123] [review: historical review missing] [provider: codex] [notes: import cleanup] [no-forbidden: confirmed]')
+  })
+
+  it('fills missing evidence on done tasks without changing completion facts', () => {
+    const doc = validDoc()
+    const task = doneWithoutEvidence(doc)
+    const before = {
+      status: task.status,
+      completedAt: task.completedAt,
+      completedOrder: task.completedOrder,
+      order: task.order,
+      nextAction: task.nextAction,
+      deps: [...task.deps],
+    }
+
+    const [result] = backfillTaskEvidence(doc, ['D-001'], 'historical [test: not rerun]')
+
+    expect(result.action).toBe('filled')
+    expect(task.evidence).toBe('historical [test: not rerun]')
+    expect({
+      status: task.status,
+      completedAt: task.completedAt,
+      completedOrder: task.completedOrder,
+      order: task.order,
+      nextAction: task.nextAction,
+      deps: task.deps,
+    }).toEqual(before)
+  })
+
+  it('rejects evidence backfill for non-done tasks', () => {
+    const doc = validDoc()
+    expect(() => backfillTaskEvidence(doc, ['U-001'], 'evidence')).toThrow('only supports done tasks')
+  })
+
+  it('refuses to overwrite existing evidence unless append or replace is explicit', () => {
+    const doc = validDoc()
+    const task = doneWithoutEvidence(doc)
+    task.evidence = 'original [test: old]'
+
+    expect(() => backfillTaskEvidence(doc, ['D-001'], 'new')).toThrow('already has evidence')
+    expect(backfillTaskEvidence(doc, ['D-001'], '[notes: appended]', { append: true })[0].evidence)
+      .toBe('original [test: old] [notes: appended]')
+    expect(backfillTaskEvidence(doc, ['D-001'], 'replacement [test: new]', { replace: true })[0].evidence)
+      .toBe('replacement [test: new]')
+  })
+
+  it('requires review evidence for requiresReview tasks unless explicitly allowed', () => {
+    const doc = validDoc()
+    const task = doneWithoutEvidence(doc)
+    task.requiresReview = true
+
+    expect(() => backfillTaskEvidence(doc, ['D-001'], 'historical [test: not rerun]'))
+      .toThrow('requires review evidence')
+
+    backfillTaskEvidence(doc, ['D-001'], 'historical [test: not rerun] [review: review gap recorded]')
+    expect(task.evidence).toContain('[review: review gap recorded]')
+  })
+
+  it('summarizes missing done evidence and missing review evidence', () => {
+    const doc = validDoc()
+    const task = doneWithoutEvidence(doc)
+    task.requiresReview = true
+
+    const summary = summarizeEvidenceRepair(doc)
+
+    expect(summary.missingDoneEvidence).toBe(1)
+    expect(summary.missingReviewEvidence).toBe(1)
+    expect(summary.taskIds).toEqual(['D-001'])
+    expect(summary.reviewTaskIds).toEqual(['D-001'])
+    expect(summary.suggestedAction).toContain('tally repair missing-evidence')
   })
 })
 

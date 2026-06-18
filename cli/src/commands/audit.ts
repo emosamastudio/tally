@@ -1,6 +1,7 @@
 // cli/src/commands/audit.ts
 import { Command } from 'commander'
 import { readLedger } from '../ledger-reader.js'
+import { summarizeEvidenceRepair } from '../evidence.js'
 import type { TallyDocument } from '../types.js'
 
 export interface AuditResult {
@@ -87,6 +88,34 @@ export function auditCommand(): Command {
           }
           if (result.missing.length === 0) {
             console.log('  (all tasks have complete metadata)')
+          }
+        }
+      } catch (e) {
+        console.error((e as Error).message)
+        process.exit(1)
+      }
+    })
+
+  cmd.command('evidence')
+    .description('Summarize done tasks with missing evidence or review evidence')
+    .option('--json', 'Output as JSON')
+    .action((opts: { json?: boolean }) => {
+      try {
+        const doc = readLedger()
+        const result = summarizeEvidenceRepair(doc)
+        if (opts.json) {
+          console.log(JSON.stringify(result, null, 2))
+        } else {
+          console.log(`Missing done evidence: ${result.missingDoneEvidence} task(s)`)
+          console.log(`Missing review evidence: ${result.missingReviewEvidence} task(s)`)
+          if (result.taskIds.length > 0) {
+            console.log(`Tasks: ${result.taskIds.join(', ')}`)
+          }
+          if (result.reviewTaskIds.length > 0) {
+            console.log(`Review gaps: ${result.reviewTaskIds.join(', ')}`)
+          }
+          if (result.suggestedAction) {
+            console.log(`Suggested action: ${result.suggestedAction}`)
           }
         }
       } catch (e) {

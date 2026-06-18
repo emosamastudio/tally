@@ -100,6 +100,7 @@ The rule of thumb: if an agent needs to know exactly how to implement something,
 | `tally task add` | Add one or more new tasks (JSON) |
 | `tally task edit <id>` | Modify task fields (14+ fields supported) |
 | `tally task done <ids...>` | Mark tasks as done with structured evidence (--test, --commit, --review, --no-forbidden) |
+| `tally task evidence <ids...>` | Backfill or intentionally append/replace evidence on done tasks only |
 | `tally task block <ids...>` | Block tasks with a reason |
 | `tally task unblock <ids...>` | Unblock tasks |
 | `tally task show <id>` | Show full task detail with quality score |
@@ -116,6 +117,8 @@ The rule of thumb: if an agent needs to know exactly how to implement something,
 | `tally round close` | Close round (--auto-next, --integrate, --json) |
 | `tally round context` | Agent state for session restoration |
 | `tally audit backlog` | Find tasks missing specified fields |
+| `tally audit evidence` | Count done tasks missing evidence or review evidence |
+| `tally repair missing-evidence` | Backfill null evidence on historical done tasks |
 | `tally export` | Export (json, csv, markdown, agent-brief) |
 | `tally graph` | Dependency graph (--level task\|feature) |
 | `tally dashboard` | Start the dashboard HTTP server |
@@ -194,6 +197,43 @@ tally task done U-001 \
   --notes "Edge case handled in U-005"
 ```
 
+## Historical Evidence Repair
+
+Use `task evidence` or `repair missing-evidence` only for preserving historical ledger state when old/imported done tasks are missing evidence. Phrase evidence honestly: record what is being backfilled, and do not imply fresh tests, commits, or review approvals happened during repair unless they actually did.
+
+Backfill selected completed tasks:
+
+```bash
+tally task evidence D-006 D-007 \
+  --evidence "Backfilled missing historical completion evidence" \
+  --test "not rerun during repair" \
+  --commit "abc1234" \
+  --review "missing prior review evidence recorded" \
+  --no-forbidden \
+  --json-output
+```
+
+Repair every done task with `evidence: null`:
+
+```bash
+tally repair missing-evidence --dry-run --json
+
+tally repair missing-evidence \
+  --evidence "Historical completion imported before evidence enforcement" \
+  --test "not rerun during repair" \
+  --commit "abc1234" \
+  --review "missing prior review evidence recorded" \
+  --no-forbidden
+```
+
+Safety rules:
+
+- Only `status: done` tasks can receive evidence through these repair paths.
+- Existing evidence is preserved unless `--append` or `--replace` is explicit.
+- Completion facts such as status, order, dependencies, and completion timestamps are not changed.
+- Done tasks with `requiresReview: true` require `--review` unless `--allow-missing-review` is explicit.
+- `tally lint --json`, `tally check --json`, `tally audit evidence --json`, and `tally upgrade` report repair guidance for missing done evidence.
+
 ## Multi-Agent Setup
 
 Tally supports multiple agents working on the same ledger. Each agent sets its identity via environment variable:
@@ -222,7 +262,7 @@ If a round start fails due to a claim conflict, re-read `.tally/tally.json`, adj
 
 See `standard/templates/tally-schema.md` for the full data model reference.
 
-Key task fields (v0.5.0):
+Key task fields (v0.6.0):
 
 | Category | Fields |
 |----------|--------|
@@ -240,12 +280,25 @@ npm install
 # Build both CLI and dashboard
 npm run build
 
-# Run tests (336 tests)
+# Run tests (346 tests)
 npm test
 
 # Coverage report
 npx vitest run --coverage
 ```
+
+## Release Discipline
+
+Every Tally release must update the agent skill files when CLI behavior, ledger schema, config shape, dashboard behavior, or recommended agent workflow changes.
+
+Required release checks:
+
+- Update `skills/codex/tally-use/SKILL.md`, which is the canonical Codex `tally-use` skill.
+- Update `skills/claude-code/skill.json` so `skill_version` and `aligned_release` match the release.
+- Update `skills/claude-code/tally.md` for Claude Code compatibility.
+- Update `skills/copilot-cli/tally.yaml` with the same command and workflow changes.
+- Mention skill-facing changes in `CHANGELOG.md`.
+- If using the skill locally with Codex, sync `skills/codex/tally-use/SKILL.md` to `~/.codex/skills/tally-use/SKILL.md`.
 
 ## Project Structure
 
@@ -264,6 +317,7 @@ tally/
 ├── dashboard/              # Web dashboard (React + Vite + Recharts)
 │   └── src/
 ├── skills/                 # Agent integration files
+│   ├── codex/              # Codex skill
 │   ├── claude-code/        # Claude Code skill
 │   └── copilot-cli/        # Copilot CLI skill
 ├── standard/               # Standard documents

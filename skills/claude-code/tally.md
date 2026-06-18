@@ -46,6 +46,8 @@ tally export --format agent-brief --task U-001
    - Preview: `tally round start --dry-run --auto-retry --json`
    - Start: `tally round start "scope" --auto-retry --json`
    - Done: `tally task done <ids> --evidence "..." --test "..." --commit "..." --no-forbidden`
+   - Backfill done evidence: `tally task evidence <done-ids> --evidence "..." --test "..." --commit "..." --review "..." --no-forbidden --json-output`
+   - Repair missing historical evidence: `tally repair missing-evidence --dry-run --json` then `tally repair missing-evidence --evidence "..." --test "..." --commit "..." --review "..." --no-forbidden --json`
    - Batch create: `tally task add --template plan.json`
    - Register plan: `tally plan register docs/superpowers/plans/<plan>.md --json-output`
    - Link plan: `tally task link-plan <id> --plan <plan-id> --task-ref "<ref>" --json-output`
@@ -95,6 +97,28 @@ Done tasks scored 0-100:
 
 Drift warnings (`tally check`):
 `DRIFT_NO_COMMIT`, `DRIFT_NO_REVIEW`, `DRIFT_NO_EVIDENCE`, `DRIFT_NO_PROVIDER`, `DRIFT_LOW_QUALITY`
+
+## Historical Evidence Repair
+
+Use repair commands only when a historical/imported ledger has `status: done` tasks with missing evidence. Keep wording honest: "not rerun during repair" means no fresh test proof was produced, and "missing prior review evidence recorded" is not a new approval.
+
+```bash
+tally audit evidence --json
+tally repair missing-evidence --dry-run --json
+tally repair missing-evidence \
+  --evidence "Historical completion imported before evidence enforcement" \
+  --test "not rerun during repair" \
+  --commit "abc123" \
+  --review "missing prior review evidence recorded" \
+  --no-forbidden \
+  --json
+```
+
+Safety rules:
+- `tally task evidence` only updates done tasks.
+- Existing evidence requires explicit `--append` or `--replace`.
+- Repair does not change status, order, dependencies, next action, or completion timestamps.
+- `requiresReview: true` done tasks require `--review` unless `--allow-missing-review` is explicit.
 
 ## Batch Template
 

@@ -922,6 +922,109 @@ describe('tally end-to-end', () => {
     expect(done.evidence).toContain('[commit: abc123]')
   })
 
+  it('task evidence backfills done task evidence and returns JSON', () => {
+    run(['init', 'e2e-backfill', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Historical Done', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'temporary'], dir)
+    const doc = readDoc(dir)
+    const task = doc.tasks[0]
+    task.evidence = null
+    writeDoc(dir, doc)
+
+    const out = run([
+      'task', 'evidence', 'D-001',
+      '--evidence', 'Backfilled historical completion',
+      '--test', 'not rerun during repair',
+      '--commit', 'abc123',
+      '--json-output',
+    ], dir)
+    const result = JSON.parse(out)
+    const repaired = readDoc(dir).tasks[0]
+
+    expect(result.ok).toBe(true)
+    expect(result.updated[0].action).toBe('filled')
+    expect(repaired.evidence).toContain('[test: not rerun during repair]')
+    expect(repaired.evidence).toContain('[commit: abc123]')
+    expect(repaired.status).toBe('done')
+    expect(repaired.completedOrder).toBe(1)
+  })
+
+  it('task evidence rejects non-done tasks and protects existing evidence', () => {
+    run(['init', 'e2e-backfill-reject', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Pending Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+      { name: 'Done Task', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-002', '--evidence', 'original [test: ok]'], dir)
+
+    expect(runLaxSafe(['task', 'evidence', 'U-001', '--evidence', 'bad'], dir)).toContain('only supports done tasks')
+    expect(runLaxSafe(['task', 'evidence', 'D-002', '--evidence', 'bad'], dir)).toContain('already has evidence')
+
+    run(['task', 'evidence', 'D-002', '--evidence', '[notes: preserved]', '--append'], dir)
+    expect(readDoc(dir).tasks.find((t: any) => t.id === 'D-002').evidence)
+      .toBe('original [test: ok] [notes: preserved]')
+
+    run(['task', 'evidence', 'D-002', '--evidence', 'replacement [test: ok]', '--replace'], dir)
+    expect(readDoc(dir).tasks.find((t: any) => t.id === 'D-002').evidence)
+      .toBe('replacement [test: ok]')
+  })
+
+  it('repair missing-evidence supports dry-run, batch repair, lint, and strict check', () => {
+    run(['init', 'e2e-repair', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Done A', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok', writeScopes: ['src/a.ts'] },
+      { name: 'Done B', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok', requiresReview: true },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'temporary'], dir)
+    run(['task', 'done', 'U-002', '--evidence', 'temporary'], dir)
+    const doc = readDoc(dir)
+    for (const task of doc.tasks) task.evidence = null
+    writeDoc(dir, doc)
+
+    const dryRun = JSON.parse(run([
+      'repair', 'missing-evidence',
+      '--dry-run',
+      '--json',
+    ], dir))
+    expect(dryRun.dryRun).toBe(true)
+    expect(dryRun.repair.missingDoneEvidence).toBe(2)
+    expect(dryRun.evidence).toBeNull()
+
+    const repaired = JSON.parse(run([
+      'repair', 'missing-evidence',
+      '--evidence', 'Historical completion imported before evidence enforcement',
+      '--test', 'not rerun during repair',
+      '--commit', 'abc123',
+      '--review', 'missing prior review evidence recorded',
+      '--json',
+    ], dir))
+    expect(repaired.repaired).toHaveLength(2)
+    expect(JSON.parse(run(['lint', '--json'], dir)).valid).toBe(true)
+    expect(JSON.parse(run(['check', '--strict', '--json'], dir)).failed).toBe(false)
+  })
+
+  it('audit and upgrade report repair guidance for missing done evidence', () => {
+    run(['init', 'e2e-guidance', '--no-hook'], dir)
+    run(['task', 'add', '--json', JSON.stringify([
+      { name: 'Done Missing', stage: 'S1', module: 'core', priority: 'P0', acceptance: 'ok' },
+    ])], dir)
+    run(['task', 'done', 'U-001', '--evidence', 'temporary'], dir)
+    const doc = readDoc(dir)
+    doc._meta.tally_version = '0.9'
+    doc.tasks[0].evidence = null
+    writeDoc(dir, doc)
+
+    const audit = JSON.parse(run(['audit', 'evidence', '--json'], dir))
+    expect(audit.missingDoneEvidence).toBe(1)
+    expect(audit.suggestedAction).toContain('tally repair missing-evidence')
+
+    const upgrade = runLaxSafe(['upgrade'], dir)
+    expect(upgrade).toContain('Missing evidence repair: 1 done task')
+    expect(upgrade).toContain('tally repair missing-evidence')
+  })
+
   it('graph --level feature outputs feature graph', () => {
     run(['init', 'e2e-fgraph', '--no-hook'], dir)
     run(['task', 'add', '--json', JSON.stringify([

@@ -1,5 +1,26 @@
 # Changelog
 
+## 0.6.0 - 2026-06-18
+
+### Added
+
+- Added a Codex-native `skills/codex/tally-use/SKILL.md` skill generated with the official Codex skill structure.
+- Added `tally task evidence <ids...>` to safely backfill, append, or replace evidence on completed tasks without changing completion facts.
+- Added `tally repair missing-evidence` with `--dry-run --json` for historical ledgers that contain done tasks with `evidence: null`.
+- Added `tally audit evidence` and JSON repair summaries from `lint`/`check` for missing done evidence and missing review evidence.
+
+### Changed
+
+- Documented that each release must update the Codex, Claude Code, and Copilot CLI skill files together when agent-facing behavior changes.
+- `tally upgrade` now reports a suggested repair command when missing done evidence blocks an upgrade.
+- Updated Codex, Claude Code, and Copilot skill files with honest historical evidence repair guidance.
+
+### Validation
+
+- `npm run build -w cli` passed.
+- `npm test -w cli` passed.
+- CLI test suite: 8 test files, 346 tests.
+
 ## 0.5.0 - 2026-06-01
 
 ### Added

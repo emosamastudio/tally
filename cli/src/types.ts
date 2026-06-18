@@ -211,6 +211,7 @@ export interface TallyConfig {
 export interface LintResult {
   valid: boolean
   errors: LintError[]
+  evidenceRepair?: EvidenceRepairSummary
 }
 
 export interface LintError {
@@ -222,12 +223,21 @@ export interface CheckResult {
   valid: boolean
   errors: CheckError[]
   warnings: CheckError[]
+  evidenceRepair?: EvidenceRepairSummary
 }
 
 export interface CheckError {
   code: string
   message: string
   path?: string
+}
+
+export interface EvidenceRepairSummary {
+  missingDoneEvidence: number
+  missingReviewEvidence: number
+  taskIds: string[]
+  reviewTaskIds: string[]
+  suggestedAction: string | null
 }
 
 export interface FeatureBreakdown {
